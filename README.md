@@ -1,6 +1,6 @@
 <p align="center">
   <img src="https://github.com/openpeeps/boogie/blob/main/.github/boogie.png" width="100px"><br>
-  A stupid simple WAL-based embedded database in Nim<br>
+  A stupid simple WAL-based embedded database in Nim 👑<br>
 </p>
 
 <p align="center">
@@ -22,6 +22,9 @@
 
 >[!NOTE]
 > Boogie is an experimental project mostly made with the chatbot for fun and learning. It is still in early stages, so expect data loss and breaking changes. Use at your own risk.
+
+>[!NOTE]
+> Fun fact, this package is using [pkg/rbtree](https://github.com/Nycto/RBTreeNim), a 11-year-old Nim package that implements a red-black tree. It is a great example of how the Nim ecosystem has some hidden gems that can be used in new projects. 📦
 
 ## Examples
 Check the [tests](https://github.com/openpeeps/boogie/tree/main/src/boogie/tests) for more examples.
