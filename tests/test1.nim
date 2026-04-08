@@ -344,7 +344,7 @@ suite "WAL functions tests":
     echo "Recovered rows: ", count
     check count == N
 
-suite "Other examples"
+suite "Other examples":
   test "basic create + insert + query flow with WAL":
     var db = newStore("tests" / "data" / "myboogie.db", StorageMode.smDisk,
                 enableWal = true, walFlushEveryOps = 100'u32)
