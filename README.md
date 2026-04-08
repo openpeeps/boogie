@@ -13,7 +13,7 @@
 </p>
 
 ## 😍 Key Features
-- Red-black tree ordered storage of rows and Hash Tables for fast lookups
+- BTrees storage and Hash Tables for fast lookups
 - Write-ahead log (WAL) for durability and crash recovery
 - Simple API for inserting, updating, deleting, and querying records
 - Configurable options for performance tuning, such as batch sizes and flush intervals
@@ -22,9 +22,6 @@
 
 >[!NOTE]
 > Boogie is an experimental project mostly made with the chatbot for fun and learning. It is still in early stages, so expect data loss and breaking changes. Use at your own risk.
-
->[!NOTE]
-> Fun fact, this package is using [pkg/rbtree](https://github.com/Nycto/RBTreeNim), a 11-year-old Nim package that implements a red-black tree. It is a great example of how the Nim ecosystem has some hidden gems that can be used in new projects. 📦
 
 This can be used as a simple embedded database for your Nim applications. If you want, you can use [openpeeps/e2ee](https://github.com/openpeeps/e2ee) to encrypt the data before inserting it into Boogie database.
 

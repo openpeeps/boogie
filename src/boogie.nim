@@ -4,7 +4,7 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/boogie
 
-import pkg/rbtree
+import pkg/sorta
 import ./boogie/[store, wal]
 
-export rbtree, store, wal
+export sorta, store, wal

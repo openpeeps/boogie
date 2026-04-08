@@ -7,7 +7,7 @@
 import std/[tables, options, strformat,
             json, strutils, os, sets]
 
-import pkg/[flatty, rbtree]
+import pkg/[flatty, sorta]
 import ./wal
 
 ## This module implements a simple WAL-based embedded database for Nim.
@@ -66,7 +66,7 @@ type
     pk: string
     cols: RowData
 
-  RowIndex* = RedBlackTree[RowRecord, string]
+  RowIndex* = SortedTable[RowRecord, string]
     ## An ordered index of rows in a table, keyed by primary key value. This allows for efficient
     ## ordered iteration and range queries.
 
@@ -142,7 +142,7 @@ proc cmp(a, b: RowRecord): int = cmp(a.pk, b.pk)
 proc extract(r: RowRecord): string = r.pk
 
 proc `==`*(a, b: RowRecord): bool =
-  ## Equality comp for RowRecord. Used by the RBTree to determine
+  ## Equality comp for RowRecord. Used by the SortedTable to determine
   ## if two records are the same. We consider two records equal if
   ## their primary keys are equal, since the primary key is the unique
   ## identifier for a row.
@@ -268,7 +268,7 @@ proc newTable*(name: string, primaryKey: string, columns: openArray[ColumnDef],
       pkSequence: 0'u64,
       columns: colsSeq,
       columnsByName: colsByName,
-      rows: newRBTree[RowRecord, string](),
+      rows: initSortedTable[RowRecord, string](),
     )
   else:
     DbTable(
@@ -277,7 +277,7 @@ proc newTable*(name: string, primaryKey: string, columns: openArray[ColumnDef],
       pkType: pkmManual,
       columns: colsSeq,
       columnsByName: colsByName,
-      rows: newRBTree[RowRecord, string](),
+      rows: initSortedTable[RowRecord, string](),
     )
 
 proc newColumn*(name: string, kind: DataType, nullable: bool): ColumnDef =
@@ -527,9 +527,9 @@ proc ensureOrderIndex(t: DbTable) =
   # be called before any operation that requires ordered access to rows.
   if not t.orderIndexDirty:
     return
-  t.rows = newRBTree[RowRecord, string]()
+  t.rows = initSortedTable[RowRecord, string]()
   for _, rec in t.rowsByPk.pairs:
-    t.rows.insert(rec)
+    t.rows[rec] = rec.pk
   t.orderIndexDirty = false
 
 proc insertRowNoWal(t: DbTable, pk: string, data: RowData): string =
@@ -736,7 +736,7 @@ iterator allRows*(t: DbTable): (string, RowData) =
   ## Iterate over all rows in the table in primary key order. This will be fast
   ## if the order index is clean, but may be slower if the index needs to be rebuilt.
   t.ensureOrderIndex()
-  for rec in t.rows:
+  for rec in t.rows.keys:
     yield (rec.pk, rec.cols)
 
 iterator allRowsByPk*(t: DbTable): (string, RowData) =
