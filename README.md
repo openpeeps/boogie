@@ -13,11 +13,11 @@
 </p>
 
 ## 😍 Key Features
-- Red-black tree indexes for fast lookups and range queries
+- Red-black tree ordered storage of rows and Hash Tables for fast lookups
 - Write-ahead log (WAL) for durability and crash recovery
 - Simple API for inserting, updating, deleting, and querying records
 - Configurable options for performance tuning, such as batch sizes and flush intervals
-- In-memory and on-disk storage
+- In-memory or On-disk storage modes
 - Primitive data types (`string`, `int`, `float`, `bool`, `json`, `null`)
 
 >[!NOTE]
