@@ -1,11 +1,15 @@
-import unittest, options, json, times, strformat
+import unittest, options, json, times, strformat, os
 import ../src/boogie
+
+discard existsOrCreateDir("tests" / "data")
+for p in walkDir("tests" / "data"):
+  removeFile(p.path)
 
 suite "No WAL + memory store tests":
   var db: Store
   test "init database without WAL":
     let t00 = cpuTime()
-    db = newStore("bench1", smInMemory,
+    db = newStore("tests" / "data" / "bench1", smInMemory,
               enableWal = false,
               walFlushEveryOps = 1000'u32
             )
@@ -18,11 +22,11 @@ suite "No WAL + memory store tests":
         name = "users",
         primaryKey = "id",
         columns = [
-          ColumnDef(name: "id", kind: DataType.dtInt, nullable: false),
-          ColumnDef(name: "name", kind: DataType.dtText, nullable: false),
-          ColumnDef(name: "age", kind: DataType.dtInt, nullable: false),
-          ColumnDef(name: "active", kind: DataType.dtBool, nullable: false),
-          ColumnDef(name: "meta", kind: DataType.dtJson, nullable: true)
+          newColumn("id", DataType.dtInt, false),
+          newColumn("name", DataType.dtText, false),
+          newColumn("age", DataType.dtInt, false),
+          newColumn("active", DataType.dtBool, false),
+          newColumn("meta", DataType.dtJson, true)
         ]
       ))
 
@@ -79,7 +83,7 @@ suite "No WAL + disk store tests":
   var db: Store
   test "init database without WAL":
     let t00 = cpuTime()
-    db = newStore("bench2", smDisk,
+    db = newStore("tests" / "data" / "bench2", smDisk,
               enableWal = false,
               walFlushEveryOps = 1000'u32
             )
@@ -92,11 +96,11 @@ suite "No WAL + disk store tests":
         name = "users",
         primaryKey = "id",
         columns = [
-          ColumnDef(name: "id", kind: DataType.dtInt, nullable: false),
-          ColumnDef(name: "name", kind: DataType.dtText, nullable: false),
-          ColumnDef(name: "age", kind: DataType.dtInt, nullable: false),
-          ColumnDef(name: "active", kind: DataType.dtBool, nullable: false),
-          ColumnDef(name: "meta", kind: DataType.dtJson, nullable: true)
+          newColumn("id", DataType.dtInt, false),
+          newColumn("name", DataType.dtText, false),
+          newColumn("age", DataType.dtInt, false),
+          newColumn("active", DataType.dtBool, false),
+          newColumn("meta", DataType.dtJson, true)
         ]
       ))
 
@@ -153,7 +157,7 @@ suite "WAL + disk store tests":
   var db: Store
   test "init database without WAL":
     let t00 = cpuTime()
-    db = newStore("bench3", smDisk,
+    db = newStore("tests" / "data" / "bench3", smDisk,
               enableWal = true,
               walFlushEveryOps = 1000'u32
             )
@@ -166,11 +170,11 @@ suite "WAL + disk store tests":
         name = "users",
         primaryKey = "id",
         columns = [
-          ColumnDef(name: "id", kind: DataType.dtInt, nullable: false),
-          ColumnDef(name: "name", kind: DataType.dtText, nullable: false),
-          ColumnDef(name: "age", kind: DataType.dtInt, nullable: false),
-          ColumnDef(name: "active", kind: DataType.dtBool, nullable: false),
-          ColumnDef(name: "meta", kind: DataType.dtJson, nullable: true)
+          newColumn("id", DataType.dtInt, false),
+          newColumn("name", DataType.dtText, false),
+          newColumn("age", DataType.dtInt, false),
+          newColumn("active", DataType.dtBool, false),
+          newColumn("meta", DataType.dtJson, true)
         ]
       ))
 
@@ -227,7 +231,7 @@ suite "WAL + memory store tests":
   var db: Store
   test "init database without WAL":
     let t00 = cpuTime()
-    db = newStore("bench4", smInMemory,
+    db = newStore("tests" / "data" / "bench4", smInMemory,
               enableWal = true,
               walFlushEveryOps = 1000'u32
             )
@@ -240,11 +244,11 @@ suite "WAL + memory store tests":
         name = "users",
         primaryKey = "id",
         columns = [
-          ColumnDef(name: "id", kind: DataType.dtInt, nullable: false),
-          ColumnDef(name: "name", kind: DataType.dtText, nullable: false),
-          ColumnDef(name: "age", kind: DataType.dtInt, nullable: false),
-          ColumnDef(name: "active", kind: DataType.dtBool, nullable: false),
-          ColumnDef(name: "meta", kind: DataType.dtJson, nullable: true)
+          newColumn("id", DataType.dtInt, false),
+          newColumn("name", DataType.dtText, false),
+          newColumn("age", DataType.dtInt, false),
+          newColumn("active", DataType.dtBool, false),
+          newColumn("meta", DataType.dtJson, true)
         ]
       ))
 
@@ -296,3 +300,46 @@ suite "WAL + memory store tests":
       inc matches
     let tWhere = cpuTime() - t5
     echo fmt"Where scan: {tWhere:.3f} s for {matches} matches"
+
+suite "WAL functions tests":
+  test "WAL crash recovery":
+    var db = newStore("tests" / "data" / "crashbench", smDisk,
+      enableWal = true,
+      walFlushEveryOps = 100'u32
+        # strict flush after every 100 ops to maximize chance of pending entries on crash
+    )
+    if not db.hasTable("users"):
+      db.createTable(newTable(
+        name = "users",
+        primaryKey = "id",
+        columns = [
+          newColumn("id", DataType.dtInt, false),
+          newColumn("name", DataType.dtText, false),
+          newColumn("age", DataType.dtInt, false),
+          newColumn("active", DataType.dtBool, false),
+          newColumn("meta", DataType.dtJson, true)
+        ]
+      ))
+    const N = 1000
+    let d = %*{"index": 0}
+    for i in 1..N:
+      db.insertRow("users", row({
+        "name": newTextValue("User"),
+        "age": newIntValue(20 + (i mod 30)),
+        "active": newBoolValue((i and 1) == 0),
+        "meta": newJSONValue(d)
+      }))
+    # we simualte a crash by not calling `db.checkpoint`
+    # so the data is only in the WAL and not yet flushed to the main store file
+
+    # re-open and verify recovery
+    db = newStore("tests" / "data" / "crashbench", smDisk,
+      enableWal = true,
+      walFlushEveryOps = 1000'u32
+    )
+    check db.hasTable("users")
+    var count = 1
+    for _ in db.getTable("users").get().allRows():
+      inc count
+    echo "Recovered rows: ", count
+    check count == N

@@ -1,29 +1,42 @@
 <p align="center">
-  <img src="https://github.com/openpeeps/PKG/blob/main/.github/logo.png" width="90px"><br>
-  OpenPeeps repository template for developing libraries,<br>projects and other cool things. 👑 Written in Nim language
+  <img src="https://github.com/openpeeps/boogie/blob/main/.github/boogie.png" width="100px"><br>
+  A stupid simple WAL-based embedded database in Nim<br>
 </p>
 
 <p align="center">
-  <code>nimble install {PKG}</code>
+  <code>nimble install boogie</code>
 </p>
 
 <p align="center">
-  <a href="https://github.com/">API reference</a><br>
-  <img src="https://github.com/openpeeps/pistachio/workflows/test/badge.svg" alt="Github Actions">  <img src="https://github.com/openpeeps/pistachio/workflows/docs/badge.svg" alt="Github Actions">
+  <a href="https://openpeeps.github.io/boogie">API reference</a><br>
+  <img src="https://github.com/openpeeps/boogie/workflows/test/badge.svg" alt="Github Actions">  <img src="https://github.com/openpeeps/boogie/workflows/docs/badge.svg" alt="Github Actions">
 </p>
 
 ## 😍 Key Features
-- [x] Open Source | `MIT` License
-- [x] Written in Nim language
+- Red-black tree indexes for fast lookups and range queries
+- Write-ahead log (WAL) for durability and crash recovery
+- Simple API for inserting, updating, deleting, and querying records
+- Configurable options for performance tuning, such as batch sizes and flush intervals
+- In-memory and on-disk storage
+- Primitive data types (`string`, `int`, `float`, `bool`, `json`, `null`)
+
+>[!NOTE]
+> Boogie is an experimental project made with the chatbot. It's still a toy and not intended for production use. Use at your own risk!
 
 ## Examples
-...
+Check the [tests](https://github.com/openpeeps/boogie/tree/main/src/boogie/tests) for more examples.
+
+
+### Todos
+- [x] Add support for multiple tables
+- [x] Add basic tests and benchmarks
+- 
 
 ### ❤ Contributions & Support
-- 🐛 Found a bug? [Create a new Issue](/issues)
-- 👋 Wanna help? [Fork it!](/fork)
+- 🐛 Found a bug? [Create a new Issue](https://github.com/openpeeps/boogie/issues)
+- 👋 Wanna help? [Fork it!](https://github.com/openpeeps/boogie/fork)
 - 😎 [Get €20 in cloud credits from Hetzner](https://hetzner.cloud/?ref=Hm0mYGM9NxZ4)
 
 ### 🎩 License
-{PKG} | MIT license. [Made by Humans from OpenPeeps](https://github.com/openpeeps).<br>
+LGPLv3 license. [Made by Humans from OpenPeeps](https://github.com/openpeeps).<br>
 Copyright OpenPeeps & Contributors &mdash; All rights reserved.

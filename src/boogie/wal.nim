@@ -212,7 +212,7 @@ proc openWal*(path: string): Wal =
   ## the correct header and starts with LSN 1.
   let walPath = path.changeFileExt(".wal")
   ensureWalFile(walPath)
-  Wal(path: walPath, nextLsn: computeNextLsn(walPath), pendingEntries: @[])
+  Wal(path: walPath, nextLsn: computeNextLsn(walPath))
 
 proc flush*(w: var Wal) =
   ## Flushes any pending entries to disk. This is typically called

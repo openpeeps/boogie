@@ -8,7 +8,6 @@ import std/[tables, options, strformat,
             json, strutils, os, sets]
 
 import pkg/[flatty, rbtree]
-
 import ./wal
 
 ## This module implements a simple WAL-based embedded database for Nim.
@@ -281,6 +280,10 @@ proc newTable*(name: string, primaryKey: string, columns: openArray[ColumnDef],
       columnsByName: colsByName,
       rows: newRBTree[RowRecord, string](),
     )
+
+proc newColumn*(name: string, kind: DataType, nullable: bool): ColumnDef =
+  ## Create a new ColumnDef with the specified name, data type, and nullability.
+  ColumnDef(name: name, kind: kind, nullable: nullable)
 
 #
 # Value constructors and helpers
