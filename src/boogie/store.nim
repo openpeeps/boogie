@@ -58,7 +58,7 @@ type
     of dtNull:
       discard
 
-  RowData* = tables.Table[string, Value]
+  RowData* = OrderedTable[string, Value]
     ## A mapping of column names to cell values representing a single row in a table
 
   RowRecord = object
@@ -86,18 +86,18 @@ type
     else: discard
     columns*: seq[ColumnDef]
       ## Schema definition of the table columns
-    columnsByName: tables.Table[string, ColumnDef]
+    columnsByName: OrderedTable[string, ColumnDef]
       # Helper for looking up column definitions by name
     rows: RowIndex
       # ordered index of rows for efficient iteration and range queries
-    rowsByPk: tables.Table[string, RowRecord]
+    rowsByPk: OrderedTable[string, RowRecord]
       # hash index of rows by primary key for fast lookups and mutations
     orderIndexDirty: bool
       # flag indicating whether the order index needs to be rebuilt.
       # This is set to true on mutations and cleared when the index is rebuilt.
     indexedCols: HashSet[string]
       # set of column names that have equality indexes built
-    eqIndex: tables.Table[string, tables.Table[string, HashSet[string]]]
+    eqIndex: Table[string, Table[string, HashSet[string]]]
       # equality indexes for columns. Maps column name to a mapping of cell value keys to sets of primary keys.
 
   Store* {.acyclic.} = ref object
@@ -207,7 +207,6 @@ proc newStore*(path: string, mode: StorageMode = smDisk,
       walObj = openWal(path)
 
   result = Store(
-    tables: initTable[string, DbTable](),
     storageMode: mode,
     hasWal: hasWal,
     wal: walObj,
@@ -240,7 +239,7 @@ proc newTable*(name: string, primaryKey: string, columns: openArray[ColumnDef],
     seen.add(c.name)
 
   let colsSeq = @columns
-  var colsByName = initTable[string, ColumnDef](colsSeq.len)
+  var colsByName = initOrderedTable[string, ColumnDef](colsSeq.len)
   for c in colsSeq:
     colsByName[c.name] = c
 
@@ -295,9 +294,18 @@ proc newBoolValue*(v: bool): Value = Value(kind: dtBool, b: v)
 proc newTextValue*(v: string): Value = Value(kind: dtText, s: v)
 proc newJSONValue*(v: JsonNode): Value = Value(kind: dtJson, j: $(v))
 
+proc `$`*(v: Value): string =
+  ## Stringified representation of a Value
+  case v.kind
+  of dtNull: "null"
+  of dtInt: $v.i
+  of dtFloat: $v.f
+  of dtBool: $v.b
+  of dtText: v.s
+  of dtJson: v.j
+
 proc row*(pairs: openArray[(string, Value)]): RowData =
   ## Helper to create RowData from an open array of (column, value) pairs.
-  result = initTable[string, Value]()
   for (k, v) in pairs:
     result[k] = v
 
@@ -394,7 +402,6 @@ proc normalizedRowWithPk(t: DbTable, data: RowData, pk: string): RowData =
     if not result.hasKey(pkCol):
       result[pkCol] = newTextValue(pk)
 
-
 proc matchesType(v: Value, c: ColumnDef): bool =
   case v.kind
   of dtNull: c.nullable
@@ -456,7 +463,7 @@ proc rowToJson(data: RowData): JsonNode =
     result[k] = cellToJson(v)
 
 proc rowFromJson(n: JsonNode): RowData =
-  result = initTable[string, Value]()
+  result = initOrderedTable[string, Value]()
   for k, v in n.pairs:
     result[k] = cellFromJson(v)
 
@@ -704,6 +711,10 @@ proc dropTable*(s: Store, name: string) =
   let lsn = s.appendWalIfEnabled(woDropTable, name, "", "")
   s.dropTableNoWal(name)
   s.markCommitted(lsn)
+
+proc isEmpty*(t: DbTable): bool =
+  ## Check if the table is empty (has no rows).
+  t.rowsByPk.len == 0
 
 proc insertRow*(t: DbTable, pk: string, data: RowData) =
   # direct table mutation: no WAL here (store-level proc logs)

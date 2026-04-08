@@ -1,4 +1,4 @@
-import unittest, options, json, times, strformat, os
+import unittest, options, json, times, strformat, os, tables
 import ../src/boogie
 
 discard existsOrCreateDir("tests" / "data")
@@ -343,3 +343,40 @@ suite "WAL functions tests":
       inc count
     echo "Recovered rows: ", count
     check count == N
+
+suite "Other examples"
+  test "basic create + insert + query flow with WAL":
+    var db = newStore("tests" / "data" / "myboogie.db", StorageMode.smDisk,
+                enableWal = true, walFlushEveryOps = 100'u32)
+
+    # Create a table with some columns
+    db.createTable(newTable(
+      name = "users",
+      primaryKey = "id",
+      columns = [
+        newColumn("id", DataType.dtInt, false),
+        newColumn("name", DataType.dtText, false),
+        newColumn("age", DataType.dtInt, false),
+        newColumn("active", DataType.dtBool, false),
+        newColumn("meta", DataType.dtJson, true)
+      ]
+    ))
+
+    # insert some data
+    db.insertRow("users", row({
+      "name": newTextValue("Alice"),
+      "age": newIntValue(30),
+      "active": newBoolValue(true),
+      "meta": newJsonValue(%*{"hobbies": ["reading", "hiking"]})
+    }))
+
+    # no data pushed to main store file yet since WAL flush is pending
+    check db.getTable("users").get().isEmpty()
+
+    # flush the WAL to disk (when enabled)
+    db.checkpoint()
+
+    # Query the data
+    for row in db.getTable("users").get().allRows():
+      for key, col in row[1]:
+        echo fmt"{key}: {$col}"
