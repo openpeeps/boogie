@@ -1,0 +1,17 @@
+nimTitle	wal	boogie/wal.html	module boogie/wal		0
+nim	woCreateTable	boogie/wal.html#woCreateTable	WalOp.woCreateTable		29
+nim	woDropTable	boogie/wal.html#woDropTable	WalOp.woDropTable		29
+nim	woInsertRow	boogie/wal.html#woInsertRow	WalOp.woInsertRow		29
+nim	woDeleteRow	boogie/wal.html#woDeleteRow	WalOp.woDeleteRow		29
+nim	woUpdateRow	boogie/wal.html#woUpdateRow	WalOp.woUpdateRow		29
+nim	WalOp	boogie/wal.html#WalOp	enum WalOp		29
+nim	WalEntry	boogie/wal.html#WalEntry	object WalEntry		37
+nim	Wal	boogie/wal.html#Wal	object Wal		52
+nim	WalError	boogie/wal.html#WalError	object WalError		71
+nim	WalMagic	boogie/wal.html#WalMagic	let WalMagic		73
+nim	openWal	boogie/wal.html#openWal,string	proc openWal(path: string): Wal		207
+nim	flush	boogie/wal.html#flush,Wal	proc flush(w: var Wal)		217
+nim	append	boogie/wal.html#append,Wal,WalEntry,bool	proc append(w: var Wal; entry: WalEntry; sync: bool = true): uint64		231
+nim	replay	boogie/wal.html#replay,Wal,proc(WalEntry)	proc replay(w: Wal; onEntry: proc (e: WalEntry))		245
+nim	reset	boogie/wal.html#reset,Wal	proc reset(w: var Wal)		259
+nim	entries	boogie/wal.html#entries.i,Wal	iterator entries(w: Wal): WalEntry		267
