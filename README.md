@@ -26,6 +26,8 @@
 >[!NOTE]
 > Fun fact, this package is using [pkg/rbtree](https://github.com/Nycto/RBTreeNim), a 11-year-old Nim package that implements a red-black tree. It is a great example of how the Nim ecosystem has some hidden gems that can be used in new projects. 📦
 
+This can be used as a simple embedded database for your Nim applications. If you want, you can use [openpeeps/e2ee](https://github.com/openpeeps/e2ee) to encrypt the data before inserting it into Boogie database.
+
 ## Examples
 Check the [tests](https://github.com/openpeeps/boogie/tree/main/src/boogie/tests) for more examples.
 
@@ -33,7 +35,7 @@ Check the [tests](https://github.com/openpeeps/boogie/tree/main/src/boogie/tests
 ### Todos
 - [x] Add support for multiple tables
 - [x] Add basic tests and benchmarks
-- 
+
 
 ### ❤ Contributions & Support
 - 🐛 Found a bug? [Create a new Issue](https://github.com/openpeeps/boogie/issues)
