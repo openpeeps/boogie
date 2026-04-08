@@ -30,7 +30,7 @@ This can be used as a simple embedded database for your Nim applications. If you
 
 ## Examples
 Here is a simple example of how to use Boogie
-```
+```nim
 import pkg/boogie
 
 var db = newStore("tests" / "data" / "myboogie.db", StorageMode.smDisk,
