@@ -21,7 +21,7 @@
 - Primitive data types (`string`, `int`, `float`, `bool`, `json`, `null`)
 
 >[!NOTE]
-> Boogie is an experimental project made with the chatbot. It's still a toy and not intended for production use. Use at your own risk!
+> Boogie is an experimental project mostly made with the chatbot for fun and learning. It is still in early stages, so expect data loss and breaking changes. Use at your own risk.
 
 ## Examples
 Check the [tests](https://github.com/openpeeps/boogie/tree/main/src/boogie/tests) for more examples.
