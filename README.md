@@ -57,9 +57,6 @@ db.insertRow("users", row({
   "meta": newJsonValue(%*{"hobbies": ["reading", "hiking"]})
 }))
 
-# no data pushed to main store file yet since WAL flush is pending
-check db.getTable("users").get().isEmpty()
-
 # flush the WAL to disk (when enabled)
 db.checkpoint()
 
