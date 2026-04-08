@@ -75,7 +75,7 @@
 <li><a class="reference" href="#PrimaryKeyMode" title="PrimaryKeyMode = enum
   pkmManual, pkmSerial">PrimaryKeyMode</a></li>
 <li><a class="reference" href="#RowData" title="RowData = OrderedTable[string, Value]">RowData</a></li>
-<li><a class="reference" href="#RowIndex" title="RowIndex = RedBlackTree[RowRecord, string]">RowIndex</a></li>
+<li><a class="reference" href="#RowIndex" title="RowIndex = SortedTable[RowRecord, string]">RowIndex</a></li>
 <li><a class="reference" href="#StorageMode" title="StorageMode = enum
   smInMemory, smDisk">StorageMode</a></li>
 <li><a class="reference" href="#Store" title="Store {.acyclic.} = ref object">Store</a></li>
@@ -307,7 +307,7 @@
   </dd>
 </div>
 <div id="RowIndex">
-  <dt><pre><a href="store.html#RowIndex"><span class="Identifier">RowIndex</span></a> <span class="Other">=</span> <span class="Identifier">RedBlackTree</span><span class="Other">[</span><span class="Identifier">RowRecord</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">]</span></pre></dt>
+  <dt><pre><a href="store.html#RowIndex"><span class="Identifier">RowIndex</span></a> <span class="Other">=</span> <span class="Identifier">SortedTable</span><span class="Other">[</span><span class="Identifier">RowRecord</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">]</span></pre></dt>
   <dd>
     
     An ordered index of rows in a table, keyed by primary key value. This allows for efficient ordered iteration and range queries.
@@ -386,7 +386,7 @@
   <dt><pre><span class="Keyword">proc</span> <a href="#%3D%3D%2CRowRecord%2CRowRecord"><span class="Identifier">`==`</span></a><span class="Other">(</span><span class="Identifier">a</span><span class="Other">,</span> <span class="Identifier">b</span><span class="Other">:</span> <span class="Identifier">RowRecord</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    <p>Equality comp for RowRecord. Used by the RBTree to determine if two records are the same. We consider two records equal if their primary keys are equal, since the primary key is the unique identifier for a row.</p>
+    <p>Equality comp for RowRecord. Used by the SortedTable to determine if two records are the same. We consider two records equal if their primary keys are equal, since the primary key is the unique identifier for a row.</p>
 <p>This allows us to update a row by deleting the old record and inserting a new one with the same primary key.</p>
 
     
@@ -745,8 +745,8 @@
   <dl class="item">
     <div id="allRows-iterators-all">
   <div id="allRows.i,DbTable">
-  <dt><pre><span class="Keyword">iterator</span> <a href="#allRows.i%2CDbTable"><span class="Identifier">allRows</span></a><span class="Other">(</span><span class="Identifier">t</span><span class="Other">:</span> <a href="store.html#DbTable"><span class="Identifier">DbTable</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <a href="store.html#RowData"><span class="Identifier">RowData</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">iterator</span> <a href="#allRows.i%2CDbTable"><span class="Identifier">allRows</span></a><span class="Other">(</span><span class="Identifier">t</span><span class="Other">:</span> <a href="store.html#DbTable"><span class="Identifier">DbTable</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <a href="store.html#RowData"><span class="Identifier">RowData</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Iterate over all rows in the table in primary key order. This will be fast if the order index is clean, but may be slower if the index needs to be rebuilt.
@@ -777,7 +777,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-04-08 02:29:40 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-04-08 09:29:34 UTC</small>
       </div>
     </div>
   </div>
