@@ -27,4 +27,4 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - run: nimble install -Y
       - run: nim c -r src/${{ github.event.repository.name }}.nim
-      - run: nimble test
+      - run: nimble test -d:release
