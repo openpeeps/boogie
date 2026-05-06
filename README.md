@@ -1,6 +1,7 @@
 <p align="center">
   <img src="https://github.com/openpeeps/boogie/blob/main/.github/boogie.png" width="100px"><br>
-  A stupid simple WAL-based embedded database in Nim 👑<br>
+  A suite of simple embedded databases in Nim with<br>
+  write-ahead log (WAL) support for durability and crash recovery
 </p>
 
 <p align="center">
@@ -19,6 +20,13 @@
 - Configurable options for performance tuning, such as batch sizes and flush intervals
 - In-memory or On-disk storage modes
 - Primitive data types (`string`, `int`, `float`, `bool`, `json`, `null`)
+
+What's included?
+- **Key/Value Store** &mdash; A simple key-value store implementation with WAL support
+- **RDBMS Store** &mdash; A relational wal-based database with support for **schemas**, **primary keys** and typed columns (However, it currently lacks explicit support for foreign keys, joins, or advanced relational features (relations between tables)
+- **Vector Store** &mdash; Vector store implementation with WAL support
+- **Columnar Store** &mdash; Columnar storage engine for analytics workloads with WAL support
+- **Graph Store** &mdash; A simple graph database with support for nodes, relationships, and basic graph queries (e.g., neighbors, shortest path) with WAL support
 
 >[!NOTE]
 > Boogie is an experimental project mostly made with the chatbot for fun and learning. It is still in early stages, so expect data loss and breaking changes. Use at your own risk.
