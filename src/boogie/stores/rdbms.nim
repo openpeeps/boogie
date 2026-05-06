@@ -8,7 +8,7 @@ import std/[tables, options, strformat,
             json, strutils, os, sets]
 
 import pkg/[flatty, sorta]
-import ./wal
+import ../wal
 
 ## This module implements a simple WAL-based embedded database for Nim.
 ## It provides a Store type that manages multiple tables, each with a defined schema and supports 
@@ -17,9 +17,9 @@ import ./wal
 ## The Store can be configured to use either in-memory storage (for testing or ephemeral data)
 ## or disk-based storage with optional write-ahead logging (WAL) for durability.
 ## 
-## Boogie is using Red-Black Trees for ordered storage of rows and hash tables for fast lookups
-## by primary key and for equality indexes on columns. The WAL is designed to support efficient group commits
-## and to allow for recovery of the store state in case of crashes. 
+## Boogie is using BTrees and HashTables for efficient data storage and retrieval.
+## The WAL is designed to support efficient group commits and to allow for recovery
+## of the store state in case of crashes. 
 
 type
   StorageMode* = enum

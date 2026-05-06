@@ -4,7 +4,4 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/boogie
 
-import pkg/sorta
-import ./boogie/[store, wal]
-
-export sorta, store, wal
+{.error: "This module is not meant to be imported directly. Import a specific store module instead".}

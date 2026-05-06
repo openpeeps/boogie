@@ -1,9 +1,10 @@
 import unittest, options, json, times, strformat, os, tables
-import ../src/boogie
+import ../src/boogie/stores/rdbms
+
+if dirExists("tests" / "data"):
+  removeDir("tests" / "data")
 
 discard existsOrCreateDir("tests" / "data")
-for p in walkDir("tests" / "data"):
-  removeFile(p.path)
 
 suite "No WAL + memory store tests":
   var db: Store
