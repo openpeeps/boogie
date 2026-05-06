@@ -16,13 +16,16 @@
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH4QQQEwksSS9ZWwAAAk1JREFUWMPtll2ITVEUx39nn/O7Y5qR8f05wtCUUr6ZIS++8pEnkZInPImneaCQ5METNdOkeFBKUhMPRIkHKfEuUZSUlGlKPN2TrgfncpvmnntnmlEyq1Z7t89/rf9a6+y99oZxGZf/XeIq61EdtgKXgdXA0xrYAvBjOIF1AI9zvjcC74BSpndrJPkBWDScTF8Aa4E3wDlgHbASaANmVqlcCnwHvgDvgVfAJ+AikAAvgfVZwLnSVZHZaOuKoQi3ZOMi4NkYkpe1p4J7A8BpYAD49hfIy/oqG0+hLomiKP2L5L+1ubn5115S+3OAn4EnwBlgMzCjyt6ZAnQCJ4A7wOs88iRJHvw50HoujuPBoCKwHWiosy8MdfZnAdcHk8dxXFJ3VQbQlCTJvRBCGdRbD4M6uc5glpY3eAihpN5S5w12diSEcCCEcKUO4ljdr15T76ur1FDDLIQQ3qv71EdDOe3Kxj3leRXyk+pxdWnFWod6Wt2bY3de3aSuUHcPBVimHs7mK9WrmeOF6lR1o9qnzskh2ar2qm1qizpfXaPeVGdlmGN5pb09qMxz1Xb1kLqgzn1RyH7JUXW52lr5e/Kqi9qpto7V1atuUzfnARrV7jEib1T76gG2qxdGmXyiekkt1GswPTtek0aBfJp6YySGBfWg2tPQ0FAYgf1stUfdmdcjarbYJEniKIq6gY/Aw+zWHAC+p2labGpqiorFYgGYCEzN7oQdQClN07O1/EfDyGgC0ALMBdYAi4FyK+4H3gLPsxfR1zRNi+NP7nH5J+QntnXe5B5mpfQAAAAASUVORK5CYII=">
 
 <!-- CSS -->
-<link rel="stylesheet" type="text/css" href="../nimdoc.out.css?v=2.2.8">
+<link rel="stylesheet" type="text/css" href="../nimdoc.out.css?v=2.2.10">
 
 <!-- JS -->
-<script type="text/javascript" src="../dochack.js?v=2.2.8"></script>
+<script type="text/javascript" src="../dochack.js?v=2.2.10"></script>
 </head>
 <body>
   <div class="document" id="documentId">
+    <input type="checkbox" id="nav-toggle" hidden>
+    <label for="nav-toggle" id="nav-burger">&#9776;</label>
+    <label for="nav-toggle" id="nav-overlay"></label>
     <div class="container">
       <h1 class="title">boogie/wal</h1>
       <div class="row">
@@ -160,11 +163,11 @@
   <h1><a class="toc-backref" href="#7">Types</a></h1>
   <dl class="item">
     <div id="Wal">
-  <dt><pre><a href="wal.html#Wal"><span class="Identifier">Wal</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
+  <dt><pre><a href="#Wal"><span class="Identifier">Wal</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
   <span class="Identifier">path</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>              <span class="Comment">## The file path to the WAL file on disk</span>
   <span class="Identifier">nextLsn</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">uint64</span> <span class="Comment">## The next LSN to be assigned to a new log entry. This is computed based</span>
                    <span class="Comment">## on the existing WAL file on open.</span>
-  <span class="Identifier">pendingEntries</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="wal.html#WalEntry"><span class="Identifier">WalEntry</span></a><span class="Other">]</span> <span class="Comment">## A sequence of pending WAL entries that have been appended but not yet flushed to disk.</span>
+  <span class="Identifier">pendingEntries</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="#WalEntry"><span class="Identifier">WalEntry</span></a><span class="Other">]</span> <span class="Comment">## A sequence of pending WAL entries that have been appended but not yet flushed to disk.</span>
                                  <span class="Comment">## This allows for efficient group commits, where multiple operations can be flushed together</span>
                                  <span class="Comment">## to reduce disk I/O. The `append` procedure adds entries to this buffer, and the `flush`</span>
                                  <span class="Comment">## procedure writes them to disk and clears the buffer.</span>
@@ -181,10 +184,10 @@
   </dd>
 </div>
 <div id="WalEntry">
-  <dt><pre><a href="wal.html#WalEntry"><span class="Identifier">WalEntry</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
+  <dt><pre><a href="#WalEntry"><span class="Identifier">WalEntry</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
   <span class="Identifier">lsn</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">uint64</span>               <span class="Comment">## Log Sequence Number, a monotonically increasing identifier for each log entry</span>
   <span class="Identifier">tsUnix</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int64</span>             <span class="Comment">## Timestamp of the log entry in Unix time (seconds since epoch)</span>
-  <span class="Identifier">op</span><span class="Operator">*</span><span class="Other">:</span> <a href="wal.html#WalOp"><span class="Identifier">WalOp</span></a>                 <span class="Comment">## The type of operation (e.g. insert, update, delete)</span>
+  <span class="Identifier">op</span><span class="Operator">*</span><span class="Other">:</span> <a href="#WalOp"><span class="Identifier">WalOp</span></a>                 <span class="Comment">## The type of operation (e.g. insert, update, delete)</span>
   <span class="Identifier">table</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>             <span class="Comment">## The name of the affected table</span>
   <span class="Identifier">pk</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>                <span class="Comment">## The primary key of the affected row (if applicable)</span>
   <span class="Identifier">payload</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>           <span class="Comment">## The payload of the log entry, typically a JSON string representing the row data for inserts/updates</span></pre></dt>
@@ -195,7 +198,7 @@
   </dd>
 </div>
 <div id="WalError">
-  <dt><pre><a href="wal.html#WalError"><span class="Identifier">WalError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <span class="Identifier">CatchableError</span></pre></dt>
+  <dt><pre><a href="#WalError"><span class="Identifier">WalError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <span class="Identifier">CatchableError</span></pre></dt>
   <dd>
     
     
@@ -203,7 +206,7 @@
   </dd>
 </div>
 <div id="WalOp">
-  <dt><pre><a href="wal.html#WalOp"><span class="Identifier">WalOp</span></a> <span class="Other">=</span> <span class="Keyword">enum</span>
+  <dt><pre><a href="#WalOp"><span class="Identifier">WalOp</span></a> <span class="Other">=</span> <span class="Keyword">enum</span>
   <span class="Identifier">woCreateTable</span><span class="Other">,</span> <span class="Identifier">woDropTable</span><span class="Other">,</span> <span class="Identifier">woInsertRow</span><span class="Other">,</span> <span class="Identifier">woDeleteRow</span><span class="Other">,</span> <span class="Identifier">woUpdateRow</span></pre></dt>
   <dd>
     
@@ -218,7 +221,7 @@
   <h1><a class="toc-backref" href="#9">Lets</a></h1>
   <dl class="item">
     <div id="WalMagic">
-  <dt><pre><a href="wal.html#WalMagic"><span class="Identifier">WalMagic</span></a> <span class="Other">=</span> <span class="StringLit">&quot;BOGWAL2\x00&quot;</span></pre></dt>
+  <dt><pre><a href="#WalMagic"><span class="Identifier">WalMagic</span></a> <span class="Other">=</span> <span class="StringLit">&quot;BOGWAL2\x00&quot;</span></pre></dt>
   <dd>
     
     magic string to identify our WAL files and version, also serves as a simple integrity check on open
@@ -233,7 +236,7 @@
   <dl class="item">
     <div id="append-procs-all">
   <div id="append,Wal,WalEntry,bool">
-  <dt><pre><span class="Keyword">proc</span> <a href="#append%2CWal%2CWalEntry%2Cbool"><span class="Identifier">append</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="wal.html#Wal"><span class="Identifier">Wal</span></a><span class="Other">;</span> <span class="Identifier">entry</span><span class="Other">:</span> <a href="wal.html#WalEntry"><span class="Identifier">WalEntry</span></a><span class="Other">;</span> <span class="Identifier">sync</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">uint64</span> {.
+  <dt><pre><span class="Keyword">proc</span> <a href="#append%2CWal%2CWalEntry%2Cbool"><span class="Identifier">append</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#Wal"><span class="Identifier">Wal</span></a><span class="Other">;</span> <span class="Identifier">entry</span><span class="Other">:</span> <a href="#WalEntry"><span class="Identifier">WalEntry</span></a><span class="Other">;</span> <span class="Identifier">sync</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">uint64</span> {.
     <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
@@ -245,7 +248,7 @@
 </div>
 <div id="flush-procs-all">
   <div id="flush,Wal">
-  <dt><pre><span class="Keyword">proc</span> <a href="#flush%2CWal"><span class="Identifier">flush</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="wal.html#Wal"><span class="Identifier">Wal</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span>
+  <dt><pre><span class="Keyword">proc</span> <a href="#flush%2CWal"><span class="Identifier">flush</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#Wal"><span class="Identifier">Wal</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span>
                          <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
@@ -257,7 +260,7 @@
 </div>
 <div id="openWal-procs-all">
   <div id="openWal,string">
-  <dt><pre><span class="Keyword">proc</span> <a href="#openWal%2Cstring"><span class="Identifier">openWal</span></a><span class="Other">(</span><span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <a href="wal.html#Wal"><span class="Identifier">Wal</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
+  <dt><pre><span class="Keyword">proc</span> <a href="#openWal%2Cstring"><span class="Identifier">openWal</span></a><span class="Other">(</span><span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <a href="#Wal"><span class="Identifier">Wal</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
     <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
@@ -271,7 +274,7 @@
 </div>
 <div id="replay-procs-all">
   <div id="replay,Wal,proc(WalEntry)">
-  <dt><pre><span class="Keyword">proc</span> <a href="#replay%2CWal%2Cproc%28WalEntry%29"><span class="Identifier">replay</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <a href="wal.html#Wal"><span class="Identifier">Wal</span></a><span class="Other">;</span> <span class="Identifier">onEntry</span><span class="Other">:</span> <span class="Keyword">proc</span> <span class="Other">(</span><span class="Identifier">e</span><span class="Other">:</span> <a href="wal.html#WalEntry"><span class="Identifier">WalEntry</span></a><span class="Other">)</span><span class="Other">)</span> {.
+  <dt><pre><span class="Keyword">proc</span> <a href="#replay%2CWal%2Cproc%28WalEntry%29"><span class="Identifier">replay</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <a href="#Wal"><span class="Identifier">Wal</span></a><span class="Other">;</span> <span class="Identifier">onEntry</span><span class="Other">:</span> <span class="Keyword">proc</span> <span class="Other">(</span><span class="Identifier">e</span><span class="Other">:</span> <a href="#WalEntry"><span class="Identifier">WalEntry</span></a><span class="Other">)</span><span class="Other">)</span> {.
     <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
@@ -284,7 +287,7 @@
 </div>
 <div id="reset-procs-all">
   <div id="reset,Wal">
-  <dt><pre><span class="Keyword">proc</span> <a href="#reset%2CWal"><span class="Identifier">reset</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="wal.html#Wal"><span class="Identifier">Wal</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span>
+  <dt><pre><span class="Keyword">proc</span> <a href="#reset%2CWal"><span class="Identifier">reset</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#Wal"><span class="Identifier">Wal</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span>
                          <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
@@ -302,7 +305,7 @@
   <dl class="item">
     <div id="entries-iterators-all">
   <div id="entries.i,Wal">
-  <dt><pre><span class="Keyword">iterator</span> <a href="#entries.i%2CWal"><span class="Identifier">entries</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <a href="wal.html#Wal"><span class="Identifier">Wal</span></a><span class="Other">)</span><span class="Other">:</span> <a href="wal.html#WalEntry"><span class="Identifier">WalEntry</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span>
+  <dt><pre><span class="Keyword">iterator</span> <a href="#entries.i%2CWal"><span class="Identifier">entries</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <a href="#Wal"><span class="Identifier">Wal</span></a><span class="Other">)</span><span class="Other">:</span> <a href="#WalEntry"><span class="Identifier">WalEntry</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span>
                                      <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span>
                                      <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
@@ -323,7 +326,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-04-14 19:59:21 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-05-06 15:55:59 UTC</small>
       </div>
     </div>
   </div>

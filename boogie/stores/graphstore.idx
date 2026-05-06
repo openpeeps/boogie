@@ -1,0 +1,23 @@
+nimTitle	graphstore	boogie/stores/graphstore.html	module boogie/stores/graphstore		0
+nim	GraphError	boogie/stores/graphstore.html#GraphError	object GraphError		28
+nim	GraphNode	boogie/stores/graphstore.html#GraphNode	object GraphNode		30
+nim	Relationship	boogie/stores/graphstore.html#Relationship	object Relationship		35
+nim	GraphStore	boogie/stores/graphstore.html#GraphStore	type GraphStore		56
+nim	GraphTx	boogie/stores/graphstore.html#GraphTx	object GraphTx		69
+nim	openGraphStore	boogie/stores/graphstore.html#openGraphStore,string	proc openGraphStore(rootDir: string): GraphStore		463
+nim	closeGraphStore	boogie/stores/graphstore.html#closeGraphStore,GraphStore	proc closeGraphStore(s: GraphStore)		490
+nim	beginTx	boogie/stores/graphstore.html#beginTx,GraphStore	proc beginTx(s: GraphStore): GraphTx		494
+nim	rollback	boogie/stores/graphstore.html#rollback,GraphTx	proc rollback(tx: var GraphTx)		497
+nim	createNode	boogie/stores/graphstore.html#createNode,GraphTx,seq[string],JsonNode	proc createNode(tx: var GraphTx; labels: seq[string] = @[];\n           props: JsonNode = newJObject()): uint64		510
+nim	upsertNode	boogie/stores/graphstore.html#upsertNode,GraphTx,GraphNode	proc upsertNode(tx: var GraphTx; node: GraphNode)		516
+nim	deleteNode	boogie/stores/graphstore.html#deleteNode,GraphTx,uint64	proc deleteNode(tx: var GraphTx; id: uint64)		520
+nim	createRelationship	boogie/stores/graphstore.html#createRelationship,GraphTx,uint64,uint64,string,JsonNode	proc createRelationship(tx: var GraphTx; fromId, toId: uint64; relType: string;\n                   props: JsonNode = newJObject()): uint64		524
+nim	upsertRelationship	boogie/stores/graphstore.html#upsertRelationship,GraphTx,Relationship	proc upsertRelationship(tx: var GraphTx; r: Relationship)		538
+nim	deleteRelationship	boogie/stores/graphstore.html#deleteRelationship,GraphTx,uint64	proc deleteRelationship(tx: var GraphTx; id: uint64)		544
+nim	commit	boogie/stores/graphstore.html#commit,GraphTx	proc commit(tx: var GraphTx)		549
+nim	getNode	boogie/stores/graphstore.html#getNode,GraphStore,uint64,GraphNode	proc getNode(s: GraphStore; id: uint64; outNode: var GraphNode): bool		572
+nim	getRelationship	boogie/stores/graphstore.html#getRelationship,GraphStore,uint64,Relationship	proc getRelationship(s: GraphStore; id: uint64; outRel: var Relationship): bool		579
+nim	outgoing	boogie/stores/graphstore.html#outgoing,GraphStore,uint64,string	proc outgoing(s: GraphStore; nodeId: uint64; relType = ""): seq[Relationship]		586
+nim	neighbors	boogie/stores/graphstore.html#neighbors,GraphStore,uint64,string	proc neighbors(s: GraphStore; nodeId: uint64; relType = ""): seq[uint64]		597
+nim	findNodesByLabel	boogie/stores/graphstore.html#findNodesByLabel,GraphStore,string	proc findNodesByLabel(s: GraphStore; label: string): seq[GraphNode]		601
+nim	traverseBfs	boogie/stores/graphstore.html#traverseBfs,GraphStore,uint64,int,string	proc traverseBfs(s: GraphStore; startNode: uint64; maxDepth: int; relType = ""): seq[\n    uint64]		607

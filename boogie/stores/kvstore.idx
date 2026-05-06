@@ -1,0 +1,17 @@
+nimTitle	kvstore	boogie/stores/kvstore.html	module boogie/stores/kvstore		0
+nim	ksmInMemory	boogie/stores/kvstore.html#ksmInMemory	KvStorageMode.ksmInMemory		15
+nim	ksmDisk	boogie/stores/kvstore.html#ksmDisk	KvStorageMode.ksmDisk		15
+nim	KvStorageMode	boogie/stores/kvstore.html#KvStorageMode	enum KvStorageMode		15
+nim	KvStoreError	boogie/stores/kvstore.html#KvStoreError	object KvStoreError		21
+nim	KvStore	boogie/stores/kvstore.html#KvStore	type KvStore		27
+nim	recoverFromWal	boogie/stores/kvstore.html#recoverFromWal,KvStore	proc recoverFromWal(s: KvStore)		54
+nim	newKvStore	boogie/stores/kvstore.html#newKvStore,string,KvStorageMode,bool,uint32,uint32	proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;\n           checkpointEveryOps: uint32 = 0'u32;\n           walFlushEveryOps: uint32 = 1000'u32): KvStore		159
+nim	newInMemoryKvStore	boogie/stores/kvstore.html#newInMemoryKvStore	proc newInMemoryKvStore(): KvStore		197
+nim	checkpoint	boogie/stores/kvstore.html#checkpoint,KvStore	proc checkpoint(s: KvStore)		202
+nim	put	boogie/stores/kvstore.html#put,KvStore,string,string	proc put(s: KvStore; key, value: string)		213
+nim	get	boogie/stores/kvstore.html#get,KvStore,string	proc get(s: KvStore; key: string): Option[string]		221
+nim	hasKey	boogie/stores/kvstore.html#hasKey,KvStore,string	proc hasKey(s: KvStore; key: string): bool		229
+nim	delete	boogie/stores/kvstore.html#delete,KvStore,string	proc delete(s: KvStore; key: string): bool		233
+nim	len	boogie/stores/kvstore.html#len,KvStore	proc len(s: KvStore): int		243
+nim	isEmpty	boogie/stores/kvstore.html#isEmpty,KvStore	proc isEmpty(s: KvStore): bool		247
+nim	pairsUnordered	boogie/stores/kvstore.html#pairsUnordered.i,KvStore	iterator pairsUnordered(s: KvStore): (string, string)		251

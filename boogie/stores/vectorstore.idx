@@ -1,0 +1,29 @@
+nimTitle	vectorstore	boogie/stores/vectorstore.html	module boogie/stores/vectorstore		0
+nim	smInMemory	boogie/stores/vectorstore.html#smInMemory	VectorStorageMode.smInMemory		15
+nim	smDisk	boogie/stores/vectorstore.html#smDisk	VectorStorageMode.smDisk		15
+nim	VectorStorageMode	boogie/stores/vectorstore.html#VectorStorageMode	enum VectorStorageMode		15
+nim	dmCosine	boogie/stores/vectorstore.html#dmCosine	DistanceMetric.dmCosine		20
+nim	dmDot	boogie/stores/vectorstore.html#dmDot	DistanceMetric.dmDot		20
+nim	dmL2	boogie/stores/vectorstore.html#dmL2	DistanceMetric.dmL2		20
+nim	DistanceMetric	boogie/stores/vectorstore.html#DistanceMetric	enum DistanceMetric		20
+nim	VectorCollection	boogie/stores/vectorstore.html#VectorCollection	type VectorCollection		28
+nim	VectorStore	boogie/stores/vectorstore.html#VectorStore	type VectorStore		35
+nim	VectorStoreError	boogie/stores/vectorstore.html#VectorStoreError	object VectorStoreError		49
+nim	recoverFromWal	boogie/stores/vectorstore.html#recoverFromWal,VectorStore	proc recoverFromWal(s: VectorStore)		64
+nim	newCollection	boogie/stores/vectorstore.html#newCollection,string,int	proc newCollection(name: string; dimension: int): VectorCollection		73
+nim	hasCollection	boogie/stores/vectorstore.html#hasCollection,VectorStore,string	proc hasCollection(s: VectorStore; name: string): bool		84
+nim	getCollection	boogie/stores/vectorstore.html#getCollection,VectorStore,string	proc getCollection(s: VectorStore; name: string): Option[VectorCollection]		87
+nim	get	boogie/stores/vectorstore.html#get,VectorCollection,string	proc get(c: VectorCollection; pk: string): Option[seq[float32]]		124
+nim	all	boogie/stores/vectorstore.html#all.i,VectorCollection	iterator all(c: VectorCollection): (string, seq[float32])		130
+nim	checkpoint	boogie/stores/vectorstore.html#checkpoint,VectorStore	proc checkpoint(s: VectorStore)		222
+nim	newVectorStore	boogie/stores/vectorstore.html#newVectorStore,string,VectorStorageMode,bool,uint32,uint32	proc newVectorStore(path: string; mode: VectorStorageMode = smDisk;\n               enableWal: bool = true; checkpointEveryOps: uint32 = 0'u32;\n               walFlushEveryOps: uint32 = 1000'u32): VectorStore		273
+nim	newInMemoryVectorStore	boogie/stores/vectorstore.html#newInMemoryVectorStore	proc newInMemoryVectorStore(): VectorStore		306
+nim	createCollection	boogie/stores/vectorstore.html#createCollection,VectorStore,VectorCollection	proc createCollection(s: VectorStore; c: VectorCollection)		311
+nim	dropCollection	boogie/stores/vectorstore.html#dropCollection,VectorStore,string	proc dropCollection(s: VectorStore; name: string)		318
+nim	insert	boogie/stores/vectorstore.html#insert,VectorStore,string,string,seq[float32]	proc insert(s: VectorStore; collection, pk: string; vec: seq[float32])		325
+nim	delete	boogie/stores/vectorstore.html#delete,VectorStore,string,string	proc delete(s: VectorStore; collection, pk: string): bool		335
+nim	get	boogie/stores/vectorstore.html#get,VectorStore,string,string	proc get(s: VectorStore; collection, pk: string): Option[seq[float32]]		346
+nim	nearest	boogie/stores/vectorstore.html#nearest,VectorCollection,seq[float32],int,DistanceMetric	proc nearest(c: VectorCollection; query: seq[float32]; k: int;\n        metric: DistanceMetric = dmCosine): seq[(string, float32)]		376
+nim	nearest	boogie/stores/vectorstore.html#nearest,VectorStore,string,seq[float32],int,DistanceMetric	proc nearest(s: VectorStore; collection: string; query: seq[float32]; k: int;\n        metric: DistanceMetric = dmCosine): seq[(string, float32)]		403
+nimgrp	nearest	boogie/stores/vectorstore.html#nearest-procs-all	proc		376
+nimgrp	get	boogie/stores/vectorstore.html#get-procs-all	proc		124

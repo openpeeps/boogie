@@ -16,195 +16,582 @@
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH4QQQEwksSS9ZWwAAAk1JREFUWMPtll2ITVEUx39nn/O7Y5qR8f05wtCUUr6ZIS++8pEnkZInPImneaCQ5METNdOkeFBKUhMPRIkHKfEuUZSUlGlKPN2TrgfncpvmnntnmlEyq1Z7t89/rf9a6+y99oZxGZf/XeIq61EdtgKXgdXA0xrYAvBjOIF1AI9zvjcC74BSpndrJPkBWDScTF8Aa4E3wDlgHbASaANmVqlcCnwHvgDvgVfAJ+AikAAvgfVZwLnSVZHZaOuKoQi3ZOMi4NkYkpe1p4J7A8BpYAD49hfIy/oqG0+hLomiKP2L5L+1ubn5115S+3OAn4EnwBlgMzCjyt6ZAnQCJ4A7wOs88iRJHvw50HoujuPBoCKwHWiosy8MdfZnAdcHk8dxXFJ3VQbQlCTJvRBCGdRbD4M6uc5glpY3eAihpN5S5w12diSEcCCEcKUO4ljdr15T76ur1FDDLIQQ3qv71EdDOe3Kxj3leRXyk+pxdWnFWod6Wt2bY3de3aSuUHcPBVimHs7mK9WrmeOF6lR1o9qnzskh2ar2qm1qizpfXaPeVGdlmGN5pb09qMxz1Xb1kLqgzn1RyH7JUXW52lr5e/Kqi9qpto7V1atuUzfnARrV7jEib1T76gG2qxdGmXyiekkt1GswPTtek0aBfJp6YySGBfWg2tPQ0FAYgf1stUfdmdcjarbYJEniKIq6gY/Aw+zWHAC+p2labGpqiorFYgGYCEzN7oQdQClN07O1/EfDyGgC0ALMBdYAi4FyK+4H3gLPsxfR1zRNi+NP7nH5J+QntnXe5B5mpfQAAAAASUVORK5CYII=">
 
 <!-- CSS -->
-<link rel="stylesheet" type="text/css" href="nimdoc.out.css?v=2.2.8">
+<link rel="stylesheet" type="text/css" href="nimdoc.out.css?v=2.2.10">
 
 <!-- JS -->
-<script type="text/javascript" src="dochack.js?v=2.2.8"></script>
+<script type="text/javascript" src="dochack.js?v=2.2.10"></script>
 </head>
 <body>
   <div class="document" id="documentId">
+    <input type="checkbox" id="nav-toggle" hidden>
+    <label for="nav-toggle" id="nav-burger">&#9776;</label>
+    <label for="nav-toggle" id="nav-overlay"></label>
     <div class="container">
       <h1 class="title">Index</h1>
-      Modules: <a href="index.html">boogie</a>, <a href="boogie/store.html">boogie/store</a>, <a href="boogie/wal.html">boogie/wal</a>.<br/><p /><h2>API symbols</h2>
+      Modules: <a href="index.html">boogie</a>, <a href="boogie/stores/columnar.html">boogie/stores/columnar</a>, <a href="boogie/stores/graphstore.html">boogie/stores/graphstore</a>, <a href="boogie/stores/kvstore.html">boogie/stores/kvstore</a>, <a href="boogie/stores/rdbms.html">boogie/stores/rdbms</a>, <a href="boogie/stores/vectorstore.html">boogie/stores/vectorstore</a>, <a href="boogie/wal.html">boogie/wal</a>.<br/><p /><h2>API symbols</h2>
 <dl><dt><a name="%60%24%60" href="#%60%24%60"><span>`$`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc `$`(v: Value): string" href="boogie/store.html#%24%2CValue">store: proc `$`(v: Value): string</a></li>
+          data-doc-search-tag="rdbms: proc `$`(v: Value): string" href="boogie/stores/rdbms.html#%24%2CValue">rdbms: proc `$`(v: Value): string</a></li>
           </ul></dd>
 <dt><a name="%60%3D%3D%60" href="#%60%3D%3D%60"><span>`==`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc `==`(a, b: RowRecord): bool" href="boogie/store.html#%3D%3D%2CRowRecord%2CRowRecord">store: proc `==`(a, b: RowRecord): bool</a></li>
+          data-doc-search-tag="rdbms: proc `==`(a, b: RowRecord): bool" href="boogie/stores/rdbms.html#%3D%3D%2CRowRecord%2CRowRecord">rdbms: proc `==`(a, b: RowRecord): bool</a></li>
           <li><a class="reference external"
-          data-doc-search-tag="store: proc `==`(a, b: Value): bool" href="boogie/store.html#%3D%3D%2CValue%2CValue">store: proc `==`(a, b: Value): bool</a></li>
+          data-doc-search-tag="rdbms: proc `==`(a, b: Value): bool" href="boogie/stores/rdbms.html#%3D%3D%2CValue%2CValue">rdbms: proc `==`(a, b: Value): bool</a></li>
+          </ul></dd>
+<dt><a name="AggKind" href="#AggKind"><span>AggKind:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: enum AggKind" href="boogie/stores/columnar.html#AggKind">columnar: enum AggKind</a></li>
+          </ul></dd>
+<dt><a name="aggregate" href="#aggregate"><span>aggregate:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: proc aggregate(s: ColumnarStore; table: string; specs: seq[AggregateSpec];
+          filters: seq[Filter] = @[]): JsonNode" href="boogie/stores/columnar.html#aggregate%2CColumnarStore%2Cstring%2Cseq%5BAggregateSpec%5D%2Cseq%5BFilter%5D">columnar: proc aggregate(s: ColumnarStore; table: string; specs: seq[AggregateSpec];
+          filters: seq[Filter] = @[]): JsonNode</a></li>
+          </ul></dd>
+<dt><a name="AggregateSpec" href="#AggregateSpec"><span>AggregateSpec:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: object AggregateSpec" href="boogie/stores/columnar.html#AggregateSpec">columnar: object AggregateSpec</a></li>
+          </ul></dd>
+<dt><a name="akAvg" href="#akAvg"><span>akAvg:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: AggKind.akAvg" href="boogie/stores/columnar.html#akAvg">columnar: AggKind.akAvg</a></li>
+          </ul></dd>
+<dt><a name="akCount" href="#akCount"><span>akCount:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: AggKind.akCount" href="boogie/stores/columnar.html#akCount">columnar: AggKind.akCount</a></li>
+          </ul></dd>
+<dt><a name="akMax" href="#akMax"><span>akMax:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: AggKind.akMax" href="boogie/stores/columnar.html#akMax">columnar: AggKind.akMax</a></li>
+          </ul></dd>
+<dt><a name="akMin" href="#akMin"><span>akMin:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: AggKind.akMin" href="boogie/stores/columnar.html#akMin">columnar: AggKind.akMin</a></li>
+          </ul></dd>
+<dt><a name="akSum" href="#akSum"><span>akSum:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: AggKind.akSum" href="boogie/stores/columnar.html#akSum">columnar: AggKind.akSum</a></li>
+          </ul></dd>
+<dt><a name="all" href="#all"><span>all:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: iterator all(c: VectorCollection): (string, seq[float32])" href="boogie/stores/vectorstore.html#all.i%2CVectorCollection">vectorstore: iterator all(c: VectorCollection): (string, seq[float32])</a></li>
           </ul></dd>
 <dt><a name="allRows" href="#allRows"><span>allRows:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: iterator allRows(t: DbTable): (string, RowData)" href="boogie/store.html#allRows.i%2CDbTable">store: iterator allRows(t: DbTable): (string, RowData)</a></li>
+          data-doc-search-tag="rdbms: iterator allRows(t: DbTable): (string, RowData)" href="boogie/stores/rdbms.html#allRows.i%2CDbTable">rdbms: iterator allRows(t: DbTable): (string, RowData)</a></li>
           </ul></dd>
 <dt><a name="allRowsByPk" href="#allRowsByPk"><span>allRowsByPk:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: iterator allRowsByPk(t: DbTable): (string, RowData)" href="boogie/store.html#allRowsByPk.i%2CDbTable">store: iterator allRowsByPk(t: DbTable): (string, RowData)</a></li>
+          data-doc-search-tag="rdbms: iterator allRowsByPk(t: DbTable): (string, RowData)" href="boogie/stores/rdbms.html#allRowsByPk.i%2CDbTable">rdbms: iterator allRowsByPk(t: DbTable): (string, RowData)</a></li>
           </ul></dd>
 <dt><a name="append" href="#append"><span>append:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: proc append(w: var Wal; entry: WalEntry; sync: bool = true): uint64" href="boogie/wal.html#append%2CWal%2CWalEntry%2Cbool">wal: proc append(w: var Wal; entry: WalEntry; sync: bool = true): uint64</a></li>
           </ul></dd>
+<dt><a name="beginTx" href="#beginTx"><span>beginTx:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: proc beginTx(s: GraphStore): GraphTx" href="boogie/stores/graphstore.html#beginTx%2CGraphStore">graphstore: proc beginTx(s: GraphStore): GraphTx</a></li>
+          </ul></dd>
+<dt><a name="ccDictionary" href="#ccDictionary"><span>ccDictionary:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: CompressionCodec.ccDictionary" href="boogie/stores/columnar.html#ccDictionary">columnar: CompressionCodec.ccDictionary</a></li>
+          </ul></dd>
+<dt><a name="ccNone" href="#ccNone"><span>ccNone:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: CompressionCodec.ccNone" href="boogie/stores/columnar.html#ccNone">columnar: CompressionCodec.ccNone</a></li>
+          </ul></dd>
+<dt><a name="ccRle" href="#ccRle"><span>ccRle:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: CompressionCodec.ccRle" href="boogie/stores/columnar.html#ccRle">columnar: CompressionCodec.ccRle</a></li>
+          </ul></dd>
 <dt><a name="checkpoint" href="#checkpoint"><span>checkpoint:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc checkpoint(s: Store)" href="boogie/store.html#checkpoint%2CStore">store: proc checkpoint(s: Store)</a></li>
+          data-doc-search-tag="columnar: proc checkpoint(s: var ColumnarStore)" href="boogie/stores/columnar.html#checkpoint%2CColumnarStore">columnar: proc checkpoint(s: var ColumnarStore)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="kvstore: proc checkpoint(s: KvStore)" href="boogie/stores/kvstore.html#checkpoint%2CKvStore">kvstore: proc checkpoint(s: KvStore)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="rdbms: proc checkpoint(s: Store)" href="boogie/stores/rdbms.html#checkpoint%2CStore">rdbms: proc checkpoint(s: Store)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc checkpoint(s: VectorStore)" href="boogie/stores/vectorstore.html#checkpoint%2CVectorStore">vectorstore: proc checkpoint(s: VectorStore)</a></li>
+          </ul></dd>
+<dt><a name="closeGraphStore" href="#closeGraphStore"><span>closeGraphStore:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: proc closeGraphStore(s: GraphStore)" href="boogie/stores/graphstore.html#closeGraphStore%2CGraphStore">graphstore: proc closeGraphStore(s: GraphStore)</a></li>
+          </ul></dd>
+<dt><a name="ColumnarError" href="#ColumnarError"><span>ColumnarError:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: object ColumnarError" href="boogie/stores/columnar.html#ColumnarError">columnar: object ColumnarError</a></li>
+          </ul></dd>
+<dt><a name="ColumnarStore" href="#ColumnarStore"><span>ColumnarStore:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: object ColumnarStore" href="boogie/stores/columnar.html#ColumnarStore">columnar: object ColumnarStore</a></li>
           </ul></dd>
 <dt><a name="ColumnDef" href="#ColumnDef"><span>ColumnDef:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: object ColumnDef" href="boogie/store.html#ColumnDef">store: object ColumnDef</a></li>
+          data-doc-search-tag="rdbms: object ColumnDef" href="boogie/stores/rdbms.html#ColumnDef">rdbms: object ColumnDef</a></li>
+          </ul></dd>
+<dt><a name="ColumnSchema" href="#ColumnSchema"><span>ColumnSchema:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: object ColumnSchema" href="boogie/stores/columnar.html#ColumnSchema">columnar: object ColumnSchema</a></li>
+          </ul></dd>
+<dt><a name="ColumnType" href="#ColumnType"><span>ColumnType:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: enum ColumnType" href="boogie/stores/columnar.html#ColumnType">columnar: enum ColumnType</a></li>
+          </ul></dd>
+<dt><a name="commit" href="#commit"><span>commit:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: proc commit(tx: var GraphTx)" href="boogie/stores/graphstore.html#commit%2CGraphTx">graphstore: proc commit(tx: var GraphTx)</a></li>
+          </ul></dd>
+<dt><a name="CompressionCodec" href="#CompressionCodec"><span>CompressionCodec:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: enum CompressionCodec" href="boogie/stores/columnar.html#CompressionCodec">columnar: enum CompressionCodec</a></li>
+          </ul></dd>
+<dt><a name="createCollection" href="#createCollection"><span>createCollection:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc createCollection(s: VectorStore; c: VectorCollection)" href="boogie/stores/vectorstore.html#createCollection%2CVectorStore%2CVectorCollection">vectorstore: proc createCollection(s: VectorStore; c: VectorCollection)</a></li>
           </ul></dd>
 <dt><a name="createIndex" href="#createIndex"><span>createIndex:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc createIndex(t: DbTable; column: string)" href="boogie/store.html#createIndex%2CDbTable%2Cstring">store: proc createIndex(t: DbTable; column: string)</a></li>
+          data-doc-search-tag="rdbms: proc createIndex(t: DbTable; column: string)" href="boogie/stores/rdbms.html#createIndex%2CDbTable%2Cstring">rdbms: proc createIndex(t: DbTable; column: string)</a></li>
+          </ul></dd>
+<dt><a name="createNode" href="#createNode"><span>createNode:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: proc createNode(tx: var GraphTx; labels: seq[string] = @[];
+           props: JsonNode = newJObject()): uint64" href="boogie/stores/graphstore.html#createNode%2CGraphTx%2Cseq%5Bstring%5D%2CJsonNode">graphstore: proc createNode(tx: var GraphTx; labels: seq[string] = @[];
+           props: JsonNode = newJObject()): uint64</a></li>
+          </ul></dd>
+<dt><a name="createRelationship" href="#createRelationship"><span>createRelationship:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: proc createRelationship(tx: var GraphTx; fromId, toId: uint64; relType: string;
+                   props: JsonNode = newJObject()): uint64" href="boogie/stores/graphstore.html#createRelationship%2CGraphTx%2Cuint64%2Cuint64%2Cstring%2CJsonNode">graphstore: proc createRelationship(tx: var GraphTx; fromId, toId: uint64; relType: string;
+                   props: JsonNode = newJObject()): uint64</a></li>
           </ul></dd>
 <dt><a name="createTable" href="#createTable"><span>createTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc createTable(s: Store; t: DbTable)" href="boogie/store.html#createTable%2CStore%2CDbTable">store: proc createTable(s: Store; t: DbTable)</a></li>
+          data-doc-search-tag="columnar: proc createTable(s: var ColumnarStore; schema: TableSchema; sync: bool = true)" href="boogie/stores/columnar.html#createTable%2CColumnarStore%2CTableSchema%2Cbool">columnar: proc createTable(s: var ColumnarStore; schema: TableSchema; sync: bool = true)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="rdbms: proc createTable(s: Store; t: DbTable)" href="boogie/stores/rdbms.html#createTable%2CStore%2CDbTable">rdbms: proc createTable(s: Store; t: DbTable)</a></li>
+          </ul></dd>
+<dt><a name="ctBool" href="#ctBool"><span>ctBool:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: ColumnType.ctBool" href="boogie/stores/columnar.html#ctBool">columnar: ColumnType.ctBool</a></li>
+          </ul></dd>
+<dt><a name="ctFloat64" href="#ctFloat64"><span>ctFloat64:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: ColumnType.ctFloat64" href="boogie/stores/columnar.html#ctFloat64">columnar: ColumnType.ctFloat64</a></li>
+          </ul></dd>
+<dt><a name="ctInt64" href="#ctInt64"><span>ctInt64:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: ColumnType.ctInt64" href="boogie/stores/columnar.html#ctInt64">columnar: ColumnType.ctInt64</a></li>
+          </ul></dd>
+<dt><a name="ctJson" href="#ctJson"><span>ctJson:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: ColumnType.ctJson" href="boogie/stores/columnar.html#ctJson">columnar: ColumnType.ctJson</a></li>
+          </ul></dd>
+<dt><a name="ctString" href="#ctString"><span>ctString:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: ColumnType.ctString" href="boogie/stores/columnar.html#ctString">columnar: ColumnType.ctString</a></li>
           </ul></dd>
 <dt><a name="DataType" href="#DataType"><span>DataType:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: enum DataType" href="boogie/store.html#DataType">store: enum DataType</a></li>
+          data-doc-search-tag="rdbms: enum DataType" href="boogie/stores/rdbms.html#DataType">rdbms: enum DataType</a></li>
           </ul></dd>
 <dt><a name="DbTable" href="#DbTable"><span>DbTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: type DbTable" href="boogie/store.html#DbTable">store: type DbTable</a></li>
+          data-doc-search-tag="rdbms: type DbTable" href="boogie/stores/rdbms.html#DbTable">rdbms: type DbTable</a></li>
+          </ul></dd>
+<dt><a name="delete" href="#delete"><span>delete:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="kvstore: proc delete(s: KvStore; key: string): bool" href="boogie/stores/kvstore.html#delete%2CKvStore%2Cstring">kvstore: proc delete(s: KvStore; key: string): bool</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc delete(s: VectorStore; collection, pk: string): bool" href="boogie/stores/vectorstore.html#delete%2CVectorStore%2Cstring%2Cstring">vectorstore: proc delete(s: VectorStore; collection, pk: string): bool</a></li>
+          </ul></dd>
+<dt><a name="deleteNode" href="#deleteNode"><span>deleteNode:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: proc deleteNode(tx: var GraphTx; id: uint64)" href="boogie/stores/graphstore.html#deleteNode%2CGraphTx%2Cuint64">graphstore: proc deleteNode(tx: var GraphTx; id: uint64)</a></li>
+          </ul></dd>
+<dt><a name="deleteRelationship" href="#deleteRelationship"><span>deleteRelationship:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: proc deleteRelationship(tx: var GraphTx; id: uint64)" href="boogie/stores/graphstore.html#deleteRelationship%2CGraphTx%2Cuint64">graphstore: proc deleteRelationship(tx: var GraphTx; id: uint64)</a></li>
           </ul></dd>
 <dt><a name="deleteRow" href="#deleteRow"><span>deleteRow:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc deleteRow(t: DbTable; pk: string): bool" href="boogie/store.html#deleteRow%2CDbTable%2Cstring">store: proc deleteRow(t: DbTable; pk: string): bool</a></li>
+          data-doc-search-tag="rdbms: proc deleteRow(t: DbTable; pk: string): bool" href="boogie/stores/rdbms.html#deleteRow%2CDbTable%2Cstring">rdbms: proc deleteRow(t: DbTable; pk: string): bool</a></li>
           <li><a class="reference external"
-          data-doc-search-tag="store: proc deleteRow(s: Store; tableName: string; pk: string): bool" href="boogie/store.html#deleteRow%2CStore%2Cstring%2Cstring">store: proc deleteRow(s: Store; tableName: string; pk: string): bool</a></li>
+          data-doc-search-tag="rdbms: proc deleteRow(s: Store; tableName: string; pk: string): bool" href="boogie/stores/rdbms.html#deleteRow%2CStore%2Cstring%2Cstring">rdbms: proc deleteRow(s: Store; tableName: string; pk: string): bool</a></li>
+          </ul></dd>
+<dt><a name="DistanceMetric" href="#DistanceMetric"><span>DistanceMetric:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: enum DistanceMetric" href="boogie/stores/vectorstore.html#DistanceMetric">vectorstore: enum DistanceMetric</a></li>
+          </ul></dd>
+<dt><a name="dmCosine" href="#dmCosine"><span>dmCosine:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: DistanceMetric.dmCosine" href="boogie/stores/vectorstore.html#dmCosine">vectorstore: DistanceMetric.dmCosine</a></li>
+          </ul></dd>
+<dt><a name="dmDot" href="#dmDot"><span>dmDot:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: DistanceMetric.dmDot" href="boogie/stores/vectorstore.html#dmDot">vectorstore: DistanceMetric.dmDot</a></li>
+          </ul></dd>
+<dt><a name="dmL2" href="#dmL2"><span>dmL2:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: DistanceMetric.dmL2" href="boogie/stores/vectorstore.html#dmL2">vectorstore: DistanceMetric.dmL2</a></li>
+          </ul></dd>
+<dt><a name="dropCollection" href="#dropCollection"><span>dropCollection:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc dropCollection(s: VectorStore; name: string)" href="boogie/stores/vectorstore.html#dropCollection%2CVectorStore%2Cstring">vectorstore: proc dropCollection(s: VectorStore; name: string)</a></li>
           </ul></dd>
 <dt><a name="dropTable" href="#dropTable"><span>dropTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc dropTable(s: Store; name: string)" href="boogie/store.html#dropTable%2CStore%2Cstring">store: proc dropTable(s: Store; name: string)</a></li>
+          data-doc-search-tag="columnar: proc dropTable(s: var ColumnarStore; table: string; sync: bool = true)" href="boogie/stores/columnar.html#dropTable%2CColumnarStore%2Cstring%2Cbool">columnar: proc dropTable(s: var ColumnarStore; table: string; sync: bool = true)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="rdbms: proc dropTable(s: Store; name: string)" href="boogie/stores/rdbms.html#dropTable%2CStore%2Cstring">rdbms: proc dropTable(s: Store; name: string)</a></li>
           </ul></dd>
 <dt><a name="dtBool" href="#dtBool"><span>dtBool:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: DataType.dtBool" href="boogie/store.html#dtBool">store: DataType.dtBool</a></li>
+          data-doc-search-tag="rdbms: DataType.dtBool" href="boogie/stores/rdbms.html#dtBool">rdbms: DataType.dtBool</a></li>
           </ul></dd>
 <dt><a name="dtFloat" href="#dtFloat"><span>dtFloat:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: DataType.dtFloat" href="boogie/store.html#dtFloat">store: DataType.dtFloat</a></li>
+          data-doc-search-tag="rdbms: DataType.dtFloat" href="boogie/stores/rdbms.html#dtFloat">rdbms: DataType.dtFloat</a></li>
           </ul></dd>
 <dt><a name="dtInt" href="#dtInt"><span>dtInt:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: DataType.dtInt" href="boogie/store.html#dtInt">store: DataType.dtInt</a></li>
+          data-doc-search-tag="rdbms: DataType.dtInt" href="boogie/stores/rdbms.html#dtInt">rdbms: DataType.dtInt</a></li>
           </ul></dd>
 <dt><a name="dtJson" href="#dtJson"><span>dtJson:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: DataType.dtJson" href="boogie/store.html#dtJson">store: DataType.dtJson</a></li>
+          data-doc-search-tag="rdbms: DataType.dtJson" href="boogie/stores/rdbms.html#dtJson">rdbms: DataType.dtJson</a></li>
           </ul></dd>
 <dt><a name="dtNull" href="#dtNull"><span>dtNull:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: DataType.dtNull" href="boogie/store.html#dtNull">store: DataType.dtNull</a></li>
+          data-doc-search-tag="rdbms: DataType.dtNull" href="boogie/stores/rdbms.html#dtNull">rdbms: DataType.dtNull</a></li>
           </ul></dd>
 <dt><a name="dtText" href="#dtText"><span>dtText:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: DataType.dtText" href="boogie/store.html#dtText">store: DataType.dtText</a></li>
+          data-doc-search-tag="rdbms: DataType.dtText" href="boogie/stores/rdbms.html#dtText">rdbms: DataType.dtText</a></li>
           </ul></dd>
 <dt><a name="entries" href="#entries"><span>entries:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: iterator entries(w: Wal): WalEntry" href="boogie/wal.html#entries.i%2CWal">wal: iterator entries(w: Wal): WalEntry</a></li>
           </ul></dd>
+<dt><a name="Filter" href="#Filter"><span>Filter:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: object Filter" href="boogie/stores/columnar.html#Filter">columnar: object Filter</a></li>
+          </ul></dd>
+<dt><a name="FilterOp" href="#FilterOp"><span>FilterOp:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: enum FilterOp" href="boogie/stores/columnar.html#FilterOp">columnar: enum FilterOp</a></li>
+          </ul></dd>
+<dt><a name="findNodesByLabel" href="#findNodesByLabel"><span>findNodesByLabel:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: proc findNodesByLabel(s: GraphStore; label: string): seq[GraphNode]" href="boogie/stores/graphstore.html#findNodesByLabel%2CGraphStore%2Cstring">graphstore: proc findNodesByLabel(s: GraphStore; label: string): seq[GraphNode]</a></li>
+          </ul></dd>
 <dt><a name="flush" href="#flush"><span>flush:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: proc flush(w: var Wal)" href="boogie/wal.html#flush%2CWal">wal: proc flush(w: var Wal)</a></li>
           </ul></dd>
+<dt><a name="foEq" href="#foEq"><span>foEq:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: FilterOp.foEq" href="boogie/stores/columnar.html#foEq">columnar: FilterOp.foEq</a></li>
+          </ul></dd>
+<dt><a name="foGt" href="#foGt"><span>foGt:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: FilterOp.foGt" href="boogie/stores/columnar.html#foGt">columnar: FilterOp.foGt</a></li>
+          </ul></dd>
+<dt><a name="foGte" href="#foGte"><span>foGte:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: FilterOp.foGte" href="boogie/stores/columnar.html#foGte">columnar: FilterOp.foGte</a></li>
+          </ul></dd>
+<dt><a name="foIn" href="#foIn"><span>foIn:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: FilterOp.foIn" href="boogie/stores/columnar.html#foIn">columnar: FilterOp.foIn</a></li>
+          </ul></dd>
+<dt><a name="foLt" href="#foLt"><span>foLt:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: FilterOp.foLt" href="boogie/stores/columnar.html#foLt">columnar: FilterOp.foLt</a></li>
+          </ul></dd>
+<dt><a name="foLte" href="#foLte"><span>foLte:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: FilterOp.foLte" href="boogie/stores/columnar.html#foLte">columnar: FilterOp.foLte</a></li>
+          </ul></dd>
+<dt><a name="foNe" href="#foNe"><span>foNe:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: FilterOp.foNe" href="boogie/stores/columnar.html#foNe">columnar: FilterOp.foNe</a></li>
+          </ul></dd>
+<dt><a name="get" href="#get"><span>get:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="kvstore: proc get(s: KvStore; key: string): Option[string]" href="boogie/stores/kvstore.html#get%2CKvStore%2Cstring">kvstore: proc get(s: KvStore; key: string): Option[string]</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc get(c: VectorCollection; pk: string): Option[seq[float32]]" href="boogie/stores/vectorstore.html#get%2CVectorCollection%2Cstring">vectorstore: proc get(c: VectorCollection; pk: string): Option[seq[float32]]</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc get(s: VectorStore; collection, pk: string): Option[seq[float32]]" href="boogie/stores/vectorstore.html#get%2CVectorStore%2Cstring%2Cstring">vectorstore: proc get(s: VectorStore; collection, pk: string): Option[seq[float32]]</a></li>
+          </ul></dd>
+<dt><a name="getCollection" href="#getCollection"><span>getCollection:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc getCollection(s: VectorStore; name: string): Option[VectorCollection]" href="boogie/stores/vectorstore.html#getCollection%2CVectorStore%2Cstring">vectorstore: proc getCollection(s: VectorStore; name: string): Option[VectorCollection]</a></li>
+          </ul></dd>
+<dt><a name="getNode" href="#getNode"><span>getNode:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: proc getNode(s: GraphStore; id: uint64; outNode: var GraphNode): bool" href="boogie/stores/graphstore.html#getNode%2CGraphStore%2Cuint64%2CGraphNode">graphstore: proc getNode(s: GraphStore; id: uint64; outNode: var GraphNode): bool</a></li>
+          </ul></dd>
+<dt><a name="getRelationship" href="#getRelationship"><span>getRelationship:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: proc getRelationship(s: GraphStore; id: uint64; outRel: var Relationship): bool" href="boogie/stores/graphstore.html#getRelationship%2CGraphStore%2Cuint64%2CRelationship">graphstore: proc getRelationship(s: GraphStore; id: uint64; outRel: var Relationship): bool</a></li>
+          </ul></dd>
 <dt><a name="getRow" href="#getRow"><span>getRow:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc getRow(t: DbTable; pk: string): Option[RowData]" href="boogie/store.html#getRow%2CDbTable%2Cstring">store: proc getRow(t: DbTable; pk: string): Option[RowData]</a></li>
+          data-doc-search-tag="rdbms: proc getRow(t: DbTable; pk: string): Option[RowData]" href="boogie/stores/rdbms.html#getRow%2CDbTable%2Cstring">rdbms: proc getRow(t: DbTable; pk: string): Option[RowData]</a></li>
           <li><a class="reference external"
-          data-doc-search-tag="store: proc getRow(s: Store; tableName: string; pk: string): Option[RowData]" href="boogie/store.html#getRow%2CStore%2Cstring%2Cstring">store: proc getRow(s: Store; tableName: string; pk: string): Option[RowData]</a></li>
+          data-doc-search-tag="rdbms: proc getRow(s: Store; tableName: string; pk: string): Option[RowData]" href="boogie/stores/rdbms.html#getRow%2CStore%2Cstring%2Cstring">rdbms: proc getRow(s: Store; tableName: string; pk: string): Option[RowData]</a></li>
           </ul></dd>
 <dt><a name="getTable" href="#getTable"><span>getTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc getTable(s: Store; name: string): Option[DbTable]" href="boogie/store.html#getTable%2CStore%2Cstring">store: proc getTable(s: Store; name: string): Option[DbTable]</a></li>
+          data-doc-search-tag="rdbms: proc getTable(s: Store; name: string): Option[DbTable]" href="boogie/stores/rdbms.html#getTable%2CStore%2Cstring">rdbms: proc getTable(s: Store; name: string): Option[DbTable]</a></li>
+          </ul></dd>
+<dt><a name="GraphError" href="#GraphError"><span>GraphError:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: object GraphError" href="boogie/stores/graphstore.html#GraphError">graphstore: object GraphError</a></li>
+          </ul></dd>
+<dt><a name="GraphNode" href="#GraphNode"><span>GraphNode:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: object GraphNode" href="boogie/stores/graphstore.html#GraphNode">graphstore: object GraphNode</a></li>
+          </ul></dd>
+<dt><a name="GraphStore" href="#GraphStore"><span>GraphStore:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: type GraphStore" href="boogie/stores/graphstore.html#GraphStore">graphstore: type GraphStore</a></li>
+          </ul></dd>
+<dt><a name="GraphTx" href="#GraphTx"><span>GraphTx:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: object GraphTx" href="boogie/stores/graphstore.html#GraphTx">graphstore: object GraphTx</a></li>
+          </ul></dd>
+<dt><a name="hasCollection" href="#hasCollection"><span>hasCollection:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc hasCollection(s: VectorStore; name: string): bool" href="boogie/stores/vectorstore.html#hasCollection%2CVectorStore%2Cstring">vectorstore: proc hasCollection(s: VectorStore; name: string): bool</a></li>
+          </ul></dd>
+<dt><a name="hasKey" href="#hasKey"><span>hasKey:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="kvstore: proc hasKey(s: KvStore; key: string): bool" href="boogie/stores/kvstore.html#hasKey%2CKvStore%2Cstring">kvstore: proc hasKey(s: KvStore; key: string): bool</a></li>
           </ul></dd>
 <dt><a name="hasTable" href="#hasTable"><span>hasTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc hasTable(s: Store; name: string): bool" href="boogie/store.html#hasTable%2CStore%2Cstring">store: proc hasTable(s: Store; name: string): bool</a></li>
+          data-doc-search-tag="rdbms: proc hasTable(s: Store; name: string): bool" href="boogie/stores/rdbms.html#hasTable%2CStore%2Cstring">rdbms: proc hasTable(s: Store; name: string): bool</a></li>
+          </ul></dd>
+<dt><a name="insert" href="#insert"><span>insert:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc insert(s: VectorStore; collection, pk: string; vec: seq[float32])" href="boogie/stores/vectorstore.html#insert%2CVectorStore%2Cstring%2Cstring%2Cseq%5Bfloat32%5D">vectorstore: proc insert(s: VectorStore; collection, pk: string; vec: seq[float32])</a></li>
+          </ul></dd>
+<dt><a name="insertBatch" href="#insertBatch"><span>insertBatch:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: proc insertBatch(s: var ColumnarStore; table: string; rows: seq[JsonNode];
+            sync: bool = true)" href="boogie/stores/columnar.html#insertBatch%2CColumnarStore%2Cstring%2Cseq%5BJsonNode%5D%2Cbool">columnar: proc insertBatch(s: var ColumnarStore; table: string; rows: seq[JsonNode];
+            sync: bool = true)</a></li>
           </ul></dd>
 <dt><a name="insertRow" href="#insertRow"><span>insertRow:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc insertRow(t: DbTable; data: RowData): string" href="boogie/store.html#insertRow%2CDbTable%2CRowData">store: proc insertRow(t: DbTable; data: RowData): string</a></li>
+          data-doc-search-tag="rdbms: proc insertRow(t: DbTable; data: RowData): string" href="boogie/stores/rdbms.html#insertRow%2CDbTable%2CRowData">rdbms: proc insertRow(t: DbTable; data: RowData): string</a></li>
           <li><a class="reference external"
-          data-doc-search-tag="store: proc insertRow(t: DbTable; pk: string; data: RowData)" href="boogie/store.html#insertRow%2CDbTable%2Cstring%2CRowData">store: proc insertRow(t: DbTable; pk: string; data: RowData)</a></li>
+          data-doc-search-tag="rdbms: proc insertRow(t: DbTable; pk: string; data: RowData)" href="boogie/stores/rdbms.html#insertRow%2CDbTable%2Cstring%2CRowData">rdbms: proc insertRow(t: DbTable; pk: string; data: RowData)</a></li>
           <li><a class="reference external"
-          data-doc-search-tag="store: proc insertRow(s: Store; tableName: string; data: RowData): string" href="boogie/store.html#insertRow%2CStore%2Cstring%2CRowData">store: proc insertRow(s: Store; tableName: string; data: RowData): string</a></li>
+          data-doc-search-tag="rdbms: proc insertRow(s: Store; tableName: string; data: RowData): string" href="boogie/stores/rdbms.html#insertRow%2CStore%2Cstring%2CRowData">rdbms: proc insertRow(s: Store; tableName: string; data: RowData): string</a></li>
           <li><a class="reference external"
-          data-doc-search-tag="store: proc insertRow(s: Store; tableName: string; pk: string; data: RowData)" href="boogie/store.html#insertRow%2CStore%2Cstring%2Cstring%2CRowData">store: proc insertRow(s: Store; tableName: string; pk: string; data: RowData)</a></li>
+          data-doc-search-tag="rdbms: proc insertRow(s: Store; tableName: string; pk: string; data: RowData)" href="boogie/stores/rdbms.html#insertRow%2CStore%2Cstring%2Cstring%2CRowData">rdbms: proc insertRow(s: Store; tableName: string; pk: string; data: RowData)</a></li>
           </ul></dd>
 <dt><a name="isEmpty" href="#isEmpty"><span>isEmpty:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc isEmpty(t: DbTable): bool" href="boogie/store.html#isEmpty%2CDbTable">store: proc isEmpty(t: DbTable): bool</a></li>
+          data-doc-search-tag="kvstore: proc isEmpty(s: KvStore): bool" href="boogie/stores/kvstore.html#isEmpty%2CKvStore">kvstore: proc isEmpty(s: KvStore): bool</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="rdbms: proc isEmpty(t: DbTable): bool" href="boogie/stores/rdbms.html#isEmpty%2CDbTable">rdbms: proc isEmpty(t: DbTable): bool</a></li>
+          </ul></dd>
+<dt><a name="join" href="#join"><span>join:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: proc join(s: ColumnarStore; joinType: JoinType; leftTable, rightTable: string): seq[
+    JsonNode]" href="boogie/stores/columnar.html#join%2CColumnarStore%2CJoinType%2Cstring%2Cstring">columnar: proc join(s: ColumnarStore; joinType: JoinType; leftTable, rightTable: string): seq[
+    JsonNode]</a></li>
+          </ul></dd>
+<dt><a name="JoinType" href="#JoinType"><span>JoinType:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: enum JoinType" href="boogie/stores/columnar.html#JoinType">columnar: enum JoinType</a></li>
+          </ul></dd>
+<dt><a name="jtCross" href="#jtCross"><span>jtCross:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: JoinType.jtCross" href="boogie/stores/columnar.html#jtCross">columnar: JoinType.jtCross</a></li>
+          </ul></dd>
+<dt><a name="jtFull" href="#jtFull"><span>jtFull:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: JoinType.jtFull" href="boogie/stores/columnar.html#jtFull">columnar: JoinType.jtFull</a></li>
+          </ul></dd>
+<dt><a name="jtInner" href="#jtInner"><span>jtInner:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: JoinType.jtInner" href="boogie/stores/columnar.html#jtInner">columnar: JoinType.jtInner</a></li>
+          </ul></dd>
+<dt><a name="jtLeft" href="#jtLeft"><span>jtLeft:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: JoinType.jtLeft" href="boogie/stores/columnar.html#jtLeft">columnar: JoinType.jtLeft</a></li>
+          </ul></dd>
+<dt><a name="jtRight" href="#jtRight"><span>jtRight:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: JoinType.jtRight" href="boogie/stores/columnar.html#jtRight">columnar: JoinType.jtRight</a></li>
+          </ul></dd>
+<dt><a name="ksmDisk" href="#ksmDisk"><span>ksmDisk:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="kvstore: KvStorageMode.ksmDisk" href="boogie/stores/kvstore.html#ksmDisk">kvstore: KvStorageMode.ksmDisk</a></li>
+          </ul></dd>
+<dt><a name="ksmInMemory" href="#ksmInMemory"><span>ksmInMemory:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="kvstore: KvStorageMode.ksmInMemory" href="boogie/stores/kvstore.html#ksmInMemory">kvstore: KvStorageMode.ksmInMemory</a></li>
+          </ul></dd>
+<dt><a name="KvStorageMode" href="#KvStorageMode"><span>KvStorageMode:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="kvstore: enum KvStorageMode" href="boogie/stores/kvstore.html#KvStorageMode">kvstore: enum KvStorageMode</a></li>
+          </ul></dd>
+<dt><a name="KvStore" href="#KvStore"><span>KvStore:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="kvstore: type KvStore" href="boogie/stores/kvstore.html#KvStore">kvstore: type KvStore</a></li>
+          </ul></dd>
+<dt><a name="KvStoreError" href="#KvStoreError"><span>KvStoreError:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="kvstore: object KvStoreError" href="boogie/stores/kvstore.html#KvStoreError">kvstore: object KvStoreError</a></li>
+          </ul></dd>
+<dt><a name="len" href="#len"><span>len:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="kvstore: proc len(s: KvStore): int" href="boogie/stores/kvstore.html#len%2CKvStore">kvstore: proc len(s: KvStore): int</a></li>
+          </ul></dd>
+<dt><a name="nearest" href="#nearest"><span>nearest:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc nearest(c: VectorCollection; query: seq[float32]; k: int;
+        metric: DistanceMetric = dmCosine): seq[(string, float32)]" href="boogie/stores/vectorstore.html#nearest%2CVectorCollection%2Cseq%5Bfloat32%5D%2Cint%2CDistanceMetric">vectorstore: proc nearest(c: VectorCollection; query: seq[float32]; k: int;
+        metric: DistanceMetric = dmCosine): seq[(string, float32)]</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc nearest(s: VectorStore; collection: string; query: seq[float32]; k: int;
+        metric: DistanceMetric = dmCosine): seq[(string, float32)]" href="boogie/stores/vectorstore.html#nearest%2CVectorStore%2Cstring%2Cseq%5Bfloat32%5D%2Cint%2CDistanceMetric">vectorstore: proc nearest(s: VectorStore; collection: string; query: seq[float32]; k: int;
+        metric: DistanceMetric = dmCosine): seq[(string, float32)]</a></li>
+          </ul></dd>
+<dt><a name="neighbors" href="#neighbors"><span>neighbors:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: proc neighbors(s: GraphStore; nodeId: uint64; relType = &quot;&quot;): seq[uint64]" href="boogie/stores/graphstore.html#neighbors%2CGraphStore%2Cuint64%2Cstring">graphstore: proc neighbors(s: GraphStore; nodeId: uint64; relType = &quot;&quot;): seq[uint64]</a></li>
           </ul></dd>
 <dt><a name="newBoolValue" href="#newBoolValue"><span>newBoolValue:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc newBoolValue(v: bool): Value" href="boogie/store.html#newBoolValue%2Cbool">store: proc newBoolValue(v: bool): Value</a></li>
+          data-doc-search-tag="rdbms: proc newBoolValue(v: bool): Value" href="boogie/stores/rdbms.html#newBoolValue%2Cbool">rdbms: proc newBoolValue(v: bool): Value</a></li>
+          </ul></dd>
+<dt><a name="newCollection" href="#newCollection"><span>newCollection:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc newCollection(name: string; dimension: int): VectorCollection" href="boogie/stores/vectorstore.html#newCollection%2Cstring%2Cint">vectorstore: proc newCollection(name: string; dimension: int): VectorCollection</a></li>
           </ul></dd>
 <dt><a name="newColumn" href="#newColumn"><span>newColumn:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc newColumn(name: string; kind: DataType; nullable: bool): ColumnDef" href="boogie/store.html#newColumn%2Cstring%2CDataType%2Cbool">store: proc newColumn(name: string; kind: DataType; nullable: bool): ColumnDef</a></li>
+          data-doc-search-tag="rdbms: proc newColumn(name: string; kind: DataType; nullable: bool): ColumnDef" href="boogie/stores/rdbms.html#newColumn%2Cstring%2CDataType%2Cbool">rdbms: proc newColumn(name: string; kind: DataType; nullable: bool): ColumnDef</a></li>
           </ul></dd>
 <dt><a name="newFloatValue" href="#newFloatValue"><span>newFloatValue:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc newFloatValue(v: float64): Value" href="boogie/store.html#newFloatValue%2Cfloat64">store: proc newFloatValue(v: float64): Value</a></li>
+          data-doc-search-tag="rdbms: proc newFloatValue(v: float64): Value" href="boogie/stores/rdbms.html#newFloatValue%2Cfloat64">rdbms: proc newFloatValue(v: float64): Value</a></li>
+          </ul></dd>
+<dt><a name="newInMemoryKvStore" href="#newInMemoryKvStore"><span>newInMemoryKvStore:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="kvstore: proc newInMemoryKvStore(): KvStore" href="boogie/stores/kvstore.html#newInMemoryKvStore">kvstore: proc newInMemoryKvStore(): KvStore</a></li>
           </ul></dd>
 <dt><a name="newInMemoryStore" href="#newInMemoryStore"><span>newInMemoryStore:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc newInMemoryStore(): Store" href="boogie/store.html#newInMemoryStore">store: proc newInMemoryStore(): Store</a></li>
+          data-doc-search-tag="rdbms: proc newInMemoryStore(): Store" href="boogie/stores/rdbms.html#newInMemoryStore">rdbms: proc newInMemoryStore(): Store</a></li>
+          </ul></dd>
+<dt><a name="newInMemoryVectorStore" href="#newInMemoryVectorStore"><span>newInMemoryVectorStore:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc newInMemoryVectorStore(): VectorStore" href="boogie/stores/vectorstore.html#newInMemoryVectorStore">vectorstore: proc newInMemoryVectorStore(): VectorStore</a></li>
           </ul></dd>
 <dt><a name="newIntValue" href="#newIntValue"><span>newIntValue:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc newIntValue(v: int64): Value" href="boogie/store.html#newIntValue%2Cint64">store: proc newIntValue(v: int64): Value</a></li>
+          data-doc-search-tag="rdbms: proc newIntValue(v: int64): Value" href="boogie/stores/rdbms.html#newIntValue%2Cint64">rdbms: proc newIntValue(v: int64): Value</a></li>
           </ul></dd>
 <dt><a name="newJSONValue" href="#newJSONValue"><span>newJSONValue:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc newJSONValue(v: JsonNode): Value" href="boogie/store.html#newJSONValue%2CJsonNode">store: proc newJSONValue(v: JsonNode): Value</a></li>
+          data-doc-search-tag="rdbms: proc newJSONValue(v: JsonNode): Value" href="boogie/stores/rdbms.html#newJSONValue%2CJsonNode">rdbms: proc newJSONValue(v: JsonNode): Value</a></li>
+          </ul></dd>
+<dt><a name="newKvStore" href="#newKvStore"><span>newKvStore:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="kvstore: proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;
+           checkpointEveryOps: uint32 = 0'u32;
+           walFlushEveryOps: uint32 = 1000'u32): KvStore" href="boogie/stores/kvstore.html#newKvStore%2Cstring%2CKvStorageMode%2Cbool%2Cuint32%2Cuint32">kvstore: proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;
+           checkpointEveryOps: uint32 = 0'u32;
+           walFlushEveryOps: uint32 = 1000'u32): KvStore</a></li>
           </ul></dd>
 <dt><a name="newNullValue" href="#newNullValue"><span>newNullValue:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc newNullValue(): Value" href="boogie/store.html#newNullValue">store: proc newNullValue(): Value</a></li>
+          data-doc-search-tag="rdbms: proc newNullValue(): Value" href="boogie/stores/rdbms.html#newNullValue">rdbms: proc newNullValue(): Value</a></li>
           </ul></dd>
 <dt><a name="newStore" href="#newStore"><span>newStore:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
-         checkpointEveryOps: uint32 = 0'u32; walFlushEveryOps: uint32 = 1000'u32): Store" href="boogie/store.html#newStore%2Cstring%2CStorageMode%2Cbool%2Cuint32%2Cuint32">store: proc newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
+          data-doc-search-tag="rdbms: proc newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
+         checkpointEveryOps: uint32 = 0'u32; walFlushEveryOps: uint32 = 1000'u32): Store" href="boogie/stores/rdbms.html#newStore%2Cstring%2CStorageMode%2Cbool%2Cuint32%2Cuint32">rdbms: proc newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
          checkpointEveryOps: uint32 = 0'u32; walFlushEveryOps: uint32 = 1000'u32): Store</a></li>
           </ul></dd>
 <dt><a name="newTable" href="#newTable"><span>newTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc newTable(name: string; primaryKey: string; columns: openArray[ColumnDef];
-         primaryKeyMode: PrimaryKeyMode = pkmSerial): DbTable" href="boogie/store.html#newTable%2Cstring%2Cstring%2CopenArray%5BColumnDef%5D%2CPrimaryKeyMode">store: proc newTable(name: string; primaryKey: string; columns: openArray[ColumnDef];
+          data-doc-search-tag="rdbms: proc newTable(name: string; primaryKey: string; columns: openArray[ColumnDef];
+         primaryKeyMode: PrimaryKeyMode = pkmSerial): DbTable" href="boogie/stores/rdbms.html#newTable%2Cstring%2Cstring%2CopenArray%5BColumnDef%5D%2CPrimaryKeyMode">rdbms: proc newTable(name: string; primaryKey: string; columns: openArray[ColumnDef];
          primaryKeyMode: PrimaryKeyMode = pkmSerial): DbTable</a></li>
           </ul></dd>
 <dt><a name="newTextValue" href="#newTextValue"><span>newTextValue:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc newTextValue(v: string): Value" href="boogie/store.html#newTextValue%2Cstring">store: proc newTextValue(v: string): Value</a></li>
+          data-doc-search-tag="rdbms: proc newTextValue(v: string): Value" href="boogie/stores/rdbms.html#newTextValue%2Cstring">rdbms: proc newTextValue(v: string): Value</a></li>
+          </ul></dd>
+<dt><a name="newVectorStore" href="#newVectorStore"><span>newVectorStore:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc newVectorStore(path: string; mode: VectorStorageMode = smDisk;
+               enableWal: bool = true; checkpointEveryOps: uint32 = 0'u32;
+               walFlushEveryOps: uint32 = 1000'u32): VectorStore" href="boogie/stores/vectorstore.html#newVectorStore%2Cstring%2CVectorStorageMode%2Cbool%2Cuint32%2Cuint32">vectorstore: proc newVectorStore(path: string; mode: VectorStorageMode = smDisk;
+               enableWal: bool = true; checkpointEveryOps: uint32 = 0'u32;
+               walFlushEveryOps: uint32 = 1000'u32): VectorStore</a></li>
+          </ul></dd>
+<dt><a name="openColumnarStore" href="#openColumnarStore"><span>openColumnarStore:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: proc openColumnarStore(rootDir: string; walPath: string = &quot;&quot;;
+                  walFlushEveryOps: int = 100): ColumnarStore" href="boogie/stores/columnar.html#openColumnarStore%2Cstring%2Cstring%2Cint">columnar: proc openColumnarStore(rootDir: string; walPath: string = &quot;&quot;;
+                  walFlushEveryOps: int = 100): ColumnarStore</a></li>
+          </ul></dd>
+<dt><a name="openGraphStore" href="#openGraphStore"><span>openGraphStore:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: proc openGraphStore(rootDir: string): GraphStore" href="boogie/stores/graphstore.html#openGraphStore%2Cstring">graphstore: proc openGraphStore(rootDir: string): GraphStore</a></li>
           </ul></dd>
 <dt><a name="openWal" href="#openWal"><span>openWal:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: proc openWal(path: string): Wal" href="boogie/wal.html#openWal%2Cstring">wal: proc openWal(path: string): Wal</a></li>
           </ul></dd>
+<dt><a name="outgoing" href="#outgoing"><span>outgoing:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: proc outgoing(s: GraphStore; nodeId: uint64; relType = &quot;&quot;): seq[Relationship]" href="boogie/stores/graphstore.html#outgoing%2CGraphStore%2Cuint64%2Cstring">graphstore: proc outgoing(s: GraphStore; nodeId: uint64; relType = &quot;&quot;): seq[Relationship]</a></li>
+          </ul></dd>
+<dt><a name="pairsUnordered" href="#pairsUnordered"><span>pairsUnordered:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="kvstore: iterator pairsUnordered(s: KvStore): (string, string)" href="boogie/stores/kvstore.html#pairsUnordered.i%2CKvStore">kvstore: iterator pairsUnordered(s: KvStore): (string, string)</a></li>
+          </ul></dd>
 <dt><a name="pkmManual" href="#pkmManual"><span>pkmManual:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: PrimaryKeyMode.pkmManual" href="boogie/store.html#pkmManual">store: PrimaryKeyMode.pkmManual</a></li>
+          data-doc-search-tag="rdbms: PrimaryKeyMode.pkmManual" href="boogie/stores/rdbms.html#pkmManual">rdbms: PrimaryKeyMode.pkmManual</a></li>
           </ul></dd>
 <dt><a name="pkmSerial" href="#pkmSerial"><span>pkmSerial:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: PrimaryKeyMode.pkmSerial" href="boogie/store.html#pkmSerial">store: PrimaryKeyMode.pkmSerial</a></li>
+          data-doc-search-tag="rdbms: PrimaryKeyMode.pkmSerial" href="boogie/stores/rdbms.html#pkmSerial">rdbms: PrimaryKeyMode.pkmSerial</a></li>
           </ul></dd>
 <dt><a name="PrimaryKeyMode" href="#PrimaryKeyMode"><span>PrimaryKeyMode:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: enum PrimaryKeyMode" href="boogie/store.html#PrimaryKeyMode">store: enum PrimaryKeyMode</a></li>
+          data-doc-search-tag="rdbms: enum PrimaryKeyMode" href="boogie/stores/rdbms.html#PrimaryKeyMode">rdbms: enum PrimaryKeyMode</a></li>
+          </ul></dd>
+<dt><a name="put" href="#put"><span>put:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="kvstore: proc put(s: KvStore; key, value: string)" href="boogie/stores/kvstore.html#put%2CKvStore%2Cstring%2Cstring">kvstore: proc put(s: KvStore; key, value: string)</a></li>
           </ul></dd>
 <dt><a name="recoverFromWal" href="#recoverFromWal"><span>recoverFromWal:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc recoverFromWal(s: Store)" href="boogie/store.html#recoverFromWal%2CStore">store: proc recoverFromWal(s: Store)</a></li>
+          data-doc-search-tag="kvstore: proc recoverFromWal(s: KvStore)" href="boogie/stores/kvstore.html#recoverFromWal%2CKvStore">kvstore: proc recoverFromWal(s: KvStore)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="rdbms: proc recoverFromWal(s: Store)" href="boogie/stores/rdbms.html#recoverFromWal%2CStore">rdbms: proc recoverFromWal(s: Store)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc recoverFromWal(s: VectorStore)" href="boogie/stores/vectorstore.html#recoverFromWal%2CVectorStore">vectorstore: proc recoverFromWal(s: VectorStore)</a></li>
+          </ul></dd>
+<dt><a name="Relationship" href="#Relationship"><span>Relationship:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: object Relationship" href="boogie/stores/graphstore.html#Relationship">graphstore: object Relationship</a></li>
           </ul></dd>
 <dt><a name="replay" href="#replay"><span>replay:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -214,41 +601,89 @@
 <li><a class="reference external"
           data-doc-search-tag="wal: proc reset(w: var Wal)" href="boogie/wal.html#reset%2CWal">wal: proc reset(w: var Wal)</a></li>
           </ul></dd>
+<dt><a name="rollback" href="#rollback"><span>rollback:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: proc rollback(tx: var GraphTx)" href="boogie/stores/graphstore.html#rollback%2CGraphTx">graphstore: proc rollback(tx: var GraphTx)</a></li>
+          </ul></dd>
 <dt><a name="row" href="#row"><span>row:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc row(pairs: openArray[(string, Value)]): RowData" href="boogie/store.html#row%2CopenArray%5B%5D">store: proc row(pairs: openArray[(string, Value)]): RowData</a></li>
+          data-doc-search-tag="rdbms: proc row(pairs: openArray[(string, Value)]): RowData" href="boogie/stores/rdbms.html#row%2CopenArray%5B%5D">rdbms: proc row(pairs: openArray[(string, Value)]): RowData</a></li>
           </ul></dd>
 <dt><a name="RowData" href="#RowData"><span>RowData:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: type RowData" href="boogie/store.html#RowData">store: type RowData</a></li>
+          data-doc-search-tag="rdbms: type RowData" href="boogie/stores/rdbms.html#RowData">rdbms: type RowData</a></li>
           </ul></dd>
 <dt><a name="RowIndex" href="#RowIndex"><span>RowIndex:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: type RowIndex" href="boogie/store.html#RowIndex">store: type RowIndex</a></li>
+          data-doc-search-tag="rdbms: type RowIndex" href="boogie/stores/rdbms.html#RowIndex">rdbms: type RowIndex</a></li>
+          </ul></dd>
+<dt><a name="scan" href="#scan"><span>scan:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: proc scan(s: ColumnarStore; table: string; projectedColumns: seq[string];
+     filters: seq[Filter] = @[]; limit: int = 0): seq[JsonNode]" href="boogie/stores/columnar.html#scan%2CColumnarStore%2Cstring%2Cseq%5Bstring%5D%2Cseq%5BFilter%5D%2Cint">columnar: proc scan(s: ColumnarStore; table: string; projectedColumns: seq[string];
+     filters: seq[Filter] = @[]; limit: int = 0): seq[JsonNode]</a></li>
           </ul></dd>
 <dt><a name="smDisk" href="#smDisk"><span>smDisk:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: StorageMode.smDisk" href="boogie/store.html#smDisk">store: StorageMode.smDisk</a></li>
+          data-doc-search-tag="rdbms: StorageMode.smDisk" href="boogie/stores/rdbms.html#smDisk">rdbms: StorageMode.smDisk</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="vectorstore: VectorStorageMode.smDisk" href="boogie/stores/vectorstore.html#smDisk">vectorstore: VectorStorageMode.smDisk</a></li>
           </ul></dd>
 <dt><a name="smInMemory" href="#smInMemory"><span>smInMemory:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: StorageMode.smInMemory" href="boogie/store.html#smInMemory">store: StorageMode.smInMemory</a></li>
+          data-doc-search-tag="rdbms: StorageMode.smInMemory" href="boogie/stores/rdbms.html#smInMemory">rdbms: StorageMode.smInMemory</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="vectorstore: VectorStorageMode.smInMemory" href="boogie/stores/vectorstore.html#smInMemory">vectorstore: VectorStorageMode.smInMemory</a></li>
           </ul></dd>
 <dt><a name="StorageMode" href="#StorageMode"><span>StorageMode:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: enum StorageMode" href="boogie/store.html#StorageMode">store: enum StorageMode</a></li>
+          data-doc-search-tag="rdbms: enum StorageMode" href="boogie/stores/rdbms.html#StorageMode">rdbms: enum StorageMode</a></li>
           </ul></dd>
 <dt><a name="Store" href="#Store"><span>Store:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: type Store" href="boogie/store.html#Store">store: type Store</a></li>
+          data-doc-search-tag="rdbms: type Store" href="boogie/stores/rdbms.html#Store">rdbms: type Store</a></li>
           </ul></dd>
 <dt><a name="StoreError" href="#StoreError"><span>StoreError:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: object StoreError" href="boogie/store.html#StoreError">store: object StoreError</a></li>
+          data-doc-search-tag="rdbms: object StoreError" href="boogie/stores/rdbms.html#StoreError">rdbms: object StoreError</a></li>
+          </ul></dd>
+<dt><a name="TableSchema" href="#TableSchema"><span>TableSchema:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="columnar: object TableSchema" href="boogie/stores/columnar.html#TableSchema">columnar: object TableSchema</a></li>
+          </ul></dd>
+<dt><a name="traverseBfs" href="#traverseBfs"><span>traverseBfs:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: proc traverseBfs(s: GraphStore; startNode: uint64; maxDepth: int; relType = &quot;&quot;): seq[
+    uint64]" href="boogie/stores/graphstore.html#traverseBfs%2CGraphStore%2Cuint64%2Cint%2Cstring">graphstore: proc traverseBfs(s: GraphStore; startNode: uint64; maxDepth: int; relType = &quot;&quot;): seq[
+    uint64]</a></li>
+          </ul></dd>
+<dt><a name="upsertNode" href="#upsertNode"><span>upsertNode:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: proc upsertNode(tx: var GraphTx; node: GraphNode)" href="boogie/stores/graphstore.html#upsertNode%2CGraphTx%2CGraphNode">graphstore: proc upsertNode(tx: var GraphTx; node: GraphNode)</a></li>
+          </ul></dd>
+<dt><a name="upsertRelationship" href="#upsertRelationship"><span>upsertRelationship:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="graphstore: proc upsertRelationship(tx: var GraphTx; r: Relationship)" href="boogie/stores/graphstore.html#upsertRelationship%2CGraphTx%2CRelationship">graphstore: proc upsertRelationship(tx: var GraphTx; r: Relationship)</a></li>
           </ul></dd>
 <dt><a name="Value" href="#Value"><span>Value:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: object Value" href="boogie/store.html#Value">store: object Value</a></li>
+          data-doc-search-tag="rdbms: object Value" href="boogie/stores/rdbms.html#Value">rdbms: object Value</a></li>
+          </ul></dd>
+<dt><a name="VectorCollection" href="#VectorCollection"><span>VectorCollection:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: type VectorCollection" href="boogie/stores/vectorstore.html#VectorCollection">vectorstore: type VectorCollection</a></li>
+          </ul></dd>
+<dt><a name="VectorStorageMode" href="#VectorStorageMode"><span>VectorStorageMode:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: enum VectorStorageMode" href="boogie/stores/vectorstore.html#VectorStorageMode">vectorstore: enum VectorStorageMode</a></li>
+          </ul></dd>
+<dt><a name="VectorStore" href="#VectorStore"><span>VectorStore:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: type VectorStore" href="boogie/stores/vectorstore.html#VectorStore">vectorstore: type VectorStore</a></li>
+          </ul></dd>
+<dt><a name="VectorStoreError" href="#VectorStoreError"><span>VectorStoreError:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: object VectorStoreError" href="boogie/stores/vectorstore.html#VectorStoreError">vectorstore: object VectorStoreError</a></li>
           </ul></dd>
 <dt><a name="Wal" href="#Wal"><span>Wal:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -272,7 +707,7 @@
           </ul></dd>
 <dt><a name="where" href="#where"><span>where:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="store: proc where(t: DbTable; column: string; value: Value): seq[(string, RowData)]" href="boogie/store.html#where%2CDbTable%2Cstring%2CValue">store: proc where(t: DbTable; column: string; value: Value): seq[(string, RowData)]</a></li>
+          data-doc-search-tag="rdbms: proc where(t: DbTable; column: string; value: Value): seq[(string, RowData)]" href="boogie/stores/rdbms.html#where%2CDbTable%2Cstring%2CValue">rdbms: proc where(t: DbTable; column: string; value: Value): seq[(string, RowData)]</a></li>
           </ul></dd>
 <dt><a name="woCreateTable" href="#woCreateTable"><span>woCreateTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -298,7 +733,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-04-14 19:59:21 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-05-06 15:56:00 UTC</small>
       </div>
     </div>
   </div>
