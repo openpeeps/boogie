@@ -98,8 +98,83 @@ assert kv.hasKey("name") == false
 
 ### Graph Store
 
+>[!NOTE]
+>Check the [tests](https://github.com/openpeeps/boogie/tree/main/src/boogie/tests) for more examples.
 
-Check the [tests](https://github.com/openpeeps/boogie/tree/main/src/boogie/tests) for more examples.
+## Benchmarks
+Here you can find some benchmarks for the available stores. You can run it yourself by cloning the repo and running `nimble test -d:release` (note `-d:release` flag is required for accurate benchmarks)
+
+#### RDBMS Store Benchmarks
+```
+[Suite] No WAL + memory store tests
+Database opened in 0.000 seconds
+  [OK] init database without WAL
+  [OK] create table
+Insert: 0.594 s for 100000 rows
+  [OK] insert rows
+Lookup: 0.076 s for 100000 gets (hits=100000)
+  [OK] lookup rows
+Ordered scan: 0.978 s for 100000 rows
+  [OK] ordered scan
+Unsorted scan: 0.067 s for 100000 rows
+  [OK] ordered scan #2
+Where scan: 0.065 s for 3334 matches
+  [OK] where scan
+
+[Suite] No WAL + disk store tests
+Database opened in 0.000 seconds
+  [OK] init database without WAL
+  [OK] create table
+Insert: 0.502 s for 100000 rows
+  [OK] insert rows
+Lookup: 0.108 s for 100000 gets (hits=100000)
+  [OK] lookup rows
+Ordered scan: 0.754 s for 100000 rows
+  [OK] ordered scan
+Unsorted scan: 0.103 s for 100000 rows
+  [OK] ordered scan #2
+Where scan: 0.081 s for 3334 matches
+  [OK] where scan
+
+[Suite] WAL + disk store tests
+Database opened in 0.001 seconds
+  [OK] init database without WAL
+  [OK] create table
+Insert: 0.056 s for 10000 rows
+  [OK] insert rows
+Lookup: 0.010 s for 10000 gets (hits=10000)
+  [OK] lookup rows
+Ordered scan: 0.075 s for 10000 rows
+  [OK] ordered scan
+Unsorted scan: 0.010 s for 10000 rows
+  [OK] ordered scan #2
+Where scan: 0.008 s for 334 matches
+  [OK] where scan
+
+[Suite] WAL + memory store tests
+Database opened in 0.000 seconds
+  [OK] init database without WAL
+  [OK] create table
+Insert: 0.046 s for 10000 rows
+  [OK] insert rows
+Lookup: 0.010 s for 10000 gets (hits=10000)
+  [OK] lookup rows
+Ordered scan: 0.076 s for 10000 rows
+  [OK] ordered scan
+Unsorted scan: 0.010 s for 10000 rows
+  [OK] ordered scan #2
+Where scan: 0.008 s for 334 matches
+  [OK] where scan
+
+[Suite] WAL functions tests
+Recovered rows: 1000
+  [OK] WAL crash recovery
+```
+
+As you can see, the performance of the RDBMS store is quite good, especially when using the WAL. The in-memory store is faster than the disk store, but the disk store provides durability and crash recovery. The WAL also significantly improves the performance of inserts and lookups.
+
+#### Key/Value Store Benchmarks
+todo
 
 ### Todos
 - [x] Add support for multiple tables
