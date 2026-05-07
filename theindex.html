@@ -28,7 +28,7 @@
     <label for="nav-toggle" id="nav-overlay"></label>
     <div class="container">
       <h1 class="title">Index</h1>
-      Modules: <a href="index.html">boogie</a>, <a href="boogie/stores/columnar.html">boogie/stores/columnar</a>, <a href="boogie/stores/graphstore.html">boogie/stores/graphstore</a>, <a href="boogie/stores/kvstore.html">boogie/stores/kvstore</a>, <a href="boogie/stores/rdbms.html">boogie/stores/rdbms</a>, <a href="boogie/stores/vectorstore.html">boogie/stores/vectorstore</a>, <a href="boogie/wal.html">boogie/wal</a>.<br/><p /><h2>API symbols</h2>
+      Modules: <a href="index.html">boogie</a>, <a href="boogie/stores/columnar.html">boogie/stores/columnar</a>, <a href="boogie/stores/graphstore.html">boogie/stores/graphstore</a>, <a href="boogie/stores/kv.html">boogie/stores/kv</a>, <a href="boogie/stores/rdbms.html">boogie/stores/rdbms</a>, <a href="boogie/stores/vectorstore.html">boogie/stores/vectorstore</a>, <a href="boogie/wal.html">boogie/wal</a>.<br/><p /><h2>API symbols</h2>
 <dl><dt><a name="%60%24%60" href="#%60%24%60"><span>`$`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="rdbms: proc `$`(v: Value): string" href="boogie/stores/rdbms.html#%24%2CValue">rdbms: proc `$`(v: Value): string</a></li>
@@ -109,7 +109,7 @@
 <li><a class="reference external"
           data-doc-search-tag="columnar: proc checkpoint(s: var ColumnarStore)" href="boogie/stores/columnar.html#checkpoint%2CColumnarStore">columnar: proc checkpoint(s: var ColumnarStore)</a></li>
           <li><a class="reference external"
-          data-doc-search-tag="kvstore: proc checkpoint(s: KvStore)" href="boogie/stores/kvstore.html#checkpoint%2CKvStore">kvstore: proc checkpoint(s: KvStore)</a></li>
+          data-doc-search-tag="kv: proc checkpoint(s: KvStore)" href="boogie/stores/kv.html#checkpoint%2CKvStore">kv: proc checkpoint(s: KvStore)</a></li>
           <li><a class="reference external"
           data-doc-search-tag="rdbms: proc checkpoint(s: Store)" href="boogie/stores/rdbms.html#checkpoint%2CStore">rdbms: proc checkpoint(s: Store)</a></li>
           <li><a class="reference external"
@@ -203,7 +203,7 @@
           </ul></dd>
 <dt><a name="delete" href="#delete"><span>delete:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="kvstore: proc delete(s: KvStore; key: string): bool" href="boogie/stores/kvstore.html#delete%2CKvStore%2Cstring">kvstore: proc delete(s: KvStore; key: string): bool</a></li>
+          data-doc-search-tag="kv: proc delete(s: KvStore; key: string): bool" href="boogie/stores/kv.html#delete%2CKvStore%2Cstring">kv: proc delete(s: KvStore; key: string): bool</a></li>
           <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc delete(s: VectorStore; collection, pk: string): bool" href="boogie/stores/vectorstore.html#delete%2CVectorStore%2Cstring%2Cstring">vectorstore: proc delete(s: VectorStore; collection, pk: string): bool</a></li>
           </ul></dd>
@@ -321,7 +321,7 @@
           </ul></dd>
 <dt><a name="get" href="#get"><span>get:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="kvstore: proc get(s: KvStore; key: string): Option[string]" href="boogie/stores/kvstore.html#get%2CKvStore%2Cstring">kvstore: proc get(s: KvStore; key: string): Option[string]</a></li>
+          data-doc-search-tag="kv: proc get(s: KvStore; key: string): Option[string]" href="boogie/stores/kv.html#get%2CKvStore%2Cstring">kv: proc get(s: KvStore; key: string): Option[string]</a></li>
           <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc get(c: VectorCollection; pk: string): Option[seq[float32]]" href="boogie/stores/vectorstore.html#get%2CVectorCollection%2Cstring">vectorstore: proc get(c: VectorCollection; pk: string): Option[seq[float32]]</a></li>
           <li><a class="reference external"
@@ -371,7 +371,7 @@
           </ul></dd>
 <dt><a name="hasKey" href="#hasKey"><span>hasKey:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="kvstore: proc hasKey(s: KvStore; key: string): bool" href="boogie/stores/kvstore.html#hasKey%2CKvStore%2Cstring">kvstore: proc hasKey(s: KvStore; key: string): bool</a></li>
+          data-doc-search-tag="kv: proc hasKey(s: KvStore; key: string): bool" href="boogie/stores/kv.html#hasKey%2CKvStore%2Cstring">kv: proc hasKey(s: KvStore; key: string): bool</a></li>
           </ul></dd>
 <dt><a name="hasTable" href="#hasTable"><span>hasTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -399,7 +399,7 @@
           </ul></dd>
 <dt><a name="isEmpty" href="#isEmpty"><span>isEmpty:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="kvstore: proc isEmpty(s: KvStore): bool" href="boogie/stores/kvstore.html#isEmpty%2CKvStore">kvstore: proc isEmpty(s: KvStore): bool</a></li>
+          data-doc-search-tag="kv: proc isEmpty(s: KvStore): bool" href="boogie/stores/kv.html#isEmpty%2CKvStore">kv: proc isEmpty(s: KvStore): bool</a></li>
           <li><a class="reference external"
           data-doc-search-tag="rdbms: proc isEmpty(t: DbTable): bool" href="boogie/stores/rdbms.html#isEmpty%2CDbTable">rdbms: proc isEmpty(t: DbTable): bool</a></li>
           </ul></dd>
@@ -435,27 +435,27 @@
           </ul></dd>
 <dt><a name="ksmDisk" href="#ksmDisk"><span>ksmDisk:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="kvstore: KvStorageMode.ksmDisk" href="boogie/stores/kvstore.html#ksmDisk">kvstore: KvStorageMode.ksmDisk</a></li>
+          data-doc-search-tag="kv: KvStorageMode.ksmDisk" href="boogie/stores/kv.html#ksmDisk">kv: KvStorageMode.ksmDisk</a></li>
           </ul></dd>
 <dt><a name="ksmInMemory" href="#ksmInMemory"><span>ksmInMemory:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="kvstore: KvStorageMode.ksmInMemory" href="boogie/stores/kvstore.html#ksmInMemory">kvstore: KvStorageMode.ksmInMemory</a></li>
+          data-doc-search-tag="kv: KvStorageMode.ksmInMemory" href="boogie/stores/kv.html#ksmInMemory">kv: KvStorageMode.ksmInMemory</a></li>
           </ul></dd>
 <dt><a name="KvStorageMode" href="#KvStorageMode"><span>KvStorageMode:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="kvstore: enum KvStorageMode" href="boogie/stores/kvstore.html#KvStorageMode">kvstore: enum KvStorageMode</a></li>
+          data-doc-search-tag="kv: enum KvStorageMode" href="boogie/stores/kv.html#KvStorageMode">kv: enum KvStorageMode</a></li>
           </ul></dd>
 <dt><a name="KvStore" href="#KvStore"><span>KvStore:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="kvstore: type KvStore" href="boogie/stores/kvstore.html#KvStore">kvstore: type KvStore</a></li>
+          data-doc-search-tag="kv: type KvStore" href="boogie/stores/kv.html#KvStore">kv: type KvStore</a></li>
           </ul></dd>
 <dt><a name="KvStoreError" href="#KvStoreError"><span>KvStoreError:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="kvstore: object KvStoreError" href="boogie/stores/kvstore.html#KvStoreError">kvstore: object KvStoreError</a></li>
+          data-doc-search-tag="kv: object KvStoreError" href="boogie/stores/kv.html#KvStoreError">kv: object KvStoreError</a></li>
           </ul></dd>
 <dt><a name="len" href="#len"><span>len:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="kvstore: proc len(s: KvStore): int" href="boogie/stores/kvstore.html#len%2CKvStore">kvstore: proc len(s: KvStore): int</a></li>
+          data-doc-search-tag="kv: proc len(s: KvStore): int" href="boogie/stores/kv.html#len%2CKvStore">kv: proc len(s: KvStore): int</a></li>
           </ul></dd>
 <dt><a name="nearest" href="#nearest"><span>nearest:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -489,7 +489,7 @@
           </ul></dd>
 <dt><a name="newInMemoryKvStore" href="#newInMemoryKvStore"><span>newInMemoryKvStore:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="kvstore: proc newInMemoryKvStore(): KvStore" href="boogie/stores/kvstore.html#newInMemoryKvStore">kvstore: proc newInMemoryKvStore(): KvStore</a></li>
+          data-doc-search-tag="kv: proc newInMemoryKvStore(): KvStore" href="boogie/stores/kv.html#newInMemoryKvStore">kv: proc newInMemoryKvStore(): KvStore</a></li>
           </ul></dd>
 <dt><a name="newInMemoryStore" href="#newInMemoryStore"><span>newInMemoryStore:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -509,9 +509,9 @@
           </ul></dd>
 <dt><a name="newKvStore" href="#newKvStore"><span>newKvStore:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="kvstore: proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;
+          data-doc-search-tag="kv: proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;
            checkpointEveryOps: uint32 = 0'u32;
-           walFlushEveryOps: uint32 = 1000'u32): KvStore" href="boogie/stores/kvstore.html#newKvStore%2Cstring%2CKvStorageMode%2Cbool%2Cuint32%2Cuint32">kvstore: proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;
+           walFlushEveryOps: uint32 = 1000'u32): KvStore" href="boogie/stores/kv.html#newKvStore%2Cstring%2CKvStorageMode%2Cbool%2Cuint32%2Cuint32">kv: proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;
            checkpointEveryOps: uint32 = 0'u32;
            walFlushEveryOps: uint32 = 1000'u32): KvStore</a></li>
           </ul></dd>
@@ -563,7 +563,7 @@
           </ul></dd>
 <dt><a name="pairsUnordered" href="#pairsUnordered"><span>pairsUnordered:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="kvstore: iterator pairsUnordered(s: KvStore): (string, string)" href="boogie/stores/kvstore.html#pairsUnordered.i%2CKvStore">kvstore: iterator pairsUnordered(s: KvStore): (string, string)</a></li>
+          data-doc-search-tag="kv: iterator pairsUnordered(s: KvStore): (string, string)" href="boogie/stores/kv.html#pairsUnordered.i%2CKvStore">kv: iterator pairsUnordered(s: KvStore): (string, string)</a></li>
           </ul></dd>
 <dt><a name="pkmManual" href="#pkmManual"><span>pkmManual:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -579,11 +579,11 @@
           </ul></dd>
 <dt><a name="put" href="#put"><span>put:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="kvstore: proc put(s: KvStore; key, value: string)" href="boogie/stores/kvstore.html#put%2CKvStore%2Cstring%2Cstring">kvstore: proc put(s: KvStore; key, value: string)</a></li>
+          data-doc-search-tag="kv: proc put(s: KvStore; key, value: string)" href="boogie/stores/kv.html#put%2CKvStore%2Cstring%2Cstring">kv: proc put(s: KvStore; key, value: string)</a></li>
           </ul></dd>
 <dt><a name="recoverFromWal" href="#recoverFromWal"><span>recoverFromWal:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="kvstore: proc recoverFromWal(s: KvStore)" href="boogie/stores/kvstore.html#recoverFromWal%2CKvStore">kvstore: proc recoverFromWal(s: KvStore)</a></li>
+          data-doc-search-tag="kv: proc recoverFromWal(s: KvStore)" href="boogie/stores/kv.html#recoverFromWal%2CKvStore">kv: proc recoverFromWal(s: KvStore)</a></li>
           <li><a class="reference external"
           data-doc-search-tag="rdbms: proc recoverFromWal(s: Store)" href="boogie/stores/rdbms.html#recoverFromWal%2CStore">rdbms: proc recoverFromWal(s: Store)</a></li>
           <li><a class="reference external"
@@ -733,7 +733,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-05-06 15:58:11 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-05-07 09:19:17 UTC</small>
       </div>
     </div>
   </div>
