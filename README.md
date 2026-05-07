@@ -22,11 +22,13 @@
 - Primitive data types (`string`, `int`, `float`, `bool`, `json`, `null`)
 
 What's included?
-- **Key/Value Store** &mdash; A simple key-value store implementation with WAL support
-- **RDBMS Store** &mdash; A relational wal-based database with support for **schemas**, **primary keys** and typed columns (However, it currently lacks explicit support for foreign keys, joins, or advanced relational features (relations between tables)
-- **Vector Store** &mdash; Vector store implementation with WAL support
-- **Columnar Store** &mdash; Columnar storage engine for analytics workloads with WAL support
-- **Graph Store** &mdash; A simple graph database with support for nodes, relationships, and basic graph queries (e.g., neighbors, shortest path) with WAL support
+| Store Type        | Description |
+|-------------------|-------------|
+| **Key/Value Store**   | A simple key-value store implementation with WAL support |
+| **RDBMS Store**       | A relational wal-based database with support for **schemas**, **primary keys** and typed columns (However, it currently lacks explicit support for foreign keys, joins, or advanced relational features (relations between tables)) |
+| **Vector Store**      | Vector store implementation with WAL support |
+| **Columnar Store**    | Columnar storage engine for analytics workloads with WAL support |
+| **Graph Store**       | A simple graph database with support for nodes, relationships, and basic graph queries (e.g., neighbors, shortest path) with WAL support |
 
 >[!NOTE]
 > Boogie is an experimental project mostly made with the chatbot for fun and learning. It is still in early stages, so expect data loss and breaking changes. Use at your own risk.
