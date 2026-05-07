@@ -35,11 +35,11 @@ nim	jtCross	boogie/stores/columnar.html#jtCross	JoinType.jtCross		67
 nim	JoinType	boogie/stores/columnar.html#JoinType	enum JoinType		67
 nim	ColumnarError	boogie/stores/columnar.html#ColumnarError	object ColumnarError		70
 nim	ColumnarStore	boogie/stores/columnar.html#ColumnarStore	object ColumnarStore		77
-nim	checkpoint	boogie/stores/columnar.html#checkpoint,ColumnarStore	proc checkpoint(s: var ColumnarStore)		247
-nim	openColumnarStore	boogie/stores/columnar.html#openColumnarStore,string,string,int	proc openColumnarStore(rootDir: string; walPath: string = "";\n                  walFlushEveryOps: int = 100): ColumnarStore		384
-nim	createTable	boogie/stores/columnar.html#createTable,ColumnarStore,TableSchema,bool	proc createTable(s: var ColumnarStore; schema: TableSchema; sync: bool = true)		414
-nim	dropTable	boogie/stores/columnar.html#dropTable,ColumnarStore,string,bool	proc dropTable(s: var ColumnarStore; table: string; sync: bool = true)		417
-nim	insertBatch	boogie/stores/columnar.html#insertBatch,ColumnarStore,string,seq[JsonNode],bool	proc insertBatch(s: var ColumnarStore; table: string; rows: seq[JsonNode];\n            sync: bool = true)		420
-nim	scan	boogie/stores/columnar.html#scan,ColumnarStore,string,seq[string],seq[Filter],int	proc scan(s: ColumnarStore; table: string; projectedColumns: seq[string];\n     filters: seq[Filter] = @[]; limit: int = 0): seq[JsonNode]		423
-nim	aggregate	boogie/stores/columnar.html#aggregate,ColumnarStore,string,seq[AggregateSpec],seq[Filter]	proc aggregate(s: ColumnarStore; table: string; specs: seq[AggregateSpec];\n          filters: seq[Filter] = @[]): JsonNode		464
-nim	join	boogie/stores/columnar.html#join,ColumnarStore,JoinType,string,string	proc join(s: ColumnarStore; joinType: JoinType; leftTable, rightTable: string): seq[\n    JsonNode]		523
+nim	checkpoint	boogie/stores/columnar.html#checkpoint,ColumnarStore	proc checkpoint(s: var ColumnarStore)		248
+nim	openColumnarStore	boogie/stores/columnar.html#openColumnarStore,string,string,int	proc openColumnarStore(rootDir: string; walPath: string = "";\n                  walFlushEveryOps: int = 100): ColumnarStore		385
+nim	createTable	boogie/stores/columnar.html#createTable,ColumnarStore,TableSchema,bool	proc createTable(s: var ColumnarStore; schema: TableSchema; sync: bool = true)		415
+nim	dropTable	boogie/stores/columnar.html#dropTable,ColumnarStore,string,bool	proc dropTable(s: var ColumnarStore; table: string; sync: bool = true)		418
+nim	insertBatch	boogie/stores/columnar.html#insertBatch,ColumnarStore,string,seq[JsonNode],bool	proc insertBatch(s: var ColumnarStore; table: string; rows: seq[JsonNode];\n            sync: bool = true)		421
+nim	scan	boogie/stores/columnar.html#scan,ColumnarStore,string,seq[string],seq[Filter],int	proc scan(s: ColumnarStore; table: string; projectedColumns: seq[string];\n     filters: seq[Filter] = @[]; limit: int = 0): seq[JsonNode]		424
+nim	aggregate	boogie/stores/columnar.html#aggregate,ColumnarStore,string,seq[AggregateSpec],seq[Filter]	proc aggregate(s: ColumnarStore; table: string; specs: seq[AggregateSpec];\n          filters: seq[Filter] = @[]): JsonNode		465
+nim	join	boogie/stores/columnar.html#join,ColumnarStore,JoinType,string,string	proc join(s: ColumnarStore; joinType: JoinType; leftTable, rightTable: string): seq[\n    JsonNode]		524
