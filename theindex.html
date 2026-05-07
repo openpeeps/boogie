@@ -28,7 +28,7 @@
     <label for="nav-toggle" id="nav-overlay"></label>
     <div class="container">
       <h1 class="title">Index</h1>
-      Modules: <a href="index.html">boogie</a>, <a href="boogie/stores/columnar.html">boogie/stores/columnar</a>, <a href="boogie/stores/graphstore.html">boogie/stores/graphstore</a>, <a href="boogie/stores/kv.html">boogie/stores/kv</a>, <a href="boogie/stores/rdbms.html">boogie/stores/rdbms</a>, <a href="boogie/stores/vectorstore.html">boogie/stores/vectorstore</a>, <a href="boogie/wal.html">boogie/wal</a>.<br/><p /><h2>API symbols</h2>
+      Modules: <a href="index.html">boogie</a>, <a href="boogie/stores/columnar.html">boogie/stores/columnar</a>, <a href="boogie/stores/docstore.html">boogie/stores/docstore</a>, <a href="boogie/stores/graphstore.html">boogie/stores/graphstore</a>, <a href="boogie/stores/kv.html">boogie/stores/kv</a>, <a href="boogie/stores/rdbms.html">boogie/stores/rdbms</a>, <a href="boogie/stores/vectorstore.html">boogie/stores/vectorstore</a>, <a href="boogie/wal.html">boogie/wal</a>.<br/><p /><h2>API symbols</h2>
 <dl><dt><a name="%60%24%60" href="#%60%24%60"><span>`$`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="rdbms: proc `$`(v: Value): string" href="boogie/stores/rdbms.html#%24%2CValue">rdbms: proc `$`(v: Value): string</a></li>
@@ -108,6 +108,8 @@
 <dt><a name="checkpoint" href="#checkpoint"><span>checkpoint:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="columnar: proc checkpoint(s: var ColumnarStore)" href="boogie/stores/columnar.html#checkpoint%2CColumnarStore">columnar: proc checkpoint(s: var ColumnarStore)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="docstore: proc checkpoint(store: var DocumentStore)" href="boogie/stores/docstore.html#checkpoint%2CDocumentStore">docstore: proc checkpoint(store: var DocumentStore)</a></li>
           <li><a class="reference external"
           data-doc-search-tag="kv: proc checkpoint(s: KvStore)" href="boogie/stores/kv.html#checkpoint%2CKvStore">kv: proc checkpoint(s: KvStore)</a></li>
           <li><a class="reference external"
@@ -201,8 +203,18 @@
 <li><a class="reference external"
           data-doc-search-tag="rdbms: type DbTable" href="boogie/stores/rdbms.html#DbTable">rdbms: type DbTable</a></li>
           </ul></dd>
+<dt><a name="deBson" href="#deBson"><span>deBson:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="docstore: DocumentEncoding.deBson" href="boogie/stores/docstore.html#deBson">docstore: DocumentEncoding.deBson</a></li>
+          </ul></dd>
+<dt><a name="deJson" href="#deJson"><span>deJson:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="docstore: DocumentEncoding.deJson" href="boogie/stores/docstore.html#deJson">docstore: DocumentEncoding.deJson</a></li>
+          </ul></dd>
 <dt><a name="delete" href="#delete"><span>delete:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
+          data-doc-search-tag="docstore: proc delete(store: var DocumentStore; key: string; sync = true): bool" href="boogie/stores/docstore.html#delete%2CDocumentStore%2Cstring">docstore: proc delete(store: var DocumentStore; key: string; sync = true): bool</a></li>
+          <li><a class="reference external"
           data-doc-search-tag="kv: proc delete(s: KvStore; key: string): bool" href="boogie/stores/kv.html#delete%2CKvStore%2Cstring">kv: proc delete(s: KvStore; key: string): bool</a></li>
           <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc delete(s: VectorStore; collection, pk: string): bool" href="boogie/stores/vectorstore.html#delete%2CVectorStore%2Cstring%2Cstring">vectorstore: proc delete(s: VectorStore; collection, pk: string): bool</a></li>
@@ -236,6 +248,18 @@
 <dt><a name="dmL2" href="#dmL2"><span>dmL2:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="vectorstore: DistanceMetric.dmL2" href="boogie/stores/vectorstore.html#dmL2">vectorstore: DistanceMetric.dmL2</a></li>
+          </ul></dd>
+<dt><a name="DocumentEncoding" href="#DocumentEncoding"><span>DocumentEncoding:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="docstore: enum DocumentEncoding" href="boogie/stores/docstore.html#DocumentEncoding">docstore: enum DocumentEncoding</a></li>
+          </ul></dd>
+<dt><a name="DocumentStore" href="#DocumentStore"><span>DocumentStore:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="docstore: object DocumentStore" href="boogie/stores/docstore.html#DocumentStore">docstore: object DocumentStore</a></li>
+          </ul></dd>
+<dt><a name="DocumentStoreError" href="#DocumentStoreError"><span>DocumentStoreError:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="docstore: object DocumentStoreError" href="boogie/stores/docstore.html#DocumentStoreError">docstore: object DocumentStoreError</a></li>
           </ul></dd>
 <dt><a name="dropCollection" href="#dropCollection"><span>dropCollection:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -321,11 +345,19 @@
           </ul></dd>
 <dt><a name="get" href="#get"><span>get:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
+          data-doc-search-tag="docstore: proc get(store: DocumentStore; key: string): Option[JsonNode]" href="boogie/stores/docstore.html#get%2CDocumentStore%2Cstring">docstore: proc get(store: DocumentStore; key: string): Option[JsonNode]</a></li>
+          <li><a class="reference external"
           data-doc-search-tag="kv: proc get(s: KvStore; key: string): Option[string]" href="boogie/stores/kv.html#get%2CKvStore%2Cstring">kv: proc get(s: KvStore; key: string): Option[string]</a></li>
           <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc get(c: VectorCollection; pk: string): Option[seq[float32]]" href="boogie/stores/vectorstore.html#get%2CVectorCollection%2Cstring">vectorstore: proc get(c: VectorCollection; pk: string): Option[seq[float32]]</a></li>
           <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc get(s: VectorStore; collection, pk: string): Option[seq[float32]]" href="boogie/stores/vectorstore.html#get%2CVectorStore%2Cstring%2Cstring">vectorstore: proc get(s: VectorStore; collection, pk: string): Option[seq[float32]]</a></li>
+          </ul></dd>
+<dt><a name="getBson" href="#getBson"><span>getBson:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="docstore: proc getBson(store: DocumentStore; key: string; version: int32 = 1'i32): Option[
+    BSONDocument]" href="boogie/stores/docstore.html#getBson%2CDocumentStore%2Cstring%2Cint32">docstore: proc getBson(store: DocumentStore; key: string; version: int32 = 1'i32): Option[
+    BSONDocument]</a></li>
           </ul></dd>
 <dt><a name="getCollection" href="#getCollection"><span>getCollection:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -334,6 +366,10 @@
 <dt><a name="getNode" href="#getNode"><span>getNode:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="graphstore: proc getNode(s: GraphStore; id: uint64; outNode: var GraphNode): bool" href="boogie/stores/graphstore.html#getNode%2CGraphStore%2Cuint64%2CGraphNode">graphstore: proc getNode(s: GraphStore; id: uint64; outNode: var GraphNode): bool</a></li>
+          </ul></dd>
+<dt><a name="getObj" href="#getObj"><span>getObj:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="docstore: proc getObj[T](store: DocumentStore; key: string; _: typedesc[T]): Option[T]" href="boogie/stores/docstore.html#getObj%2CDocumentStore%2Cstring%2Ctypedesc%5BT%5D">docstore: proc getObj[T](store: DocumentStore; key: string; _: typedesc[T]): Option[T]</a></li>
           </ul></dd>
 <dt><a name="getRelationship" href="#getRelationship"><span>getRelationship:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -371,6 +407,8 @@
           </ul></dd>
 <dt><a name="hasKey" href="#hasKey"><span>hasKey:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
+          data-doc-search-tag="docstore: proc hasKey(store: DocumentStore; key: string): bool" href="boogie/stores/docstore.html#hasKey%2CDocumentStore%2Cstring">docstore: proc hasKey(store: DocumentStore; key: string): bool</a></li>
+          <li><a class="reference external"
           data-doc-search-tag="kv: proc hasKey(s: KvStore; key: string): bool" href="boogie/stores/kv.html#hasKey%2CKvStore%2Cstring">kv: proc hasKey(s: KvStore; key: string): bool</a></li>
           </ul></dd>
 <dt><a name="hasTable" href="#hasTable"><span>hasTable:</span></a></dt><dd><ul class="simple">
@@ -379,6 +417,10 @@
           </ul></dd>
 <dt><a name="insert" href="#insert"><span>insert:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
+          data-doc-search-tag="docstore: proc insert(store: var DocumentStore; key: string; doc: JsonNode; sync = true;
+       enc: DocumentEncoding = deJson)" href="boogie/stores/docstore.html#insert%2CDocumentStore%2Cstring%2CJsonNode%2CDocumentEncoding">docstore: proc insert(store: var DocumentStore; key: string; doc: JsonNode; sync = true;
+       enc: DocumentEncoding = deJson)</a></li>
+          <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc insert(s: VectorStore; collection, pk: string; vec: seq[float32])" href="boogie/stores/vectorstore.html#insert%2CVectorStore%2Cstring%2Cstring%2Cseq%5Bfloat32%5D">vectorstore: proc insert(s: VectorStore; collection, pk: string; vec: seq[float32])</a></li>
           </ul></dd>
 <dt><a name="insertBatch" href="#insertBatch"><span>insertBatch:</span></a></dt><dd><ul class="simple">
@@ -455,6 +497,8 @@
           </ul></dd>
 <dt><a name="len" href="#len"><span>len:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
+          data-doc-search-tag="docstore: proc len(store: DocumentStore): int" href="boogie/stores/docstore.html#len%2CDocumentStore">docstore: proc len(store: DocumentStore): int</a></li>
+          <li><a class="reference external"
           data-doc-search-tag="kv: proc len(s: KvStore): int" href="boogie/stores/kv.html#len%2CKvStore">kv: proc len(s: KvStore): int</a></li>
           </ul></dd>
 <dt><a name="nearest" href="#nearest"><span>nearest:</span></a></dt><dd><ul class="simple">
@@ -543,11 +587,23 @@
                enableWal: bool = true; checkpointEveryOps: uint32 = 0'u32;
                walFlushEveryOps: uint32 = 1000'u32): VectorStore</a></li>
           </ul></dd>
+<dt><a name="openBSONDocument" href="#openBSONDocument"><span>openBSONDocument:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="docstore: proc openBSONDocument(store: var DocumentStore; key, path: string; sync = true): bool" href="boogie/stores/docstore.html#openBSONDocument%2CDocumentStore%2Cstring%2Cstring">docstore: proc openBSONDocument(store: var DocumentStore; key, path: string; sync = true): bool</a></li>
+          </ul></dd>
 <dt><a name="openColumnarStore" href="#openColumnarStore"><span>openColumnarStore:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="columnar: proc openColumnarStore(rootDir: string; walPath: string = &quot;&quot;;
                   walFlushEveryOps: int = 100): ColumnarStore" href="boogie/stores/columnar.html#openColumnarStore%2Cstring%2Cstring%2Cint">columnar: proc openColumnarStore(rootDir: string; walPath: string = &quot;&quot;;
                   walFlushEveryOps: int = 100): ColumnarStore</a></li>
+          </ul></dd>
+<dt><a name="openDocumentStore" href="#openDocumentStore"><span>openDocumentStore:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="docstore: proc openDocumentStore(path: string; name = &quot;documents&quot;; defaultEncoding = deJson;
+                  enableSnapshots = true; checkpointEveryOps: uint32 = 1000'u32;
+                  walFlushEveryOps: uint32 = 1000'u32): DocumentStore" href="boogie/stores/docstore.html#openDocumentStore%2Cstring%2Cstring%2Cuint32%2Cuint32">docstore: proc openDocumentStore(path: string; name = &quot;documents&quot;; defaultEncoding = deJson;
+                  enableSnapshots = true; checkpointEveryOps: uint32 = 1000'u32;
+                  walFlushEveryOps: uint32 = 1000'u32): DocumentStore</a></li>
           </ul></dd>
 <dt><a name="openGraphStore" href="#openGraphStore"><span>openGraphStore:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -560,6 +616,10 @@
 <dt><a name="outgoing" href="#outgoing"><span>outgoing:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="graphstore: proc outgoing(s: GraphStore; nodeId: uint64; relType = &quot;&quot;): seq[Relationship]" href="boogie/stores/graphstore.html#outgoing%2CGraphStore%2Cuint64%2Cstring">graphstore: proc outgoing(s: GraphStore; nodeId: uint64; relType = &quot;&quot;): seq[Relationship]</a></li>
+          </ul></dd>
+<dt><a name="pairs" href="#pairs"><span>pairs:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="docstore: iterator pairs(store: DocumentStore): (string, JsonNode)" href="boogie/stores/docstore.html#pairs.i%2CDocumentStore">docstore: iterator pairs(store: DocumentStore): (string, JsonNode)</a></li>
           </ul></dd>
 <dt><a name="pairsUnordered" href="#pairsUnordered"><span>pairsUnordered:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -581,8 +641,16 @@
 <li><a class="reference external"
           data-doc-search-tag="kv: proc put(s: KvStore; key, value: string)" href="boogie/stores/kv.html#put%2CKvStore%2Cstring%2Cstring">kv: proc put(s: KvStore; key, value: string)</a></li>
           </ul></dd>
+<dt><a name="putObj" href="#putObj"><span>putObj:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="docstore: proc putObj[T: object | ref object](store: var DocumentStore; key: string; value: T;
+                               sync = true; enc: DocumentEncoding = deJson)" href="boogie/stores/docstore.html#putObj%2CDocumentStore%2Cstring%2CT%2CDocumentEncoding">docstore: proc putObj[T: object | ref object](store: var DocumentStore; key: string; value: T;
+                               sync = true; enc: DocumentEncoding = deJson)</a></li>
+          </ul></dd>
 <dt><a name="recoverFromWal" href="#recoverFromWal"><span>recoverFromWal:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
+          data-doc-search-tag="docstore: proc recoverFromWal(s: var DocumentStore)" href="boogie/stores/docstore.html#recoverFromWal%2CDocumentStore">docstore: proc recoverFromWal(s: var DocumentStore)</a></li>
+          <li><a class="reference external"
           data-doc-search-tag="kv: proc recoverFromWal(s: KvStore)" href="boogie/stores/kv.html#recoverFromWal%2CKvStore">kv: proc recoverFromWal(s: KvStore)</a></li>
           <li><a class="reference external"
           data-doc-search-tag="rdbms: proc recoverFromWal(s: Store)" href="boogie/stores/rdbms.html#recoverFromWal%2CStore">rdbms: proc recoverFromWal(s: Store)</a></li>
@@ -657,6 +725,12 @@
     uint64]" href="boogie/stores/graphstore.html#traverseBfs%2CGraphStore%2Cuint64%2Cint%2Cstring">graphstore: proc traverseBfs(s: GraphStore; startNode: uint64; maxDepth: int; relType = &quot;&quot;): seq[
     uint64]</a></li>
           </ul></dd>
+<dt><a name="upsert" href="#upsert"><span>upsert:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="docstore: proc upsert(store: var DocumentStore; key: string; doc: JsonNode; sync = true;
+       enc: DocumentEncoding = deJson)" href="boogie/stores/docstore.html#upsert%2CDocumentStore%2Cstring%2CJsonNode%2CDocumentEncoding">docstore: proc upsert(store: var DocumentStore; key: string; doc: JsonNode; sync = true;
+       enc: DocumentEncoding = deJson)</a></li>
+          </ul></dd>
 <dt><a name="upsertNode" href="#upsertNode"><span>upsertNode:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="graphstore: proc upsertNode(tx: var GraphTx; node: GraphNode)" href="boogie/stores/graphstore.html#upsertNode%2CGraphTx%2CGraphNode">graphstore: proc upsertNode(tx: var GraphTx; node: GraphNode)</a></li>
@@ -729,11 +803,17 @@
 <li><a class="reference external"
           data-doc-search-tag="wal: WalOp.woUpdateRow" href="boogie/wal.html#woUpdateRow">wal: WalOp.woUpdateRow</a></li>
           </ul></dd>
+<dt><a name="writeBSONDocument" href="#writeBSONDocument"><span>writeBSONDocument:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="docstore: proc writeBSONDocument(store: DocumentStore; key, path: string;
+                  version: int32 = 1'i32): bool" href="boogie/stores/docstore.html#writeBSONDocument%2CDocumentStore%2Cstring%2Cstring%2Cint32">docstore: proc writeBSONDocument(store: DocumentStore; key, path: string;
+                  version: int32 = 1'i32): bool</a></li>
+          </ul></dd>
 </dl>
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-05-07 09:57:48 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-05-07 11:41:14 UTC</small>
       </div>
     </div>
   </div>
