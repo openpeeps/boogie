@@ -1,5 +1,5 @@
 import unittest, options, json, times, strformat, os, tables
-import ../src/boogie/stores/kvstore
+import ../src/boogie/stores/kv
 
 # discard existsOrCreateDir("tests" / "data")
 # for p in walkDir("tests" / "data"):

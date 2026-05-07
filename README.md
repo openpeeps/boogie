@@ -1,6 +1,6 @@
 <p align="center">
   <img src="https://github.com/openpeeps/boogie/blob/main/.github/boogie.png" width="100px"><br>
-  A suite of simple embedded databases in Nim with<br>
+  A suite of embedded data stores in Nim with<br>
   write-ahead log (WAL) support for durability and crash recovery
 </p>
 
@@ -35,8 +35,11 @@ This can be used as a simple embedded database for your Nim applications. If you
 
 ## Examples
 Here is a simple example of how to use Boogie
+
+### RDBMS Store
+Here is an example of using the RDBMS store to create a table, insert some data, and query it:
 ```nim
-import pkg/boogie
+import boogie/stores/rdbms
 
 var db = newStore("tests" / "data" / "myboogie.db", StorageMode.smDisk,
             enableWal = true, walFlushEveryOps = 100'u32)
@@ -71,8 +74,32 @@ for row in db.getTable("users").get().allRows():
     echo fmt"{key}: {$col}"
 ```
 
-Check the [tests](https://github.com/openpeeps/boogie/tree/main/src/boogie/tests) for more examples.
+### Key/Value Store
+Boogie also provides a simple key-value store implementation with WAL support.
+```nim
+import boogie/stores/kv
 
+let kv = newKVStore("./mykv.db", StorageMode.ksmDisk,
+            enableWal = true,
+            checkpointEveryOps = 50'u32)
+
+kv.put("name", "Alice")
+assert kv.get("name") == "Alice"
+
+kv.delete("name")
+assert kv.hasKey("name") == false
+```
+
+### Vector Store
+
+
+### Columnar Store
+
+
+### Graph Store
+
+
+Check the [tests](https://github.com/openpeeps/boogie/tree/main/src/boogie/tests) for more examples.
 
 ### Todos
 - [x] Add support for multiple tables
