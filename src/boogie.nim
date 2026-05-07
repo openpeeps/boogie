@@ -11,5 +11,5 @@ else:
   import ./boogie/wal
   export wal
 
-  import ./boogie/stores/[columnar, rdbms, kv, graphstore, vectorstore]
-  export columnar, rdbms, kv, graphstore, vectorstore
+  import ./boogie/stores/[columnar, rdbms, kv, graphstore, vectorstore, docstore]
+  export columnar, rdbms, kv, graphstore, vectorstore, docstore

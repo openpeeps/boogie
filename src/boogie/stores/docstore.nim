@@ -15,24 +15,53 @@
 ## a more direct conversion between Nim objects and JsonNode (related to `/pkg/openparser/json`).
 
 import std/[tables, options, base64, os]
+
+import pkg/flatty
 import pkg/openparser/[json, bson]
+
 import ../wal
-export wal
+export wal, bson
 
 type
   DocumentEncoding* = enum
+    ## The encoding format for documents stored in the document
+    ## store. This determines how the document is serialized
     deJson, deBson
 
   DocumentStoreError* = object of CatchableError
 
+  SnapshotOnDisk = tuple
+    version: uint32
+    checkpointLsn: uint64
+    docs: seq[(string, string)] # (key, jsonText)
+
   DocumentStore* = object
+    ## A simple document store that supports storing
+    ## JSON documents with flexible schemas. Each document
+    ## is identified by a unique string key.
     name*: string
     wal*: Wal
     defaultEncoding*: DocumentEncoding
     docs: OrderedTable[string, JsonNode]
 
+    # snapshot + durability policy (similar to rdbms)
+    hasDbFile: bool
+    dbPath: string
+    checkpointLsn: uint64
+    pendingOps: uint32
+    checkpointEveryOps: uint32
+    walFlushEveryOps: uint32
+    pendingWalOps: uint32
+
 proc fail(msg: string) {.noreturn.} =
   raise newException(DocumentStoreError, msg)
+
+proc writeTextAtomic(path, content: string) =
+  let tmp = path & ".tmp"
+  writeFile(tmp, content)
+  if fileExists(path):
+    removeFile(path)
+  moveFile(tmp, path)
 
 proc bytesToString(b: openArray[byte]): string =
   result = newString(b.len)
@@ -51,7 +80,8 @@ proc encodePayload(doc: JsonNode, enc: DocumentEncoding): string =
   of deJson:
     "J" & toJson(doc)
   of deBson:
-    "B" & base64.encode(bytesToString(toBson(doc)))
+    let bdoc = newBSONDocument(doc, 1'i32)
+    "B" & base64.encode(bytesToString(toBytes(bdoc)))
 
 proc decodePayload(payload: string): JsonNode =
   if payload.len < 2:
@@ -60,41 +90,153 @@ proc decodePayload(payload: string): JsonNode =
   of 'J':
     fromJson(payload[1 .. ^1])
   of 'B':
-    fromBson(stringToBytes(base64.decode(payload[1 .. ^1])))
+    let bdoc = fromBytes(stringToBytes(base64.decode(payload[1 .. ^1])))
+    toJsonNode(bdoc)
   else:
     fail("Unknown payload encoding")
 
-proc applyReplay(store: var DocumentStore) =
-  for e in store.wal.entries:
-    if e.table != store.name: continue
-    case e.op
-    of woInsertRow, woUpdateRow:
-      store.docs[e.pk] = decodePayload(e.payload)
-    of woDeleteRow:
-      if store.docs.hasKey(e.pk):
-        store.docs.del(e.pk)
-    else:
-      discard
+proc buildSnapshot(s: DocumentStore): SnapshotOnDisk =
+  result.version = 1'u32
+  result.checkpointLsn = s.checkpointLsn
+  for k, v in s.docs.pairs:
+    result.docs.add((k, toJson(v)))
 
-proc openDocumentStore*(
-  path: string,
-  name = "documents",
-  defaultEncoding = deJson
-): DocumentStore =
-  let walPath = path / name
+proc loadSnapshotIntoStore(s: var DocumentStore, snap: SnapshotOnDisk) =
+  if snap.version != 1'u32:
+    fail("unsupported document snapshot version")
+  s.docs = initOrderedTable[string, JsonNode]()
+  s.checkpointLsn = snap.checkpointLsn
+  for (k, jsonText) in snap.docs:
+    s.docs[k] = fromJson(jsonText)
+
+proc saveSnapshotIfEnabled(s: var DocumentStore) =
+  if not s.hasDbFile:
+    return
+  let blob = toFlatty(buildSnapshot(s))
+  writeTextAtomic(s.dbPath, blob)
+
+proc loadSnapshotIfPresent(s: var DocumentStore) =
+  if (not s.hasDbFile) or (not fileExists(s.dbPath)):
+    return
+  let blob = readFile(s.dbPath)
+  if blob.len == 0:
+    return
+  let snap = fromFlatty(blob, SnapshotOnDisk)
+  s.loadSnapshotIntoStore(snap)
+
+proc flushWalIfNeeded(s: var DocumentStore, force = false) =
+  if force:
+    s.wal.flush()
+    s.pendingWalOps = 0'u32
+    return
+
+  if s.walFlushEveryOps == 0'u32:
+    return
+  if s.pendingWalOps >= s.walFlushEveryOps:
+    s.wal.flush()
+    s.pendingWalOps = 0'u32
+
+proc appendWal(s: var DocumentStore, op: WalOp, key, payload: string, sync: bool): uint64 =
+  let lsn = s.wal.append(
+    WalEntry(op: op, table: s.name, pk: key, payload: payload),
+    sync = false
+  )
+  inc s.pendingWalOps
+  if sync:
+    s.flushWalIfNeeded(force = true)
+  else:
+    s.flushWalIfNeeded(force = false)
+  result = lsn
+
+proc markCommitted(s: var DocumentStore, lsn: uint64) =
+  if lsn > s.checkpointLsn:
+    s.checkpointLsn = lsn
+
+  if s.hasDbFile and s.checkpointEveryOps > 0'u32:
+    inc s.pendingOps
+    if s.pendingOps >= s.checkpointEveryOps:
+      s.saveSnapshotIfEnabled()
+      s.pendingOps = 0'u32
+
+proc applyWalEntry(s: var DocumentStore, e: WalEntry) =
+  if e.table != s.name:
+    return
+  case e.op
+  of woInsertRow, woUpdateRow:
+    s.docs[e.pk] = decodePayload(e.payload)
+  of woDeleteRow:
+    if s.docs.hasKey(e.pk):
+      s.docs.del(e.pk)
+  else:
+    discard
+
+proc recoverFromWal*(s: var DocumentStore) =
+  s.docs = initOrderedTable[string, JsonNode]()
+  s.checkpointLsn = 0'u64
+  s.pendingOps = 0'u32
+  s.pendingWalOps = 0'u32
+
+  s.loadSnapshotIfPresent()
+
+  for e in s.wal.entries:
+    if e.lsn <= s.checkpointLsn:
+      continue
+    s.applyWalEntry(e)
+    s.checkpointLsn = e.lsn
+
+  s.flushWalIfNeeded(force = true)
+  s.saveSnapshotIfEnabled()
+  s.pendingOps = 0'u32
+  s.pendingWalOps = 0'u32
+
+proc openDocumentStore*(path: string, name = "documents",
+                  defaultEncoding = deJson,
+                  enableSnapshots = true,
+                  checkpointEveryOps: uint32 = 1000'u32,
+                  walFlushEveryOps: uint32 = 1000'u32): DocumentStore =
+  ## Opens a document store with the given name at the specified path.
+  ## 
+  ## If the WAL file already exists, it will be replayed to reconstruct the in-memory state of the store.
+  ## The default encoding for documents can be set to either JSON or BSON.
+  if path.len > 0 and not dirExists(path):
+    createDir(path)
+
+  let base = path / name
   result = DocumentStore(
     name: name,
-    wal: openWal(walPath),
+    wal: openWal(base),
     defaultEncoding: defaultEncoding,
-    docs: initOrderedTable[string, JsonNode]()
+    docs: initOrderedTable[string, JsonNode](),
+    hasDbFile: enableSnapshots,
+    dbPath: base.changeFileExt(".ddb"),
+    checkpointLsn: 0'u64,
+    pendingOps: 0'u32,
+    checkpointEveryOps: checkpointEveryOps,
+    walFlushEveryOps: walFlushEveryOps,
+    pendingWalOps: 0'u32
   )
-  result.applyReplay()
+  result.recoverFromWal()
 
-proc len*(store: DocumentStore): int {.inline.} = store.docs.len
-proc hasKey*(store: DocumentStore, key: string): bool {.inline.} = store.docs.hasKey(key)
+proc checkpoint*(store: var DocumentStore) =
+  ## Force snapshot checkpoint.
+  store.flushWalIfNeeded(force = true)
+  store.saveSnapshotIfEnabled()
+  store.pendingOps = 0'u32
+
+proc len*(store: DocumentStore): int =
+  ## Returns the number of documents currently stored in the document store.
+  store.docs.len
+
+proc hasKey*(store: DocumentStore, key: string): bool =
+  ## Checks if a document with the given key exists in the store.
+  store.docs.hasKey(key)
 
 proc get*(store: DocumentStore, key: string): Option[JsonNode] =
-  if store.docs.hasKey(key): some(store.docs[key]) else: none(JsonNode)
+  ## Retrieves the document with the given key, if it exists. Returns `none` if the key is not found.
+  if store.docs.hasKey(key):
+    some(store.docs[key])
+  else:
+    none(JsonNode)
 
 proc insert*(
   store: var DocumentStore,
@@ -106,8 +248,9 @@ proc insert*(
   if store.docs.hasKey(key):
     fail("Duplicate key: " & key)
   let payload = encodePayload(doc, enc)
-  discard store.wal.append(WalEntry(op: woInsertRow, table: store.name, pk: key, payload: payload), sync)
+  let lsn = store.appendWal(woInsertRow, key, payload, sync)
   store.docs[key] = doc
+  store.markCommitted(lsn)
 
 proc upsert*(
   store: var DocumentStore,
@@ -120,16 +263,18 @@ proc upsert*(
   ## it will be updated with the new document.
   let payload = encodePayload(doc, enc)
   let op = if store.docs.hasKey(key): woUpdateRow else: woInsertRow
-  discard store.wal.append(WalEntry(op: op, table: store.name, pk: key, payload: payload), sync)
+  let lsn = store.appendWal(op, key, payload, sync)
   store.docs[key] = doc
+  store.markCommitted(lsn)
 
 proc delete*(store: var DocumentStore, key: string, sync = true): bool =
   ## Deletes the document with the given key. Returns true if the document
   ## was found and deleted, false if the key was not found.
   if not store.docs.hasKey(key):
     return false
-  discard store.wal.append(WalEntry(op: woDeleteRow, table: store.name, pk: key, payload: ""), sync)
+  let lsn = store.appendWal(woDeleteRow, key, "", sync)
   store.docs.del(key)
+  store.markCommitted(lsn)
   true
 
 proc putObj*[T: object|ref object](
@@ -158,13 +303,33 @@ proc getObj*[T](store: DocumentStore, key: string, _: typedesc[T]): Option[T] =
   let s = toJson(store.docs[key])
   some(fromJson(s, T))
 
-proc getBson*(store: DocumentStore, key: string): Option[seq[byte]] =
+proc getBson*(store: DocumentStore, key: string, version: int32 = 1'i32): Option[BSONDocument] =
   ## Returns the raw BSON bytes for the document with the given key, if it exists. This allows
   ## clients to retrieve the original BSON data without converting it to JSON first. If the document
   ## was stored using JSON encoding, this will return the JSON string as bytes instead.
   if not store.docs.hasKey(key):
-    return none(seq[byte])
-  some(toBson(store.docs[key]))
+    return none(BSONDocument)
+  some(newBSONDocument(store.docs[key], version))
+
+proc writeBSONDocument*(store: DocumentStore, key, path: string,
+                    version: int32 = 1'i32): bool {.discardable.} =
+  ## Writes the document with the given key to a file in BSON format. Returns true if the document
+  ## was found and written, false if the key was not found
+  let d = store.getBson(key, version)
+  if d.isNone:
+    return false
+  bson.writeBSONDocument(path, d.get)
+  true
+
+proc openBSONDocument*(store: var DocumentStore, key, path: string, sync = true): bool {.discardable.} =
+  ## Reads a BSON document from a file and upserts it into the store with the given key.
+  ## 
+  ## Returns true if the file was found and read, false if the file does not exist.
+  if not fileExists(path):
+    return false
+  let d = bson.openBSONDocument(path)
+  store.upsert(key, d.toJsonNode(), sync = sync, enc = deBson)
+  true
 
 iterator pairs*(store: DocumentStore): (string, JsonNode) =
   ## Iterates over all key-document pairs in the store. The order is the same as insertion order.
