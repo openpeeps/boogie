@@ -1,7 +1,7 @@
 # Boogie - A suite of WAL-based embedded data stores.
 # RDBMS, KV Store, GraphStore, VectorStore, Columnar and more 
 #
-# (c) 2025 George Lemon | LGPL-3.0-or-later License
+# (c) 2026 George Lemon | LGPL-3.0-or-later License
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/boogie
 
