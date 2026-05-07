@@ -1,4 +1,4 @@
-import std/[unittest, os, times, json]
+import std/[unittest, os, times, json, strformat]
 import ../src/boogie/stores/columnar
 
 proc mkTempRoot(prefix = "boogie-columnar-test"): string =
@@ -123,3 +123,46 @@ suite "columnar store":
       check rows.len == 2
       check rows[0]["user"].getStr() == "alice"
       check rows[1]["amount"].getFloat() == 25.0
+
+suite "Columnar Store benchmarks":
+  test "columnar ops/sec benchmark (insert/scan/filter)":
+    const N = 20000
+    const batchSize = 1000
+    let root = mkTempRoot("bench-columnar")
+    defer:
+      if dirExists(root): removeDir(root)
+
+    var s = openColumnarStore(root)
+    s.createTable(baseSchema())
+
+    # Insert in batches
+    var t0 = cpuTime()
+    var batch = newSeq[JsonNode]()
+    for i in 1..N:
+      batch.add(%*{"id": i, "user": "user" & $i, "amount": float(i), "ok": (i mod 2 == 0)})
+      if batch.len == batchSize or i == N:
+        s.insertBatch("events", batch)
+        batch.setLen(0)
+    let insertSecs = cpuTime() - t0
+
+    # Scan (project all columns)
+    t0 = cpuTime()
+    let rows = s.scan("events", @["id", "user", "amount", "ok"])
+    let scanSecs = cpuTime() - t0
+
+    # Filter (amount > N/2)
+    t0 = cpuTime()
+    let filtered = s.scan("events", @["id"], filters = @[
+      Filter(column: "amount", op: foGt, value: newJFloat(N.float / 2))
+    ])
+    let filterSecs = cpuTime() - t0
+
+    let insertOps = float(N) / max(insertSecs, 1e-9)
+    let scanOps = float(rows.len) / max(scanSecs, 1e-9)
+    let filterOps = float(filtered.len) / max(filterSecs, 1e-9)
+
+    echo fmt"[bench][columnar] insert={insertOps:>10.0f} ops/s scan={scanOps:>10.0f} ops/s filter={filterOps:>10.0f} ops/s"
+
+    check insertOps > 0
+    check scanOps > 0
+    check filterOps > 0

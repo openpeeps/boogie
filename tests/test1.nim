@@ -378,3 +378,57 @@ suite "Other examples":
     for row in db.getTable("users").get().allRows():
       for key, col in row[1]:
         echo fmt"{key}: {$col}"
+
+suite "RDBMS Store benchmarks":
+  test "rdbms ops/sec benchmark (insert/lookup/scan)":
+    const N = 20000
+    let db = newStore("tests" / "data" / "bench_rdbms_mem",
+                smInMemory, enableWal = true, walFlushEveryOps = 0'u32)
+    if not db.hasTable("users"):
+      db.createTable(newTable(
+        name = "users",
+        primaryKey = "id",
+        columns = [
+          newColumn("id", DataType.dtInt, false),
+          newColumn("name", DataType.dtText, false),
+          newColumn("age", DataType.dtInt, false),
+          newColumn("active", DataType.dtBool, false),
+          newColumn("meta", DataType.dtJson, true)
+        ]
+      ))
+
+    # Insert
+    var t0 = cpuTime()
+    for i in 1..N:
+      db.insertRow("users", row({
+        "name": newTextValue("User"),
+        "age": newIntValue(20 + (i mod 30)),
+        "active": newBoolValue((i and 1) == 0),
+        "meta": newJSONValue(%*{"index": i})
+      }))
+    let insertSecs = cpuTime() - t0
+
+    # Lookup
+    t0 = cpuTime()
+    var hits = 0
+    for i in 1..N:
+      if db.getRow("users", $i).isSome:
+        inc hits
+    let lookupSecs = cpuTime() - t0
+
+    # Scan
+    t0 = cpuTime()
+    var scanned = 0
+    for _ in db.getTable("users").get().allRows():
+      inc scanned
+    let scanSecs = cpuTime() - t0
+
+    let insertOps = float(N) / max(insertSecs, 1e-9)
+    let lookupOps = float(N) / max(lookupSecs, 1e-9)
+    let scanOps = float(N) / max(scanSecs, 1e-9)
+
+    echo fmt"[bench][rdbms][mem] insert={insertOps:>10.0f} ops/s lookup={lookupOps:>10.0f} ops/s scan={scanOps:>10.0f} ops/s"
+
+    check insertOps > 0
+    check lookupOps > 0
+    check scanOps > 0

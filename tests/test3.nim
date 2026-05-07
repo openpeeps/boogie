@@ -1,4 +1,4 @@
-import std/[unittest, os, sequtils, options]
+import std/[unittest, os, sequtils, options, times, strformat]
 import ../src/boogie/stores/vectorstore
 
 const testDir = "tests/data_vector"
@@ -73,3 +73,41 @@ suite "VectorStore WAL/snapshot recovery":
     vs.checkpoint()
     vs = newVectorStore(path, smDisk, enableWal=true)
     check vs.get("embeddings", "z").isSome
+
+
+suite "VectorStore benchmarks":
+  test "vectorstore ops/sec benchmark (insert/get/del)":
+    const N = 20000
+    let collName = "bench"
+    let dim = 8
+    let vs = newInMemoryVectorStore()
+    let coll = newCollection(collName, dim)
+    vs.createCollection(coll)
+
+    # Insert
+    var t0 = cpuTime()
+    for i in 0..<N:
+      vs.insert(collName, "id" & $i, newSeqWith(dim, float32(i)))
+    let insertSecs = cpuTime() - t0
+
+    # Get
+    t0 = cpuTime()
+    for i in 0..<N:
+      discard vs.get(collName, "id" & $i)
+    let getSecs = cpuTime() - t0
+
+    # Delete
+    t0 = cpuTime()
+    for i in 0..<N:
+      discard vs.delete(collName, "id" & $i)
+    let delSecs = cpuTime() - t0
+
+    let insertOps = float(N) / max(insertSecs, 1e-9)
+    let getOps = float(N) / max(getSecs, 1e-9)
+    let delOps = float(N) / max(delSecs, 1e-9)
+
+    echo fmt"[bench][vectorstore] insert={insertOps:>10.0f} ops/s get={getOps:>10.0f} ops/s del={delOps:>10.0f} ops/s"
+
+    check insertOps > 0
+    check getOps > 0
+    check delOps > 0

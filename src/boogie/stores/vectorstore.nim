@@ -6,7 +6,7 @@
 #          https://github.com/openpeeps/boogie
 
 import std/[tables, options, strformat, json, os, math, algorithm]
-import pkg/flatty
+import pkg/[flatty, sorta]
 import ../wal
 
 ## A simple vector store implementation with optional disk persistence and write-ahead logging (WAL) for 
@@ -37,11 +37,11 @@ type
     ## Each vector is associated with a primary key (pk) for lookup.
     name*: string
     dimension*: int
-    vectorsByPk: OrderedTable[string, seq[float32]]
+    vectorsByPk: SortedTable[string, seq[float32]]
 
   VectorStore* {.acyclic.} = ref object
     ## The main data structure for the vector store, containing multiple collections of vectors
-    collections: tables.Table[string, VectorCollection]
+    collections: SortedTable[string, VectorCollection]
     storageMode: VectorStorageMode
     hasWal: bool
     wal: Wal
@@ -85,7 +85,7 @@ proc newCollection*(name: string, dimension: int): VectorCollection =
   VectorCollection(
     name: name,
     dimension: dimension,
-    vectorsByPk: initOrderedTable[string, seq[float32]]()
+    vectorsByPk: initSortedTable[string, seq[float32]]()
   )
 
 proc hasCollection*(s: VectorStore, name: string): bool =
@@ -194,7 +194,7 @@ proc buildSnapshot(s: VectorStore): SnapshotOnDisk =
 proc loadSnapshotIntoStore(s: VectorStore, snap: SnapshotOnDisk) =
   if snap.version != 1'u32:
     raise newException(VectorStoreError, "unsupported snapshot version")
-  s.collections = initTable[string, VectorCollection]()
+  s.collections = initSortedTable[string, VectorCollection]()
   s.checkpointLsn = snap.checkpointLsn
   for cd in snap.collections:
     var c = newCollection(cd.name, cd.dimension)
@@ -259,7 +259,7 @@ proc recoverFromWal*(s: VectorStore) =
   ## replaying any WAL entries that have an LSN greater than the checkpoint LSN, ensuring that the
   ## vector store is up-to-date with all committed operations. This procedure is typically called
   ## during initialization of the vector store to restore its state after a crash or restart
-  s.collections = initTable[string, VectorCollection]()
+  s.collections = initSortedTable[string, VectorCollection]()
   s.checkpointLsn = 0'u64
   s.pendingOps = 0'u32
   s.pendingWalOps = 0'u32

@@ -1,11 +1,7 @@
-import unittest, options, json, times, strformat, os, tables
+import std/[unittest, options, json, times, strformat, os, tables]
 import ../src/boogie/stores/kv
 
-# discard existsOrCreateDir("tests" / "data")
-# for p in walkDir("tests" / "data"):
-#   removeFile(p.path)
-
-suite "WAL + memory store tests":
+suite "KeyValue Store WAL + memory store tests":
   test "in-memory put/get/delete":
     let kv = newInMemoryKvStore()
     check kv.isEmpty
@@ -21,9 +17,6 @@ suite "WAL + memory store tests":
 
   test "disk store with WAL and recovery":
     let dbPath = "test_kvstore"
-    if fileExists(dbPath): removeFile(dbPath)
-    if fileExists(dbPath & ".db"): removeFile(dbPath & ".db")
-    if fileExists(dbPath & ".wal"): removeFile(dbPath & ".wal")
 
     block:
       let kv = newKvStore(dbPath, ksmDisk, enableWal = true, checkpointEveryOps = 2)
@@ -45,10 +38,6 @@ suite "WAL + memory store tests":
       kv2.put("d", "4")
       check kv2.get("d").get() == "4"
 
-    # Cleanup
-    for ext in ["", ".db", ".wal"]:
-      if fileExists(dbPath & ext): removeFile(dbPath & ext)
-
   test "iterator pairsUnordered":
     let kv = newInMemoryKvStore()
     kv.put("x", "1")
@@ -58,3 +47,71 @@ suite "WAL + memory store tests":
       keys.add(k)
       check v in ["1", "2"]
     check keys.len == 2
+
+suite "KeyValue Store throughput benchmarks":
+  test "in-memory put/get/delete ops per second":
+    const n = 100_000
+    let kv = newInMemoryKvStore()
+
+    var t0 = cpuTime()
+    for i in 0..<n:
+      kv.put("k" & $i, "v" & $i)
+    let putSecs = cpuTime() - t0
+
+    t0 = cpuTime()
+    for i in 0..<n:
+      discard kv.get("k" & $i)
+    let getSecs = cpuTime() - t0
+
+    t0 = cpuTime()
+    for i in 0..<n:
+      discard kv.delete("k" & $i)
+    let delSecs = cpuTime() - t0
+
+    let putOps = float(n) / max(putSecs, 1e-9)
+    let getOps = float(n) / max(getSecs, 1e-9)
+    let delOps = float(n) / max(delSecs, 1e-9)
+
+    echo fmt"[bench][mem] put={putOps:>10.0f} ops/s get={getOps:>10.0f} ops/s del={delOps:>10.0f} ops/s"
+    check putOps > 0
+    check getOps > 0
+    check delOps > 0
+
+  test "disk+wal put/get/delete ops per second":
+    const n = 20_000
+    let dbPath = "tests" / "data" / "bench_kvstore"
+
+    block:
+      let kv = newKvStore(
+        dbPath,
+        ksmDisk,
+        enableWal = true,
+        checkpointEveryOps = 0,
+        walFlushEveryOps = 1000
+      )
+
+      var t0 = cpuTime()
+      for i in 0..<n:
+        kv.put("k" & $i, "v" & $i)
+      kv.checkpoint()
+      let putSecs = cpuTime() - t0
+
+      t0 = cpuTime()
+      for i in 0..<n:
+        discard kv.get("k" & $i)
+      let getSecs = cpuTime() - t0
+
+      t0 = cpuTime()
+      for i in 0..<n:
+        discard kv.delete("k" & $i)
+      kv.checkpoint()
+      let delSecs = cpuTime() - t0
+
+      let putOps = float(n) / max(putSecs, 1e-9)
+      let getOps = float(n) / max(getSecs, 1e-9)
+      let delOps = float(n) / max(delSecs, 1e-9)
+
+      echo fmt"[bench][disk+wal] put={putOps:>10.0f} ops/s get={getOps:>10.0f} ops/s del={delOps:>10.0f} ops/s"
+      check putOps > 0
+      check getOps > 0
+      check delOps > 0

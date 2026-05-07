@@ -29,7 +29,7 @@ type
 
   KvStore* {.acyclic.} = ref object
     ## The main data structure for the key-value store
-    dataByKey: OrderedTable[string, string]
+    dataByKey: SortedTable[string, string]
 
     storageMode: KvStorageMode
     hasWal: bool
@@ -87,7 +87,7 @@ proc buildSnapshot(s: KvStore): KvSnapshotOnDisk =
 proc loadSnapshotIntoStore(s: KvStore, snap: KvSnapshotOnDisk) =
   if snap.version != 1'u32:
     raise newException(KvStoreError, "unsupported .db snapshot version")
-  s.dataByKey = initOrderedTable[string, string](snap.entries.len)
+  s.dataByKey = initSortedTable[string, string]()
   s.checkpointLsn = snap.checkpointLsn
   for (k, v) in snap.entries:
     s.dataByKey[k] = v
@@ -185,7 +185,7 @@ proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = 
       walObj = openWal(path)
 
   result = KvStore(
-    dataByKey: initOrderedTable[string, string](),
+    dataByKey: initSortedTable[string, string](),
     storageMode: mode,
     hasWal: hasWal,
     wal: walObj,
@@ -262,7 +262,7 @@ proc recoverFromWal*(s: KvStore) =
   ## ensure that the store reflects all committed operations even after a crash.
   ## 
   ## The checkpoint LSN is updated to reflect the latest applied WAL entry
-  s.dataByKey = initOrderedTable[string, string]()
+  s.dataByKey = initSortedTable[string, string]()
   s.checkpointLsn = 0'u64
   s.pendingOps = 0'u32
   s.pendingWalOps = 0'u32

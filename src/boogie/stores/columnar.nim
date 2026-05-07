@@ -205,6 +205,7 @@ proc appendColumnValues(path: string, values: seq[JsonNode]) =
   # to a single line of JSON text. In a production system, you would want to
   # include more robust handling of escaping and newlines within values,
   # as well as consider more efficient binary formats for large datasets.
+  if values.len == 0: return
   let f = open(path, fmAppend)
   defer: f.close()
   for v in values:

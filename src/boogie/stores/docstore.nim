@@ -16,7 +16,7 @@
 
 import std/[tables, options, base64, os]
 
-import pkg/flatty
+import pkg/[flatty, sorta]
 import pkg/openparser/[json, bson]
 
 import ../wal
@@ -42,7 +42,7 @@ type
     name*: string
     wal*: Wal
     defaultEncoding*: DocumentEncoding
-    docs: OrderedTable[string, JsonNode]
+    docs: SortedTable[string, JsonNode]
 
     # snapshot + durability policy (similar to rdbms)
     hasDbFile: bool
@@ -104,7 +104,7 @@ proc buildSnapshot(s: DocumentStore): SnapshotOnDisk =
 proc loadSnapshotIntoStore(s: var DocumentStore, snap: SnapshotOnDisk) =
   if snap.version != 1'u32:
     fail("unsupported document snapshot version")
-  s.docs = initOrderedTable[string, JsonNode]()
+  s.docs = initSortedTable[string, JsonNode]()
   s.checkpointLsn = snap.checkpointLsn
   for (k, jsonText) in snap.docs:
     s.docs[k] = fromJson(jsonText)
@@ -171,7 +171,7 @@ proc applyWalEntry(s: var DocumentStore, e: WalEntry) =
     discard
 
 proc recoverFromWal*(s: var DocumentStore) =
-  s.docs = initOrderedTable[string, JsonNode]()
+  s.docs = initSortedTable[string, JsonNode]()
   s.checkpointLsn = 0'u64
   s.pendingOps = 0'u32
   s.pendingWalOps = 0'u32
@@ -206,7 +206,7 @@ proc openDocumentStore*(path: string, name = "documents",
     name: name,
     wal: openWal(base),
     defaultEncoding: defaultEncoding,
-    docs: initOrderedTable[string, JsonNode](),
+    docs: initSortedTable[string, JsonNode](),
     hasDbFile: enableSnapshots,
     dbPath: base.changeFileExt(".ddb"),
     checkpointLsn: 0'u64,
