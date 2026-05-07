@@ -1,14 +1,20 @@
-# Boogie - A stupid simple embedded database for Nim
+# Boogie - A suite of WAL-based embedded data stores.
+# RDBMS, KV Store, GraphStore, VectorStore, Columnar and more 
 #
-# (c) 2025 George Lemon | LGPLv3 License
+# (c) 2025 George Lemon | LGPL-3.0-or-later License
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/boogie
 
-
-# Description: Store data by columns for analytics workloads.
-# How: Store each column as a separate array/file. Optimize for column scans and compression.
-# Example: Parquet, ClickHouse, https://github.com/kelindar/column
-# key features: bitmap indexing, columnar compression, vectorized execution
+## This module implements a simple Columnar store with basic schema management, data insertion, and querying capabilities.
+## It uses a write-ahead log (WAL) for durability and crash recovery, and stores data in a columnar format on disk.
+## 
+## The design is intentionally minimalistic to focus on core concepts, and is not optimized
+## for performance or concurrency. For a production-quality system, we probably want to add features such as:
+## - More efficient storage formats (e.g. binary encoding, compression)
+## - Support for more complex data types (e.g. nested structures, arrays)
+## - Indexing and query optimization
+## - Concurrency control and transactions
+## - More robust error handling and validation
 
 import std/[tables, options, json, strformat, sets, strutils, os, sequtils]
 import ../wal

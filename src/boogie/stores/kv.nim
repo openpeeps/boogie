@@ -1,6 +1,9 @@
-# Boogie KV Store - WAL-based key-value storage using sorta BTree tables
+# Boogie - A suite of WAL-based embedded data stores.
+# RDBMS, KV Store, GraphStore, VectorStore, Columnar and more 
 #
-# (c) 2026 George Lemon | LGPLv3 License
+# (c) 2025 George Lemon | LGPL-3.0-or-later License
+#          Made by Humans from OpenPeeps
+#          https://github.com/openpeeps/boogie
 
 import std/[tables, options, strformat, os]
 import pkg/[flatty, sorta]

@@ -1,9 +1,9 @@
-# Boogie - A stupid simple embedded database for Nim
+# Boogie - A suite of WAL-based embedded data stores.
+# RDBMS, KV Store, GraphStore, VectorStore, Columnar and more 
 #
-# (c) 2025 George Lemon | LGPLv3 License
+# (c) 2025 George Lemon | LGPL-3.0-or-later License
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/boogie
-
 
 ## This module implements a simple graph store on top of the Boogie WAL for durability.
 ## The graph store supports basic operations for creating, updating, and deleting nodes and relationships,
