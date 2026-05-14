@@ -78,6 +78,8 @@ proc writeTextAtomic(path, content: string) =
   moveFile(tmp, path)
 
 proc newCollection*(name: string, dimension: int): VectorCollection =
+  ## Creates a new `VectorCollection` with the specified name and dimension. The collection is initialized
+  ## with an empty sorted table to store vectors by their primary key (pk)
   if name.len == 0:
     raise newException(VectorStoreError, "collection name cannot be empty")
   if dimension <= 0:
@@ -89,9 +91,11 @@ proc newCollection*(name: string, dimension: int): VectorCollection =
   )
 
 proc hasCollection*(s: VectorStore, name: string): bool =
+  ## Checks if a collection with the specified name exists in the vector store
   s.collections.hasKey(name)
 
 proc getCollection*(s: VectorStore, name: string): Option[VectorCollection] =
+  ## Retrieves a collection by name from the vector store
   if s.collections.hasKey(name):
     some(s.collections[name])
   else:
