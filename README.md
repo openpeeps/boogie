@@ -35,45 +35,86 @@ What's included?
 
 This can be used as a simple embedded database for your Nim applications. If you want, you can use [openpeeps/e2ee](https://github.com/openpeeps/e2ee) to encrypt the data before inserting it into Boogie database.
 
-## Examples
-Here is a simple example of how to use Boogie
-
 ### RDBMS Store
+Notes
+- Use `smInMemory` for fast, ephemeral stores: `let store = newInMemoryStore()`
+- Use `getRow`, `allRows`, or `where` for data access
+- Foreign key violations and type mismatches raise StoreError
+- WAL and snapshots ensure durability and fast recovery
+
+
 Here is an example of using the RDBMS store to create a table, insert some data, and query it:
 ```nim
 import boogie/stores/rdbms
 
-var db = newStore("tests" / "data" / "myboogie.db", StorageMode.smDisk,
-            enableWal = true, walFlushEveryOps = 100'u32)
+# Define columns
+let userIdCol = newColumn("id", dtInt, false)
+let userNameCol = newColumn("name", dtText, false)
+let userEmailCol = newColumn("email", dtText, true)
 
-# Create a table with some columns
-db.createTable(newTable(
+let postIdCol = newColumn("id", dtInt, false)
+let postUserIdCol = newColumn("user_id", dtInt, false)
+let postContentCol = newColumn("content", dtText, false)
+
+# Create tables
+let users = newTable(
   name = "users",
   primaryKey = "id",
-  columns = [
-    newColumn("id", DataType.dtInt, false),
-    newColumn("name", DataType.dtText, false),
-    newColumn("age", DataType.dtInt, false),
-    newColumn("active", DataType.dtBool, false),
-    newColumn("meta", DataType.dtJson, true)
-  ]
-))
+  columns = [userIdCol, userNameCol, userEmailCol],
+  primaryKeyMode = pkmSerial
+)
 
-# insert some data
-db.insertRow("users", row({
+let fkUser = newForeignKey(
+  name = "fk_post_user",
+  column = "user_id",
+  refTable = "users",
+  refColumn = "id"
+)
+
+let posts = newTable(
+  name = "posts",
+  primaryKey = "id",
+  columns = [postIdCol, postUserIdCol, postContentCol],
+  primaryKeyMode = pkmSerial,
+  foreignKeys = [fkUser]
+)
+
+# Create a disk-backed store with WAL and checkpointing
+let store = newStore("blogdata", smDisk, enableWal = true, checkpointEveryOps = 10)
+
+# Register tables
+store.createTable(users)
+store.createTable(posts)
+
+# Insert a user (auto-increment PK)
+let userPk = store.insertRow("users", row({
   "name": newTextValue("Alice"),
-  "age": newIntValue(30),
-  "active": newBoolValue(true),
-  "meta": newJsonValue(%*{"hobbies": ["reading", "hiking"]})
+  "email": newTextValue("alice@example.com")
 }))
 
-# flush the WAL to disk (when enabled)
-db.checkpoint()
+# Insert a post for Alice
+let postPk = store.insertRow("posts", row({
+  "user_id": newIntValue(userPk.parseInt64),
+  "content": newTextValue("Hello, world!")
+}))
 
-# Query the data
-for row in db.getTable("users").get().allRows():
-  for key, col in row[1]:
-    echo fmt"{key}: {$col}"
+# Query users by name (with index)
+users.createIndex("name")
+for pk, row in users.where("name", newTextValue("Alice")):
+  echo "User: ", pk, " -> ", row
+
+# Query all posts for Alice
+for pk, row in posts.where("user_id", newIntValue(userPk.parseInt64)):
+  echo "Post: ", pk, " -> ", row
+
+# Delete user (will fail if posts exist due to FK restrict)
+try:
+  store.deleteRow("users", userPk)
+except StoreError as e:
+  echo "Delete failed: ", e.msg
+
+# Force a checkpoint (snapshot)
+store.checkpoint()
 ```
 
 ### Key/Value Store
