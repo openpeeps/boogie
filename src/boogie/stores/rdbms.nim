@@ -74,6 +74,16 @@ type
   PrimaryKeyMode* = enum
     pkmManual, pkmSerial
 
+  ForeignKeyAction* = enum
+    fkaRestrict
+
+  ForeignKeyDef* = object
+    name*: string
+    column*: string
+    refTable*: string
+    refColumn*: string
+    onDelete*: ForeignKeyAction
+
   DbTable* {.acyclic.} = ref object
     ## Represents a table in the store, including its schema and data.
     name*: string
@@ -100,6 +110,8 @@ type
       # set of column names that have equality indexes built
     eqIndex: Table[string, Table[string, HashSet[string]]]
       # equality indexes for columns. Maps column name to a mapping of cell value keys to sets of primary keys.
+    foreignKeys*: seq[ForeignKeyDef]
+      # foreign key constraints owned by this table.
 
   Store* {.acyclic.} = ref object
     ## Represents the main store, containing multiple tables and managing persistence and WAL.
@@ -138,6 +150,7 @@ type
 
 # fwd declarations
 proc recoverFromWal*(s: Store)
+proc where*(t: DbTable, column: string, value: Value): seq[(string, RowData)]
 
 proc cmp(a, b: RowRecord): int = cmp(a.pk, b.pk)
 proc extract(r: RowRecord): string = r.pk
@@ -224,7 +237,8 @@ proc newInMemoryStore*(): Store =
   newStore("", smInMemory, false)
 
 proc newTable*(name: string, primaryKey: string, columns: openArray[ColumnDef],
-              primaryKeyMode: PrimaryKeyMode = pkmSerial): DbTable =
+              primaryKeyMode: PrimaryKeyMode = pkmSerial,
+              foreignKeys: openArray[ForeignKeyDef] = []): DbTable =
   ## Create a new DbTable with the specified name, primary key, columns, and primary key mode.
   if name.len == 0:
     raise newException(StoreError, "table name cannot be empty")
@@ -270,6 +284,10 @@ proc newTable*(name: string, primaryKey: string, columns: openArray[ColumnDef],
       columns: colsSeq,
       columnsByName: colsByName,
       rows: initSortedTable[RowRecord, string](),
+      rowsByPk: initOrderedTable[string, RowRecord](),
+      indexedCols: initHashSet[string](),
+      eqIndex: initTable[string, Table[string, HashSet[string]]](),
+      foreignKeys: @foreignKeys,
     )
   else:
     DbTable(
@@ -279,7 +297,30 @@ proc newTable*(name: string, primaryKey: string, columns: openArray[ColumnDef],
       columns: colsSeq,
       columnsByName: colsByName,
       rows: initSortedTable[RowRecord, string](),
+      rowsByPk: initOrderedTable[string, RowRecord](),
+      indexedCols: initHashSet[string](),
+      eqIndex: initTable[string, Table[string, HashSet[string]]](),
+      foreignKeys: @foreignKeys,
     )
+
+proc newForeignKey*(name, column, refTable, refColumn: string,
+                    onDelete: ForeignKeyAction = fkaRestrict): ForeignKeyDef =
+  ## Create a new foreign key definition.
+  if name.len == 0:
+    raise newException(StoreError, "foreign key name cannot be empty")
+  if column.len == 0:
+    raise newException(StoreError, "foreign key column cannot be empty")
+  if refTable.len == 0:
+    raise newException(StoreError, "foreign key referenced table cannot be empty")
+  if refColumn.len == 0:
+    raise newException(StoreError, "foreign key referenced column cannot be empty")
+  ForeignKeyDef(
+    name: name,
+    column: column,
+    refTable: refTable,
+    refColumn: refColumn,
+    onDelete: onDelete
+  )
 
 proc newColumn*(name: string, kind: DataType, nullable: bool): ColumnDef =
   ## Create a new ColumnDef with the specified name, data type, and nullability.
@@ -332,27 +373,34 @@ proc cellIndexKey(v: Value): string =
   of dtJson: "j:" & v.j
 
 proc addToEqIndexes(t: DbTable, pk: string, data: RowData) =
-  # Update equality indexes for the given row data. This should be
-  # called on insert and update. 
+  # Update equality indexes for the given row data.
   for col in t.indexedCols.items:
-    if data.hasKey(col):
-      let k = cellIndexKey(data[col])
-      var colMap = t.eqIndex.mgetOrPut(col, initTable[string, HashSet[string]]())
-      var pkSet = colMap.mgetOrPut(k, initHashSet[string]())
-      pkSet.incl(pk)
+    if not data.hasKey(col):
+      continue
+    let k = cellIndexKey(data[col])
+
+    if not t.eqIndex.hasKey(col):
+      t.eqIndex[col] = initTable[string, HashSet[string]]()
+    if not t.eqIndex[col].hasKey(k):
+      t.eqIndex[col][k] = initHashSet[string]()
+
+    t.eqIndex[col][k].incl(pk)
 
 proc removeFromEqIndexes(t: DbTable, pk: string, data: RowData) =
   for col in t.indexedCols.items:
-    if data.hasKey(col) and t.eqIndex.hasKey(col):
-      let k = cellIndexKey(data[col])
+    if not data.hasKey(col):
+      continue
+    if not t.eqIndex.hasKey(col):
+      continue
 
-      if t.eqIndex[col].hasKey(k):
-        t.eqIndex[col][k].excl(pk)
-        if t.eqIndex[col][k].len == 0:
-          t.eqIndex[col].del(k)
+    let k = cellIndexKey(data[col])
+    if t.eqIndex[col].hasKey(k):
+      t.eqIndex[col][k].excl(pk)
+      if t.eqIndex[col][k].len == 0:
+        t.eqIndex[col].del(k)
 
-      if t.eqIndex[col].len == 0:
-        t.eqIndex.del(col)
+    if t.eqIndex[col].len == 0:
+      t.eqIndex.del(col)
 
 proc createIndex*(t: DbTable, column: string) =
   ## Create an equality index on the specified column
@@ -472,10 +520,20 @@ proc schemaToPayload(t: DbTable): string =
   var cols = newJArray()
   for c in t.columns:
     cols.add(%*{"name": c.name, "kind": $c.kind, "nullable": c.nullable})
+  var fks = newJArray()
+  for fk in t.foreignKeys:
+    fks.add(%*{
+      "name": fk.name,
+      "column": fk.column,
+      "refTable": fk.refTable,
+      "refColumn": fk.refColumn,
+      "onDelete": $fk.onDelete
+    })
   var payload = %*{
     "primaryKeyMode": $t.pkType,
     "primaryKey": t.primaryKey,
-    "columns": cols
+    "columns": cols,
+    "foreignKeys": fks
   }
   if t.pkType == pkmSerial:
     payload["pkSequence"] = %t.pkSequence
@@ -490,11 +548,21 @@ proc tableFromPayload(tableName, payload: string): DbTable =
       kind: parseEnum[DataType](c["kind"].getStr()),
       nullable: c["nullable"].getBool()
     ))
+  var foreignKeys: seq[ForeignKeyDef] = @[]
+  if n.hasKey("foreignKeys"):
+    for fk in n["foreignKeys"].items:
+      foreignKeys.add(ForeignKeyDef(
+        name: fk["name"].getStr(),
+        column: fk["column"].getStr(),
+        refTable: fk["refTable"].getStr(),
+        refColumn: fk["refColumn"].getStr(),
+        onDelete: parseEnum[ForeignKeyAction](fk["onDelete"].getStr())
+      ))
   let pkm =
     if n.hasKey("primaryKeyMode"):
       parseEnum[PrimaryKeyMode](n["primaryKeyMode"].getStr())
     else: pkmManual
-  var t = newTable(tableName, n["primaryKey"].getStr(), cols, pkm)
+  var t = newTable(tableName, n["primaryKey"].getStr(), cols, pkm, foreignKeys)
   if pkm == pkmSerial and n.hasKey("pkSequence"):
     t.pkSequence = n["pkSequence"].getInt.uint64
   t
@@ -508,12 +576,129 @@ proc rowFromPayload(payload: string): RowData =
   # Parse a JSON string payload back into RowData. This should be the inverse of `rowToPayload`.
   rowFromJson(parseJson(payload))
 
+proc pkStringFromValue(v: Value): string =
+  case v.kind
+  of dtNull:
+    ""
+  of dtInt:
+    $v.i
+  of dtFloat:
+    $v.f
+  of dtBool:
+    if v.b: "true" else: "false"
+  of dtText:
+    v.s
+  of dtJson:
+    v.j
+
+proc validateForeignKeysOnInsert(s: Store, t: DbTable, data: RowData) =
+  for fk in t.foreignKeys:
+    if not data.hasKey(fk.column):
+      continue
+
+    let v = data[fk.column]
+    if v.kind == dtNull:
+      continue
+
+    if unlikely(not s.tables.hasKey(fk.refTable)):
+      raise newException(StoreError, fmt"foreign key '{fk.name}' references missing table '{fk.refTable}'")
+
+    let parent = s.tables[fk.refTable]
+    let parentPk = pkStringFromValue(v)
+    if unlikely(parentPk.len == 0):
+      raise newException(StoreError, fmt"foreign key '{fk.name}' has invalid referenced key value")
+
+    if not parent.rowsByPk.hasKey(parentPk):
+      raise newException(
+        StoreError,
+        fmt"foreign key violation '{fk.name}' on table '{t.name}' column '{fk.column}'"
+      )
+
+proc validateNoRestrictChildRows(s: Store, parentTable: string, parentPk: string) =
+  let parent = s.tables[parentTable]
+
+  for childName, child in s.tables.pairs:
+    if childName == parentTable:
+      continue
+    for fk in child.foreignKeys:
+      if fk.refTable != parentTable:
+        continue
+      if fk.onDelete != fkaRestrict:
+        continue
+
+      let childCol = child.findColumn(fk.column)
+      if childCol.isNone:
+        continue
+
+      let parentPkCol = parent.findColumn(parent.primaryKey)
+      if parentPkCol.isNone:
+        continue
+
+      var probe: Value
+      case childCol.get.kind
+      of dtInt:
+        probe = newIntValue(parentPk.parseBiggestInt.int64)
+      of dtText:
+        probe = newTextValue(parentPk)
+      else:
+        probe = newTextValue(parentPk)
+
+      # correctness-first: do not depend on eq index for FK integrity checks
+      for _, rec in child.rowsByPk.pairs:
+        if rec.cols.hasKey(fk.column) and rec.cols[fk.column] == probe:
+          raise newException(
+            StoreError,
+            fmt"cannot delete '{parentTable}:{parentPk}', referenced by foreign key '{fk.name}' in table '{childName}'"
+          )
+
+proc validateTableForeignKeys(s: Store, t: DbTable) =
+  var seen = initHashSet[string]()
+  for fk in t.foreignKeys:
+    if fk.name.len == 0:
+      raise newException(StoreError, "foreign key name cannot be empty")
+    if fk.name in seen:
+      raise newException(StoreError, fmt"duplicate foreign key '{fk.name}' in table '{t.name}'")
+    seen.incl(fk.name)
+
+    let childCol = t.findColumn(fk.column)
+    if childCol.isNone:
+      raise newException(StoreError, fmt"foreign key '{fk.name}' column '{fk.column}' not found in table '{t.name}'")
+
+    if unlikely(not s.tables.hasKey(fk.refTable)):
+      raise newException(StoreError, fmt"foreign key '{fk.name}' references unknown table '{fk.refTable}'")
+    let parent = s.tables[fk.refTable]
+
+    let parentCol = parent.findColumn(fk.refColumn)
+    if parentCol.isNone:
+      raise newException(
+        StoreError,
+        fmt"foreign key '{fk.name}' references unknown column '{fk.refColumn}' in table '{fk.refTable}'"
+      )
+
+    if fk.refColumn != parent.primaryKey:
+      raise newException(
+        StoreError,
+        fmt"foreign key '{fk.name}' must reference primary key column '{parent.primaryKey}' on table '{fk.refTable}'"
+      )
+
+    if childCol.get.kind != parentCol.get.kind:
+      raise newException(
+        StoreError,
+        fmt"foreign key '{fk.name}' type mismatch between '{t.name}.{fk.column}' and '{fk.refTable}.{fk.refColumn}'"
+      )
+
+proc ensureForeignKeyIndexes(t: DbTable) =
+  for fk in t.foreignKeys:
+    t.createIndex(fk.column)
+
 #
 # internal mutators. no WAL write
 #
 proc createTableNoWal(s: Store, t: DbTable) =
   if s.tables.hasKey(t.name):
     raise newException(StoreError, fmt"table already exists: {t.name}")
+  s.validateTableForeignKeys(t)
+  t.ensureForeignKeyIndexes()
   s.tables[t.name] = t
 
 proc dropTableNoWal(s: Store, name: string) =
@@ -584,6 +769,7 @@ type
       pkType: PrimaryKeyMode,
       pkSequence: uint64,
       columns: seq[ColumnDef],
+      foreignKeys: seq[ForeignKeyDef],
       rows: seq[(string, RowData)]
     ]]
 
@@ -606,6 +792,7 @@ proc buildSnapshot(s: Store): SnapshotOnDisk =
       pkType: t.pkType,
       pkSequence: (if t.pkType == pkmSerial: t.pkSequence else: 0'u64),
       columns: t.columns,
+      foreignKeys: t.foreignKeys,
       rows: rows
     ))
 
@@ -617,7 +804,8 @@ proc loadSnapshotIntoStore(s: Store, snap: SnapshotOnDisk) =
   s.tables = initTable[string, DbTable]()
   s.checkpointLsn = snap.checkpointLsn
   for td in snap.tables:
-    var t = newTable(td.name, td.primaryKey, td.columns, td.pkType)
+    var t = newTable(td.name, td.primaryKey, td.columns, td.pkType, td.foreignKeys)
+    t.ensureForeignKeyIndexes()
     if td.pkType == pkmSerial:
       t.pkSequence = td.pkSequence
     for (pk, data) in td.rows:
@@ -703,12 +891,28 @@ proc getTable*(s: Store, name: string): Option[DbTable] =
 
 proc createTable*(s: Store, t: DbTable) =
   ## Create a new table in the store. This will write to the WAL and commit the transaction.
+  s.validateTableForeignKeys(t)
+  t.ensureForeignKeyIndexes()
   let lsn = s.appendWalIfEnabled(woCreateTable, t.name, "", schemaToPayload(t))
   s.createTableNoWal(t)
   s.markCommitted(lsn)
 
+proc createTableIfNotExist*(s: Store, t: DbTable) =
+  ## Create a new table in the store only if it does not already exist.
+  if not s.hasTable(t.name):
+    s.createTable(t)
+
 proc dropTable*(s: Store, name: string) =
   ## Drop a table from the store. This will write to the WAL and commit the transaction.
+  for childName, child in s.tables.pairs:
+    if childName == name:
+      continue
+    for fk in child.foreignKeys:
+      if fk.refTable == name:
+        raise newException(
+          StoreError,
+          fmt"cannot drop table '{name}', referenced by foreign key '{fk.name}' in table '{childName}'"
+        )
   let lsn = s.appendWalIfEnabled(woDropTable, name, "", "")
   s.dropTableNoWal(name)
   s.markCommitted(lsn)
@@ -721,7 +925,7 @@ proc insertRow*(t: DbTable, pk: string, data: RowData) =
   # direct table mutation: no WAL here (store-level proc logs)
   discard t.insertRowNoWal(pk, data)
 
-proc deleteRow*(t: DbTable, pk: string): bool =
+proc deleteRow*(t: DbTable, pk: string): bool {.discardable.} =
   # direct table mutation: no WAL here (store-level proc logs)
   t.deleteRowNoWal(pk)
 
@@ -753,6 +957,13 @@ proc insertRow*(s: Store, tableName: string, pk: string, data: RowData) =
     raise newException(StoreError, fmt"table not found: {tableName}")
   var t = s.tables[tableName]
   let effectivePk = t.effectivePkForInsert(pk)
+  if t.rowsByPk.hasKey(effectivePk):
+    raise newException(StoreError, fmt"duplicate primary key '{effectivePk}' in table '{t.name}'")
+
+  let normalized = t.normalizedRowWithPk(data, effectivePk)
+  validateRow(t, normalized)
+  s.validateForeignKeysOnInsert(t, normalized)
+
   let lsn = s.appendWalIfEnabled(woInsertRow, tableName, effectivePk, rowToPayload(data))
   discard t.insertRowNoWal(effectivePk, data)
   s.markCommitted(lsn)
@@ -772,18 +983,30 @@ proc insertRow*(s: Store, tableName: string, data: RowData): string {.discardabl
     raise newException(StoreError, "insertRow(tableName, data) requires a serial primary key table")
 
   let effectivePk = t.effectivePkForInsert("")
+  if t.rowsByPk.hasKey(effectivePk):
+    raise newException(StoreError, fmt"duplicate primary key '{effectivePk}' in table '{t.name}'")
+
+  let normalized = t.normalizedRowWithPk(data, effectivePk)
+  validateRow(t, normalized)
+  s.validateForeignKeysOnInsert(t, normalized)
+
   let lsn = s.appendWalIfEnabled(woInsertRow, tableName, effectivePk, rowToPayload(data))
   discard t.insertRowNoWal(effectivePk, data)
   s.tables[tableName] = t
   s.markCommitted(lsn)
   result = effectivePk
 
-proc deleteRow*(s: Store, tableName: string, pk: string): bool =
+proc deleteRow*(s: Store, tableName: string, pk: string): bool {.discardable.} =
   ## Delete a row by primary key. Returns true if a row was deleted, false if not found
   if unlikely(not s.tables.hasKey(tableName)):
     return false
-  let lsn = s.appendWalIfEnabled(woDeleteRow, tableName, pk, "")
   var t = s.tables[tableName]
+  if not t.rowsByPk.hasKey(pk):
+    return false
+
+  s.validateNoRestrictChildRows(tableName, pk)
+
+  let lsn = s.appendWalIfEnabled(woDeleteRow, tableName, pk, "")
   let removed = t.deleteRowNoWal(pk)
   s.tables[tableName] = t
   s.markCommitted(lsn)

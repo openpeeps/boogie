@@ -345,39 +345,150 @@ suite "WAL functions tests":
     echo "Recovered rows: ", count
     check count == N
 
-suite "Other examples":
-  test "basic create + insert + query flow with WAL":
-    var db = newStore("tests" / "data" / "myboogie.db", StorageMode.smDisk,
-                enableWal = true, walFlushEveryOps = 100'u32)
 
-    # Create a table with some columns
+suite "Foreign key functionality tests":
+  test "FK insert: valid parent passes, missing parent fails":
+    let db = newStore("tests" / "data" / "fk_mem", smInMemory,
+      enableWal = false
+    )
+
     db.createTable(newTable(
       name = "users",
       primaryKey = "id",
       columns = [
         newColumn("id", DataType.dtInt, false),
-        newColumn("name", DataType.dtText, false),
-        newColumn("age", DataType.dtInt, false),
-        newColumn("active", DataType.dtBool, false),
-        newColumn("meta", DataType.dtJson, true)
+        newColumn("name", DataType.dtText, false)
       ]
     ))
 
-    # insert some data
-    db.insertRow("users", row({
-      "name": newTextValue("Alice"),
-      "age": newIntValue(30),
-      "active": newBoolValue(true),
-      "meta": newJsonValue(%*{"hobbies": ["reading", "hiking"]})
+    db.createTable(newTable(
+      name = "posts",
+      primaryKey = "id",
+      columns = [
+        newColumn("id", DataType.dtInt, false),
+        newColumn("user_id", DataType.dtInt, false),
+        newColumn("title", DataType.dtText, false)
+      ],
+      foreignKeys = [
+        newForeignKey("fk_posts_user", "user_id", "users", "id", fkaRestrict)
+      ]
+    ))
+
+    discard db.insertRow("users", row({
+      "name": newTextValue("George")
     }))
 
-    # flush the WAL to disk (when enabled)
-    db.checkpoint()
+    discard db.insertRow("posts", row({
+      "user_id": newIntValue(1),
+      "title": newTextValue("hello")
+    }))
 
-    # Query the data
-    for row in db.getTable("users").get().allRows():
-      for key, col in row[1]:
-        echo fmt"{key}: {$col}"
+    check db.getTable("posts").get().where("user_id", newIntValue(1)).len == 1
+
+    expect(StoreError):
+      discard db.insertRow("posts", row({
+        "user_id": newIntValue(999),
+        "title": newTextValue("invalid")
+      }))
+
+  test "FK delete RESTRICT blocks parent delete when children exist":
+    let db = newStore("tests" / "data" / "fk_mem_restrict", smInMemory,
+      enableWal = false
+    )
+
+    db.createTable(newTable(
+      name = "users",
+      primaryKey = "id",
+      columns = [
+        newColumn("id", DataType.dtInt, false),
+        newColumn("name", DataType.dtText, false)
+      ]
+    ))
+
+    db.createTable(newTable(
+      name = "posts",
+      primaryKey = "id",
+      columns = [
+        newColumn("id", DataType.dtInt, false),
+        newColumn("user_id", DataType.dtInt, false),
+        newColumn("title", DataType.dtText, false)
+      ],
+      foreignKeys = [
+        newForeignKey("fk_posts_user", "user_id", "users", "id", fkaRestrict)
+      ]
+    ))
+
+    discard db.insertRow("users", row({
+      "name": newTextValue("Owner")
+    }))
+    discard db.insertRow("posts", row({
+      "user_id": newIntValue(1),
+      "title": newTextValue("owned")
+    }))
+
+    expect(StoreError):
+      discard db.deleteRow("users", "1")
+
+    check db.getRow("users", "1").isSome
+    check db.getRow("posts", "1").isSome
+
+  test "FK metadata + checks survive WAL recovery":
+    let path = "tests" / "data" / "fk_wal"
+    if dirExists(path):
+      removeDir(path)
+
+    var db = newStore(path, smDisk,
+      enableWal = true,
+      walFlushEveryOps = 1'u32
+    )
+
+    db.createTable(newTable(
+      name = "users",
+      primaryKey = "id",
+      columns = [
+        newColumn("id", DataType.dtInt, false),
+        newColumn("name", DataType.dtText, false)
+      ]
+    ))
+
+    db.createTable(newTable(
+      name = "posts",
+      primaryKey = "id",
+      columns = [
+        newColumn("id", DataType.dtInt, false),
+        newColumn("user_id", DataType.dtInt, false),
+        newColumn("title", DataType.dtText, false)
+      ],
+      foreignKeys = [
+        newForeignKey("fk_posts_user", "user_id", "users", "id", fkaRestrict)
+      ]
+    ))
+
+    discard db.insertRow("users", row({
+      "name": newTextValue("Recovered")
+    }))
+    discard db.insertRow("posts", row({
+      "user_id": newIntValue(1),
+      "title": newTextValue("from wal")
+    }))
+
+    # Simulate restart without explicit checkpoint
+    db = newStore(path, smDisk,
+      enableWal = true,
+      walFlushEveryOps = 1'u32
+    )
+
+    check db.hasTable("users")
+    check db.hasTable("posts")
+    check db.getRow("users", "1").isSome
+    check db.getRow("posts", "1").isSome
+
+    expect(StoreError):
+      discard db.insertRow("posts", row({
+        "user_id": newIntValue(404),
+        "title": newTextValue("should fail")
+      }))
+
 
 suite "RDBMS Store benchmarks":
   test "rdbms ops/sec benchmark (insert/lookup/scan)":
@@ -432,3 +543,5 @@ suite "RDBMS Store benchmarks":
     check insertOps > 0
     check lookupOps > 0
     check scanOps > 0
+
+    
