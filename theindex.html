@@ -175,6 +175,10 @@
           <li><a class="reference external"
           data-doc-search-tag="rdbms: proc createTable(s: Store; t: DbTable)" href="boogie/stores/rdbms.html#createTable%2CStore%2CDbTable">rdbms: proc createTable(s: Store; t: DbTable)</a></li>
           </ul></dd>
+<dt><a name="createTableIfNotExist" href="#createTableIfNotExist"><span>createTableIfNotExist:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms: proc createTableIfNotExist(s: Store; t: DbTable)" href="boogie/stores/rdbms.html#createTableIfNotExist%2CStore%2CDbTable">rdbms: proc createTableIfNotExist(s: Store; t: DbTable)</a></li>
+          </ul></dd>
 <dt><a name="ctBool" href="#ctBool"><span>ctBool:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="columnar: ColumnType.ctBool" href="boogie/stores/columnar.html#ctBool">columnar: ColumnType.ctBool</a></li>
@@ -311,6 +315,10 @@
 <li><a class="reference external"
           data-doc-search-tag="graphstore: proc findNodesByLabel(s: GraphStore; label: string): seq[GraphNode]" href="boogie/stores/graphstore.html#findNodesByLabel%2CGraphStore%2Cstring">graphstore: proc findNodesByLabel(s: GraphStore; label: string): seq[GraphNode]</a></li>
           </ul></dd>
+<dt><a name="fkaRestrict" href="#fkaRestrict"><span>fkaRestrict:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms: ForeignKeyAction.fkaRestrict" href="boogie/stores/rdbms.html#fkaRestrict">rdbms: ForeignKeyAction.fkaRestrict</a></li>
+          </ul></dd>
 <dt><a name="flush" href="#flush"><span>flush:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: proc flush(w: var Wal)" href="boogie/wal.html#flush%2CWal">wal: proc flush(w: var Wal)</a></li>
@@ -342,6 +350,14 @@
 <dt><a name="foNe" href="#foNe"><span>foNe:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="columnar: FilterOp.foNe" href="boogie/stores/columnar.html#foNe">columnar: FilterOp.foNe</a></li>
+          </ul></dd>
+<dt><a name="ForeignKeyAction" href="#ForeignKeyAction"><span>ForeignKeyAction:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms: enum ForeignKeyAction" href="boogie/stores/rdbms.html#ForeignKeyAction">rdbms: enum ForeignKeyAction</a></li>
+          </ul></dd>
+<dt><a name="ForeignKeyDef" href="#ForeignKeyDef"><span>ForeignKeyDef:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms: object ForeignKeyDef" href="boogie/stores/rdbms.html#ForeignKeyDef">rdbms: object ForeignKeyDef</a></li>
           </ul></dd>
 <dt><a name="get" href="#get"><span>get:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -531,6 +547,12 @@
 <li><a class="reference external"
           data-doc-search-tag="rdbms: proc newFloatValue(v: float64): Value" href="boogie/stores/rdbms.html#newFloatValue%2Cfloat64">rdbms: proc newFloatValue(v: float64): Value</a></li>
           </ul></dd>
+<dt><a name="newForeignKey" href="#newForeignKey"><span>newForeignKey:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms: proc newForeignKey(name, column, refTable, refColumn: string;
+              onDelete: ForeignKeyAction = fkaRestrict): ForeignKeyDef" href="boogie/stores/rdbms.html#newForeignKey%2Cstring%2Cstring%2Cstring%2Cstring%2CForeignKeyAction">rdbms: proc newForeignKey(name, column, refTable, refColumn: string;
+              onDelete: ForeignKeyAction = fkaRestrict): ForeignKeyDef</a></li>
+          </ul></dd>
 <dt><a name="newInMemoryKvStore" href="#newInMemoryKvStore"><span>newInMemoryKvStore:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="kv: proc newInMemoryKvStore(): KvStore" href="boogie/stores/kv.html#newInMemoryKvStore">kv: proc newInMemoryKvStore(): KvStore</a></li>
@@ -572,8 +594,10 @@
 <dt><a name="newTable" href="#newTable"><span>newTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="rdbms: proc newTable(name: string; primaryKey: string; columns: openArray[ColumnDef];
-         primaryKeyMode: PrimaryKeyMode = pkmSerial): DbTable" href="boogie/stores/rdbms.html#newTable%2Cstring%2Cstring%2CopenArray%5BColumnDef%5D%2CPrimaryKeyMode">rdbms: proc newTable(name: string; primaryKey: string; columns: openArray[ColumnDef];
-         primaryKeyMode: PrimaryKeyMode = pkmSerial): DbTable</a></li>
+         primaryKeyMode: PrimaryKeyMode = pkmSerial;
+         foreignKeys: openArray[ForeignKeyDef] = []): DbTable" href="boogie/stores/rdbms.html#newTable%2Cstring%2Cstring%2CopenArray%5BColumnDef%5D%2CPrimaryKeyMode%2CopenArray%5BForeignKeyDef%5D">rdbms: proc newTable(name: string; primaryKey: string; columns: openArray[ColumnDef];
+         primaryKeyMode: PrimaryKeyMode = pkmSerial;
+         foreignKeys: openArray[ForeignKeyDef] = []): DbTable</a></li>
           </ul></dd>
 <dt><a name="newTextValue" href="#newTextValue"><span>newTextValue:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -813,7 +837,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-05-07 20:04:07 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-05-14 10:15:02 UTC</small>
       </div>
     </div>
   </div>

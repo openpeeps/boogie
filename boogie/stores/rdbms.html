@@ -74,7 +74,16 @@
   of pkmSerial:
   else:
     nil
-  columns*: seq[ColumnDef]   ## Schema definition of the table columns">DbTable</a></li>
+  columns*: seq[ColumnDef]   ## Schema definition of the table columns
+  foreignKeys*: seq[ForeignKeyDef]">DbTable</a></li>
+<li><a class="reference" href="#ForeignKeyAction" title="ForeignKeyAction = enum
+  fkaRestrict">ForeignKeyAction</a></li>
+<li><a class="reference" href="#ForeignKeyDef" title="ForeignKeyDef = object
+  name*: string
+  column*: string
+  refTable*: string
+  refColumn*: string
+  onDelete*: ForeignKeyAction">ForeignKeyDef</a></li>
 <li><a class="reference" href="#PrimaryKeyMode" title="PrimaryKeyMode = enum
   pkmManual, pkmSerial">PrimaryKeyMode</a></li>
 <li><a class="reference" href="#RowData" title="RowData = OrderedTable[string, Value]">RowData</a></li>
@@ -127,6 +136,10 @@
   <li><a class="reference" href="#createTable%2CStore%2CDbTable" title="createTable(s: Store; t: DbTable)">createTable(s: Store; t: DbTable)</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">createTableIfNotExist
+  <li><a class="reference" href="#createTableIfNotExist%2CStore%2CDbTable" title="createTableIfNotExist(s: Store; t: DbTable)">createTableIfNotExist(s: Store; t: DbTable)</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">deleteRow
   <li><a class="reference" href="#deleteRow%2CStore%2Cstring%2Cstring" title="deleteRow(s: Store; tableName: string; pk: string): bool">deleteRow(s: Store; tableName: string; pk: string): bool</a></li>
 <li><a class="reference" href="#deleteRow%2CDbTable%2Cstring" title="deleteRow(t: DbTable; pk: string): bool">deleteRow(t: DbTable; pk: string): bool</a></li>
@@ -172,6 +185,12 @@
   <li><a class="reference" href="#newFloatValue%2Cfloat64" title="newFloatValue(v: float64): Value">newFloatValue(v: float64): Value</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">newForeignKey
+  <li><a class="reference" href="#newForeignKey%2Cstring%2Cstring%2Cstring%2Cstring%2CForeignKeyAction" title="newForeignKey(name, column, refTable, refColumn: string;
+              onDelete: ForeignKeyAction = fkaRestrict): ForeignKeyDef">newForeignKey(name, column, refTable, refColumn: string;
+              onDelete: ForeignKeyAction = fkaRestrict): ForeignKeyDef</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">newInMemoryStore
   <li><a class="reference" href="#newInMemoryStore" title="newInMemoryStore(): Store">newInMemoryStore(): Store</a></li>
 
@@ -195,9 +214,11 @@
 
 </ul>
 <ul class="simple nested-toc-section">newTable
-  <li><a class="reference" href="#newTable%2Cstring%2Cstring%2CopenArray%5BColumnDef%5D%2CPrimaryKeyMode" title="newTable(name: string; primaryKey: string; columns: openArray[ColumnDef];
-         primaryKeyMode: PrimaryKeyMode = pkmSerial): DbTable">newTable(name: string; primaryKey: string; columns: openArray[ColumnDef];
-         primaryKeyMode: PrimaryKeyMode = pkmSerial): DbTable</a></li>
+  <li><a class="reference" href="#newTable%2Cstring%2Cstring%2CopenArray%5BColumnDef%5D%2CPrimaryKeyMode%2CopenArray%5BForeignKeyDef%5D" title="newTable(name: string; primaryKey: string; columns: openArray[ColumnDef];
+         primaryKeyMode: PrimaryKeyMode = pkmSerial;
+         foreignKeys: openArray[ForeignKeyDef] = []): DbTable">newTable(name: string; primaryKey: string; columns: openArray[ColumnDef];
+         primaryKeyMode: PrimaryKeyMode = pkmSerial;
+         foreignKeys: openArray[ForeignKeyDef] = []): DbTable</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">newTextValue
@@ -285,10 +306,33 @@
   <span class="Keyword">of</span> <span class="Identifier">pkmSerial</span><span class="Other">:</span>
   <span class="Keyword">else</span><span class="Other">:</span>
     <span class="Keyword">nil</span>
-  <span class="Identifier">columns</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="#ColumnDef"><span class="Identifier">ColumnDef</span></a><span class="Other">]</span>   <span class="Comment">## Schema definition of the table columns</span></pre></dt>
+  <span class="Identifier">columns</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="#ColumnDef"><span class="Identifier">ColumnDef</span></a><span class="Other">]</span>   <span class="Comment">## Schema definition of the table columns</span>
+  <span class="Identifier">foreignKeys</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="#ForeignKeyDef"><span class="Identifier">ForeignKeyDef</span></a><span class="Other">]</span></pre></dt>
   <dd>
     
     Represents a table in the store, including its schema and data.
+    
+  </dd>
+</div>
+<div id="ForeignKeyAction">
+  <dt><pre><a href="#ForeignKeyAction"><span class="Identifier">ForeignKeyAction</span></a> <span class="Other">=</span> <span class="Keyword">enum</span>
+  <span class="Identifier">fkaRestrict</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+<div id="ForeignKeyDef">
+  <dt><pre><a href="#ForeignKeyDef"><span class="Identifier">ForeignKeyDef</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
+  <span class="Identifier">name</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">column</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">refTable</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">refColumn</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">onDelete</span><span class="Operator">*</span><span class="Other">:</span> <a href="#ForeignKeyAction"><span class="Identifier">ForeignKeyAction</span></a></pre></dt>
+  <dd>
+    
+    
     
   </dd>
 </div>
@@ -432,7 +476,7 @@
 <div id="createTable-procs-all">
   <div id="createTable,Store,DbTable">
   <dt><pre><span class="Keyword">proc</span> <a href="#createTable%2CStore%2CDbTable"><span class="Identifier">createTable</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">;</span> <span class="Identifier">t</span><span class="Other">:</span> <a href="#DbTable"><span class="Identifier">DbTable</span></a><span class="Other">)</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
     <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
@@ -443,10 +487,24 @@
 </div>
 
 </div>
+<div id="createTableIfNotExist-procs-all">
+  <div id="createTableIfNotExist,Store,DbTable">
+  <dt><pre><span class="Keyword">proc</span> <a href="#createTableIfNotExist%2CStore%2CDbTable"><span class="Identifier">createTableIfNotExist</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">;</span> <span class="Identifier">t</span><span class="Other">:</span> <a href="#DbTable"><span class="Identifier">DbTable</span></a><span class="Other">)</span> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
+    <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Create a new table in the store only if it does not already exist.
+    
+  </dd>
+</div>
+
+</div>
 <div id="deleteRow-procs-all">
   <div id="deleteRow,Store,string,string">
-  <dt><pre><span class="Keyword">proc</span> <a href="#deleteRow%2CStore%2Cstring%2Cstring"><span class="Identifier">deleteRow</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">;</span> <span class="Identifier">tableName</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">pk</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
+  <dt><pre><span class="Keyword">proc</span> <a href="#deleteRow%2CStore%2Cstring%2Cstring"><span class="Identifier">deleteRow</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">;</span> <span class="Identifier">tableName</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">pk</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span class="Identifier">discardable</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span>
+    <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
     <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
@@ -456,8 +514,8 @@
   </dd>
 </div>
 <div id="deleteRow,DbTable,string">
-  <dt><pre><span class="Keyword">proc</span> <a href="#deleteRow%2CDbTable%2Cstring"><span class="Identifier">deleteRow</span></a><span class="Other">(</span><span class="Identifier">t</span><span class="Other">:</span> <a href="#DbTable"><span class="Identifier">DbTable</span></a><span class="Other">;</span> <span class="Identifier">pk</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#deleteRow%2CDbTable%2Cstring"><span class="Identifier">deleteRow</span></a><span class="Other">(</span><span class="Identifier">t</span><span class="Other">:</span> <a href="#DbTable"><span class="Identifier">DbTable</span></a><span class="Other">;</span> <span class="Identifier">pk</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span class="Identifier">discardable</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
@@ -469,7 +527,7 @@
 <div id="dropTable-procs-all">
   <div id="dropTable,Store,string">
   <dt><pre><span class="Keyword">proc</span> <a href="#dropTable%2CStore%2Cstring"><span class="Identifier">dropTable</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">;</span> <span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
     <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
@@ -527,7 +585,7 @@
 <div id="insertRow-procs-all">
   <div id="insertRow,Store,string,RowData">
   <dt><pre><span class="Keyword">proc</span> <a href="#insertRow%2CStore%2Cstring%2CRowData"><span class="Identifier">insertRow</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">;</span> <span class="Identifier">tableName</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">data</span><span class="Other">:</span> <a href="#RowData"><span class="Identifier">RowData</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.
-    <span class="Identifier">discardable</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span>
+    <span class="Identifier">discardable</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span>
                           <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span>
     <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
@@ -538,7 +596,7 @@
 </div>
 <div id="insertRow,Store,string,string,RowData">
   <dt><pre><span class="Keyword">proc</span> <a href="#insertRow%2CStore%2Cstring%2Cstring%2CRowData"><span class="Identifier">insertRow</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">;</span> <span class="Identifier">tableName</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">pk</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">data</span><span class="Other">:</span> <a href="#RowData"><span class="Identifier">RowData</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span>
-    <span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
+    <span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
     <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
@@ -612,6 +670,19 @@
 </div>
 
 </div>
+<div id="newForeignKey-procs-all">
+  <div id="newForeignKey,string,string,string,string,ForeignKeyAction">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newForeignKey%2Cstring%2Cstring%2Cstring%2Cstring%2CForeignKeyAction"><span class="Identifier">newForeignKey</span></a><span class="Other">(</span><span class="Identifier">name</span><span class="Other">,</span> <span class="Identifier">column</span><span class="Other">,</span> <span class="Identifier">refTable</span><span class="Other">,</span> <span class="Identifier">refColumn</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span>
+                   <span class="Identifier">onDelete</span><span class="Other">:</span> <a href="#ForeignKeyAction"><span class="Identifier">ForeignKeyAction</span></a> <span class="Other">=</span> <span class="Identifier">fkaRestrict</span><span class="Other">)</span><span class="Other">:</span> <a href="#ForeignKeyDef"><span class="Identifier">ForeignKeyDef</span></a> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">StoreError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Create a new foreign key definition.
+    
+  </dd>
+</div>
+
+</div>
 <div id="newInMemoryStore-procs-all">
   <div id="newInMemoryStore">
   <dt><pre><span class="Keyword">proc</span> <a href="#newInMemoryStore"><span class="Identifier">newInMemoryStore</span></a><span class="Other">(</span><span class="Other">)</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span>
@@ -680,9 +751,10 @@
 
 </div>
 <div id="newTable-procs-all">
-  <div id="newTable,string,string,openArray[ColumnDef],PrimaryKeyMode">
-  <dt><pre><span class="Keyword">proc</span> <a href="#newTable%2Cstring%2Cstring%2CopenArray%5BColumnDef%5D%2CPrimaryKeyMode"><span class="Identifier">newTable</span></a><span class="Other">(</span><span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">primaryKey</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">columns</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><a href="#ColumnDef"><span class="Identifier">ColumnDef</span></a><span class="Other">]</span><span class="Other">;</span>
-              <span class="Identifier">primaryKeyMode</span><span class="Other">:</span> <a href="#PrimaryKeyMode"><span class="Identifier">PrimaryKeyMode</span></a> <span class="Other">=</span> <span class="Identifier">pkmSerial</span><span class="Other">)</span><span class="Other">:</span> <a href="#DbTable"><span class="Identifier">DbTable</span></a> {.
+  <div id="newTable,string,string,openArray[ColumnDef],PrimaryKeyMode,openArray[ForeignKeyDef]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newTable%2Cstring%2Cstring%2CopenArray%5BColumnDef%5D%2CPrimaryKeyMode%2CopenArray%5BForeignKeyDef%5D"><span class="Identifier">newTable</span></a><span class="Other">(</span><span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">primaryKey</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">columns</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><a href="#ColumnDef"><span class="Identifier">ColumnDef</span></a><span class="Other">]</span><span class="Other">;</span>
+              <span class="Identifier">primaryKeyMode</span><span class="Other">:</span> <a href="#PrimaryKeyMode"><span class="Identifier">PrimaryKeyMode</span></a> <span class="Other">=</span> <span class="Identifier">pkmSerial</span><span class="Other">;</span>
+              <span class="Identifier">foreignKeys</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><a href="#ForeignKeyDef"><span class="Identifier">ForeignKeyDef</span></a><span class="Other">]</span> <span class="Other">=</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="#DbTable"><span class="Identifier">DbTable</span></a> {.
     <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">StoreError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
@@ -734,7 +806,7 @@
     <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    Return all rows where the given column matches the specified value. This will be fast if the column is indexed, but will fall back to a full scan if not.
+    
     
   </dd>
 </div>
@@ -780,7 +852,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-05-07 20:04:07 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-05-14 10:15:01 UTC</small>
       </div>
     </div>
   </div>
