@@ -60,7 +60,9 @@ type
 
     nextNodeId: uint64
     nextRelId: uint64
-
+    checkpointEvery: int
+    pendingWalOps: int
+    
     nodes: Table[uint64, GraphNode]
     rels: Table[uint64, Relationship]
     outAdj: Table[uint64, seq[uint64]]
@@ -221,10 +223,13 @@ proc readRel(f: File, r: var Relationship): bool =
 # indexing + apply ops
 #
 proc removeRid(v: var seq[uint64], rid: uint64) =
-  var i = 0
-  while i < v.len:
-    if v[i] == rid: v.delete(i)
-    else: inc i
+  # Relationship IDs are unique per adjacency list in normal flow.
+  # O(1) erase by swap-with-last instead of O(n) shifting delete().
+  for i in 0 ..< v.len:
+    if v[i] == rid:
+      v[i] = v[^1]
+      v.setLen(v.len - 1)
+      break
 
 proc indexRelNoLock(s: GraphStore, r: Relationship) =
   s.outAdj.mgetOrPut(r.fromId, @[]).add(r.id)
@@ -247,14 +252,15 @@ proc upsertNodeNoLock(s: GraphStore, n: GraphNode) =
 proc deleteNodeNoLock(s: GraphStore, id: uint64) =
   if not s.nodes.hasKey(id): return
 
-  var toDelete: seq[uint64] = @[]
+  var toDelete = initHashSet[uint64]()
   if s.outAdj.hasKey(id):
-    for rid in s.outAdj[id]: toDelete.add(rid)
+    for rid in s.outAdj[id]:
+      toDelete.incl(rid)
   if s.inAdj.hasKey(id):
     for rid in s.inAdj[id]:
-      if rid notin toDelete: toDelete.add(rid)
+      toDelete.incl(rid)
 
-  for rid in toDelete:
+  for rid in toDelete.items:
     if s.rels.hasKey(rid):
       let r = s.rels[rid]
       deindexRelNoLock(s, r)
@@ -455,6 +461,8 @@ proc loadSnapshotNoLock(s: GraphStore) =
 proc checkpointNoLock(s: GraphStore) =
   saveSnapshotNoLock(s)
   s.wal.reset()
+  s.pendingWalOps = 0
+
 
 #
 # Public API
@@ -473,6 +481,8 @@ proc openGraphStore*(rootDir: string): GraphStore =
   result.rels = initTable[uint64, Relationship]()
   result.outAdj = initTable[uint64, seq[uint64]]()
   result.inAdj = initTable[uint64, seq[uint64]]()
+  result.checkpointEvery = 1024
+  result.pendingWalOps = 0
   
   # initialize WAL and load existing state
   result.wal = openWal(joinPath(rootDir, "graph"))
@@ -555,17 +565,19 @@ proc commit*(tx: var GraphTx) =
   let s = tx.store
 
   writeWith graphStoreRwLock:
-    # 1) WAL append (durable intent)
+    # WAL append (durable intent)
     for op in tx.ops:
       discard s.wal.append(walEntryFor(op), sync = false)
     s.wal.flush()
 
-    # 2) Apply in-memory
+    # Apply in-memory
     for op in tx.ops:
       applyOpNoLock(s, op)
 
-    # 3) Snapshot + WAL reset (checkpoint)
-    checkpointNoLock(s)
+    # Checkpoint less frequently (major throughput win)
+    s.pendingWalOps += tx.ops.len
+    if s.pendingWalOps >= s.checkpointEvery:
+      checkpointNoLock(s)
 
   tx.finished = true
 
@@ -588,15 +600,34 @@ proc outgoing*(s: GraphStore, nodeId: uint64, relType = ""): seq[Relationship] =
   ## only relationships of that type are returned.
   writeWith graphStoreRwLock:
     if not s.outAdj.hasKey(nodeId): return @[]
-    for rid in s.outAdj[nodeId]:
-      if not s.rels.hasKey(rid): continue
-      let r = s.rels[rid]
-      if relType.len == 0 or r.relType == relType:
-        result.add(r)
+    let rids = s.outAdj[nodeId]
+    result = newSeqOfCap[Relationship](rids.len)
+    if relType.len == 0:
+      for rid in rids:
+        if s.rels.hasKey(rid):
+          result.add(s.rels[rid])
+    else:
+      for rid in rids:
+        if not s.rels.hasKey(rid): continue
+        let r = s.rels[rid]
+        if r.relType == relType:
+          result.add(r)
 
 proc neighbors*(s: GraphStore, nodeId: uint64, relType = ""): seq[uint64] =
-  for r in s.outgoing(nodeId, relType):
-    result.add(r.toId)
+  writeWith graphStoreRwLock:
+    if not s.outAdj.hasKey(nodeId): return @[]
+    let rids = s.outAdj[nodeId]
+    result = newSeqOfCap[uint64](rids.len)
+    if relType.len == 0:
+      for rid in rids:
+        if s.rels.hasKey(rid):
+          result.add(s.rels[rid].toId)
+    else:
+      for rid in rids:
+        if not s.rels.hasKey(rid): continue
+        let r = s.rels[rid]
+        if r.relType == relType:
+          result.add(r.toId)
 
 proc findNodesByLabel*(s: GraphStore, label: string): seq[GraphNode] =
   writeWith graphStoreRwLock:
