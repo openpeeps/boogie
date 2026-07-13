@@ -360,7 +360,6 @@ proc insertBatchInternal(s: var ColumnarStore, table: string, rows: seq[JsonNode
     if sync: s.checkpoint()
     else: s.maybeFlushWal()
 
-
 proc recoverFromWal(s: var ColumnarStore) =
   for e in s.wal.entries():
     case e.op
@@ -462,7 +461,8 @@ proc scan*(s: ColumnarStore, table: string,
     if limit > 0 and result.len >= limit:
       break
 
-proc aggregate*(s: ColumnarStore, table: string, specs: seq[AggregateSpec], filters: seq[Filter] = @[]): JsonNode =
+proc aggregate*(s: ColumnarStore, table: string, specs: seq[AggregateSpec],
+          filters: seq[Filter] = @[]): JsonNode =
   if not s.tables.hasKey(table):
     raise newException(ColumnarError, fmt"Table not found: {table}")
   if specs.len == 0:

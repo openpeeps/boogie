@@ -418,3 +418,12 @@ proc nearest*(s: VectorStore, collection: string, query: seq[float32],
   if not s.collections.hasKey(collection):
     raise newException(VectorStoreError, fmt"collection not found: {collection}")
   s.collections[collection].nearest(query, k, metric)
+
+proc exportCollection*(s: VectorStore, collection: string, path: string) =
+  ## Exports the specified collection to a file in a simple text format, where each
+  ## line contains the primary key and the corresponding vector serialized as a JSON array
+  if not s.collections.hasKey(collection):
+    raise newException(VectorStoreError, fmt"collection not found: {collection}")
+  let c = s.collections[collection]
+  let data = @[for pk, vec in c.vectorsByPk.pairs: (pk, vec)]
+  writeFile(path, %data)

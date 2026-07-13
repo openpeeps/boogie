@@ -171,6 +171,8 @@ proc applyWalEntry(s: var DocumentStore, e: WalEntry) =
     discard
 
 proc recoverFromWal*(s: var DocumentStore) =
+  ## Reconstructs the in-memory state of the document store by loading a snapshot (if enabled) and replaying
+  ## any WAL entries that have occurred since the last checkpoint.
   s.docs = initSortedTable[string, JsonNode]()
   s.checkpointLsn = 0'u64
   s.pendingOps = 0'u32
@@ -238,13 +240,14 @@ proc get*(store: DocumentStore, key: string): Option[JsonNode] =
   else:
     none(JsonNode)
 
-proc insert*(
-  store: var DocumentStore,
-  key: string,
-  doc: JsonNode,
-  sync = true,
-  enc: DocumentEncoding = deJson
-) =
+proc insert*(store: var DocumentStore, key: string, doc: JsonNode,
+          sync = true, enc: DocumentEncoding = deJson) =
+  ## Inserts a new document with the given key. If a document with the same key already exists,
+  ## this will fail with an error. Use `upsert` if you want to insert or update a document
+  ## without checking for existence.
+  ## 
+  ## The document is encoded using the specified encoding (JSON or BSON) and stored in the WAL
+  ## for durability. The in-memory state is updated after the WAL entry is successfully appended.
   if store.docs.hasKey(key):
     fail("Duplicate key: " & key)
   let payload = encodePayload(doc, enc)
@@ -252,13 +255,8 @@ proc insert*(
   store.docs[key] = doc
   store.markCommitted(lsn)
 
-proc upsert*(
-  store: var DocumentStore,
-  key: string,
-  doc: JsonNode,
-  sync = true,
-  enc: DocumentEncoding = deJson
-) =
+proc upsert*(store: var DocumentStore, key: string, doc: JsonNode,
+          sync = true, enc: DocumentEncoding = deJson) =
   ## Inserts or updates a document with the given key. If the key already exists,
   ## it will be updated with the new document.
   let payload = encodePayload(doc, enc)
@@ -277,13 +275,7 @@ proc delete*(store: var DocumentStore, key: string, sync = true): bool =
   store.markCommitted(lsn)
   true
 
-proc putObj*[T: object|ref object](
-  store: var DocumentStore,
-  key: string,
-  value: T,
-  sync = true,
-  enc: DocumentEncoding = deJson
-) =
+proc putObj*[T: object|ref object](store: var DocumentStore, key: string, value: T, sync = true, enc: DocumentEncoding = deJson) =
   ## This is a bit hacky - we convert the Nim object to JSON and then parse it back into
   ## a JsonNode to store in the document store. This allows us to leverage the existing
   ## JSON encoding logic for storing arbitrary Nim objects, but it does involve an
