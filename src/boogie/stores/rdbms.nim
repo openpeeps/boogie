@@ -45,15 +45,15 @@ type
     ## Value representing a cell in a table row
     case kind*: DataType
     of dtInt:
-      i*: int64
+      intVal*: int64
     of dtFloat:
-      f*: float64
+      floatVal*: float64
     of dtBool:
-      b*: bool
+      boolVal*: bool
     of dtText:
-      s*: string
+      strVal*: string
     of dtJson:
-      j*: string
+      jsonVal*: string
         ## For JSON, we store the raw JSON string. This allows us to
         ## preserve formatting and avoid double-encoding issues.
     of dtNull:
@@ -173,15 +173,15 @@ proc `==`*(a, b: Value): bool =
   of dtNull:
     true
   of dtInt:
-    a.i == b.i
+    a.intVal == b.intVal
   of dtFloat:
-    a.f == b.f
+    a.floatVal == b.floatVal
   of dtBool:
-    a.b == b.b
+    a.boolVal == b.boolVal
   of dtText:
-    a.s == b.s
+    a.strVal == b.strVal
   of dtJson:
-    a.j == b.j
+    a.jsonVal == b.jsonVal
 
 proc writeTextAtomic(path, content: string) =
   # Atomically write text content to a file by writing to a temp file and renaming it
@@ -330,21 +330,21 @@ proc newColumn*(name: string, kind: DataType, nullable: bool): ColumnDef =
 # Value constructors and helpers
 #
 proc newNullValue*(): Value = Value(kind: dtNull)
-proc newIntValue*(v: int64): Value = Value(kind: dtInt, i: v)
-proc newFloatValue*(v: float64): Value = Value(kind: dtFloat, f: v)
-proc newBoolValue*(v: bool): Value = Value(kind: dtBool, b: v)
-proc newTextValue*(v: string): Value = Value(kind: dtText, s: v)
-proc newJSONValue*(v: JsonNode): Value = Value(kind: dtJson, j: $(v))
+proc newIntValue*(v: int64): Value = Value(kind: dtInt, intVal: v)
+proc newFloatValue*(v: float64): Value = Value(kind: dtFloat, floatVal: v)
+proc newBoolValue*(v: bool): Value = Value(kind: dtBool, boolVal: v)
+proc newTextValue*(v: string): Value = Value(kind: dtText, strVal: v)
+proc newJSONValue*(v: JsonNode): Value = Value(kind: dtJson, jsonVal: $(v))
 
 proc `$`*(v: Value): string =
   ## Stringified representation of a Value
   case v.kind
   of dtNull: "null"
-  of dtInt: $v.i
-  of dtFloat: $v.f
-  of dtBool: $v.b
-  of dtText: v.s
-  of dtJson: v.j
+  of dtInt: $v.intVal
+  of dtFloat: $v.floatVal
+  of dtBool: $v.boolVal
+  of dtText: v.strVal
+  of dtJson: v.jsonVal
 
 proc row*(pairs: openArray[(string, Value)]): RowData =
   ## Helper to create RowData from an open array of (column, value) pairs.
@@ -366,11 +366,11 @@ proc cellIndexKey(v: Value): string =
   # generate a string key for a cell value for use in equality indexes
   case v.kind
   of dtNull: "n:"
-  of dtInt: "i:" & $v.i
-  of dtFloat: "f:" & $v.f
-  of dtBool: "b:" & (if v.b: "1" else: "0")
-  of dtText: "t:" & v.s
-  of dtJson: "j:" & v.j
+  of dtInt: "i:" & $v.intVal
+  of dtFloat: "f:" & $v.floatVal
+  of dtBool: "b:" & (if v.boolVal: "1" else: "0")
+  of dtText: "t:" & v.strVal
+  of dtJson: "j:" & v.jsonVal
 
 proc addToEqIndexes(t: DbTable, pk: string, data: RowData) =
   # Update equality indexes for the given row data.
@@ -486,11 +486,11 @@ proc validateRow(t: DbTable, data: RowData) =
 proc cellToJson(v: Value): JsonNode =
   case v.kind
   of dtNull: %*{"k": "null"}
-  of dtInt: %*{"k": "int", "v": v.i}
-  of dtFloat: %*{"k": "float", "v": v.f}
-  of dtBool: %*{"k": "bool", "v": v.b}
-  of dtText: %*{"k": "text", "v": v.s}
-  of dtJson: %*{"k": "json", "v": v.j}
+  of dtInt: %*{"k": "int", "v": v.intVal}
+  of dtFloat: %*{"k": "float", "v": v.floatVal}
+  of dtBool: %*{"k": "bool", "v": v.boolVal}
+  of dtText: %*{"k": "text", "v": v.strVal}
+  of dtJson: %*{"k": "json", "v": v.jsonVal}
 
 proc cellFromJson(n: JsonNode): Value =
   let k = n["k"].getStr()
@@ -502,7 +502,7 @@ proc cellFromJson(n: JsonNode): Value =
   of "text": newTextValue(n["v"].getStr)
   of "json":
     # stored as raw JSON string
-    Value(kind: dtJson, j: n["v"].getStr)
+    Value(kind: dtJson, jsonVal: n["v"].getStr)
   else:
     raise newException(StoreError, "invalid cell kind in WAL payload: " & k)
 
@@ -581,15 +581,15 @@ proc pkStringFromValue(v: Value): string =
   of dtNull:
     ""
   of dtInt:
-    $v.i
+    $v.intVal
   of dtFloat:
-    $v.f
+    $v.floatVal
   of dtBool:
-    if v.b: "true" else: "false"
+    if v.boolVal: "true" else: "false"
   of dtText:
-    v.s
+    v.strVal
   of dtJson:
-    v.j
+    v.jsonVal
 
 proc validateForeignKeysOnInsert(s: Store, t: DbTable, data: RowData) =
   for fk in t.foreignKeys:
