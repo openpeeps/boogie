@@ -6,7 +6,7 @@
 #          https://github.com/openpeeps/boogie
 
 import std/[tables, options, strformat, os]
-import pkg/[flatty, sorta]
+import pkg/flatty
 import ../wal
 
 ## This module implements a simple key-value store with optional
@@ -24,12 +24,9 @@ type
   KvStoreError* = object of CatchableError
     ## A catchable exception type for errors related to the key-value store operations.
 
-  KeyRecord = object
-    k: string
-
   KvStore* {.acyclic.} = ref object
     ## The main data structure for the key-value store
-    dataByKey: SortedTable[string, string]
+    dataByKey: Table[string, string]
 
     storageMode: KvStorageMode
     hasWal: bool
@@ -55,10 +52,6 @@ const
   KvTableName = "__kv__"
 
 proc recoverFromWal*(s: KvStore)
-
-proc cmp(a, b: KeyRecord): int = cmp(a.k, b.k)
-proc extract(r: KeyRecord): string = r.k
-proc `==`(a, b: KeyRecord): bool = a.k == b.k
 
 proc writeTextAtomic(path, content: string) =
   let tmp = path & ".tmp"
@@ -87,7 +80,7 @@ proc buildSnapshot(s: KvStore): KvSnapshotOnDisk =
 proc loadSnapshotIntoStore(s: KvStore, snap: KvSnapshotOnDisk) =
   if snap.version != 1'u32:
     raise newException(KvStoreError, "unsupported .db snapshot version")
-  s.dataByKey = initSortedTable[string, string]()
+  s.dataByKey = initTable[string, string]()
   s.checkpointLsn = snap.checkpointLsn
   for (k, v) in snap.entries:
     s.dataByKey[k] = v
@@ -185,7 +178,7 @@ proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = 
       walObj = openWal(path)
 
   result = KvStore(
-    dataByKey: initSortedTable[string, string](),
+    dataByKey: initTable[string, string](),
     storageMode: mode,
     hasWal: hasWal,
     wal: walObj,
@@ -262,7 +255,7 @@ proc recoverFromWal*(s: KvStore) =
   ## ensure that the store reflects all committed operations even after a crash.
   ## 
   ## The checkpoint LSN is updated to reflect the latest applied WAL entry
-  s.dataByKey = initSortedTable[string, string]()
+  s.dataByKey = initTable[string, string]()
   s.checkpointLsn = 0'u64
   s.pendingOps = 0'u32
   s.pendingWalOps = 0'u32

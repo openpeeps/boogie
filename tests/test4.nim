@@ -145,10 +145,15 @@ suite "Columnar Store benchmarks":
         batch.setLen(0)
     let insertSecs = cpuTime() - t0
 
-    # Scan (project all columns)
+    # Scan (project all columns) - cold (first load parses files)
     t0 = cpuTime()
     let rows = s.scan("events", @["id", "user", "amount", "ok"])
     let scanSecs = cpuTime() - t0
+
+    # Warm scan (columns now cached)
+    t0 = cpuTime()
+    let rows2 = s.scan("events", @["id", "user", "amount", "ok"])
+    let warmScanSecs = cpuTime() - t0
 
     # Filter (amount > N/2)
     t0 = cpuTime()
@@ -159,10 +164,12 @@ suite "Columnar Store benchmarks":
 
     let insertOps = float(N) / max(insertSecs, 1e-9)
     let scanOps = float(rows.len) / max(scanSecs, 1e-9)
+    let warmScanOps = float(rows2.len) / max(warmScanSecs, 1e-9)
     let filterOps = float(filtered.len) / max(filterSecs, 1e-9)
 
-    echo fmt"[bench][columnar] insert={insertOps:>10.0f} ops/s scan={scanOps:>10.0f} ops/s filter={filterOps:>10.0f} ops/s"
+    echo fmt"[bench][columnar] insert={insertOps:>10.0f} ops/s scan_cold={scanOps:>10.0f} ops/s scan_warm={warmScanOps:>10.0f} ops/s filter={filterOps:>10.0f} ops/s"
 
     check insertOps > 0
     check scanOps > 0
+    check warmScanOps > 0
     check filterOps > 0

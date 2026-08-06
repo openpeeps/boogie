@@ -236,14 +236,12 @@ proc indexRelNoLock(s: GraphStore, r: Relationship) =
   s.inAdj.mgetOrPut(r.toId, @[]).add(r.id)
 
 proc deindexRelNoLock(s: GraphStore, r: Relationship) =
+  # Mutate the adjacency seqs in place via the table's var reference, avoiding a
+  # full copy + write-back of the seq on every relationship delete or upsert.
   if s.outAdj.hasKey(r.fromId):
-    var outv = s.outAdj[r.fromId]
-    outv.removeRid(r.id)
-    s.outAdj[r.fromId] = outv
+    s.outAdj.mgetOrPut(r.fromId, @[]).removeRid(r.id)
   if s.inAdj.hasKey(r.toId):
-    var inv = s.inAdj[r.toId]
-    inv.removeRid(r.id)
-    s.inAdj[r.toId] = inv
+    s.inAdj.mgetOrPut(r.toId, @[]).removeRid(r.id)
 
 proc upsertNodeNoLock(s: GraphStore, n: GraphNode) =
   s.nodes[n.id] = n
@@ -301,39 +299,75 @@ proc applyOpNoLock(s: GraphStore, op: TxOp) =
 #
 # WAL conversion + recovery
 #
+const
+  PayloadNode = 0x4E'u8  # 'N'
+  PayloadRel  = 0x52'u8  # 'R'
+
+proc wU32(s: var string, v: uint32) =
+  for i in 0..3:
+    s.add(char((v shr (i * 8)) and 0xFF'u32))
+
+proc wU64(s: var string, v: uint64) =
+  for i in 0..7:
+    s.add(char((v shr (i * 8)) and 0xFF'u64))
+
+proc wStr(s: var string, x: string) =
+  wU32(s, uint32(x.len))
+  s.add(x)
+
+proc rU32(s: string, off: var int): uint32 =
+  result = uint32(ord(s[off])) or
+    (uint32(ord(s[off + 1])) shl 8) or
+    (uint32(ord(s[off + 2])) shl 16) or
+    (uint32(ord(s[off + 3])) shl 24)
+  off += 4
+
+proc rU64(s: string, off: var int): uint64 =
+  for i in 0..7:
+    result = result or (uint64(ord(s[off + i])) shl (i * 8))
+  off += 8
+
+proc rStr(s: string, off: var int): string =
+  let n = int(rU32(s, off))
+  result = s[off ..< off + n]
+  off += n
+
 proc nodeToPayload(n: GraphNode): string =
-  let j = %*{
-    "id": n.id,
-    "labels": n.labels,
-    "props": ensureObj(n.props)
-  }
-  $j
+  result.add(char(PayloadNode))
+  wU64(result, n.id)
+  wU32(result, uint32(n.labels.len))
+  for l in n.labels:
+    wStr(result, l)
+  wStr(result, $(ensureObj(n.props)))
 
 proc relToPayload(r: Relationship): string =
-  let j = %*{
-    "id": r.id,
-    "fromId": r.fromId,
-    "toId": r.toId,
-    "relType": r.relType,
-    "props": ensureObj(r.props)
-  }
-  $j
+  result.add(char(PayloadRel))
+  wU64(result, r.id)
+  wU64(result, r.fromId)
+  wU64(result, r.toId)
+  wStr(result, r.relType)
+  wStr(result, $(ensureObj(r.props)))
 
 proc nodeFromPayload(payload: string): GraphNode =
-  let j = parseJson(payload)
-  result.id = j["id"].getBiggestInt().uint64
-  result.labels = @[]
-  for it in j["labels"].items:
-    result.labels.add(it.getStr())
-  result.props = if j.hasKey("props"): j["props"] else: newJObject()
+  if payload.len == 0 or payload[0] != char(PayloadNode):
+    raise newException(GraphError, "invalid node WAL payload")
+  var off = 1
+  result.id = rU64(payload, off)
+  let n = int(rU32(payload, off))
+  result.labels = newSeq[string](n)
+  for i in 0 ..< n:
+    result.labels[i] = rStr(payload, off)
+  result.props = parseProps(rStr(payload, off))
 
 proc relFromPayload(payload: string): Relationship =
-  let j = parseJson(payload)
-  result.id = j["id"].getBiggestInt().uint64
-  result.fromId = j["fromId"].getBiggestInt().uint64
-  result.toId = j["toId"].getBiggestInt().uint64
-  result.relType = j["relType"].getStr()
-  result.props = if j.hasKey("props"): j["props"] else: newJObject()
+  if payload.len == 0 or payload[0] != char(PayloadRel):
+    raise newException(GraphError, "invalid rel WAL payload")
+  var off = 1
+  result.id = rU64(payload, off)
+  result.fromId = rU64(payload, off)
+  result.toId = rU64(payload, off)
+  result.relType = rStr(payload, off)
+  result.props = parseProps(rStr(payload, off))
 
 proc walEntryFor(op: TxOp): WalEntry =
   case op.kind
@@ -583,14 +617,14 @@ proc commit*(tx: var GraphTx) =
 
 proc getNode*(s: GraphStore, id: uint64, outNode: var GraphNode): bool =
   ## Retrieves the node with the specified ID. Returns true if found, false otherwise.
-  writeWith graphStoreRwLock:
+  readWith graphStoreRwLock:
     if not s.nodes.hasKey(id): return false
     outNode = s.nodes[id]
     return true
 
 proc getRelationship*(s: GraphStore, id: uint64, outRel: var Relationship): bool =
   ## Retrieves the relationship with the specified ID. Returns true if found, false otherwise.
-  writeWith graphStoreRwLock:
+  readWith graphStoreRwLock:
     if not s.rels.hasKey(id): return false
     outRel = s.rels[id]
     return true
@@ -598,7 +632,7 @@ proc getRelationship*(s: GraphStore, id: uint64, outRel: var Relationship): bool
 proc outgoing*(s: GraphStore, nodeId: uint64, relType = ""): seq[Relationship] =
   ## Returns the outgoing relationships from the specified node. If `relType` is provided,
   ## only relationships of that type are returned.
-  writeWith graphStoreRwLock:
+  readWith graphStoreRwLock:
     if not s.outAdj.hasKey(nodeId): return @[]
     let rids = s.outAdj[nodeId]
     result = newSeqOfCap[Relationship](rids.len)
@@ -614,7 +648,7 @@ proc outgoing*(s: GraphStore, nodeId: uint64, relType = ""): seq[Relationship] =
           result.add(r)
 
 proc neighbors*(s: GraphStore, nodeId: uint64, relType = ""): seq[uint64] =
-  writeWith graphStoreRwLock:
+  readWith graphStoreRwLock:
     if not s.outAdj.hasKey(nodeId): return @[]
     let rids = s.outAdj[nodeId]
     result = newSeqOfCap[uint64](rids.len)
@@ -630,14 +664,14 @@ proc neighbors*(s: GraphStore, nodeId: uint64, relType = ""): seq[uint64] =
           result.add(r.toId)
 
 proc findNodesByLabel*(s: GraphStore, label: string): seq[GraphNode] =
-  writeWith graphStoreRwLock:
+  readWith graphStoreRwLock:
     for _, n in s.nodes.pairs:
       if label in n.labels:
         result.add(n)
 
 proc traverseBfs*(s: GraphStore, startNode: uint64, maxDepth: int, relType = ""): seq[uint64] =
   if maxDepth < 0: return @[]
-  writeWith graphStoreRwLock:
+  readWith graphStoreRwLock:
     if not s.nodes.hasKey(startNode): return @[]
 
     var visited = initHashSet[uint64]()

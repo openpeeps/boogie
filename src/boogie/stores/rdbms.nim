@@ -413,8 +413,7 @@ proc createIndex*(t: DbTable, column: string) =
   for pk, rec in t.rowsByPk.pairs:
     if rec.cols.hasKey(column):
       let k = cellIndexKey(rec.cols[column])
-      var pkSet = colMap.mgetOrPut(k, initHashSet[string]())
-      pkSet.incl(pk)
+      colMap.mgetOrPut(k, initHashSet[string]()).incl(pk)
 
   t.eqIndex[column] = colMap
   t.indexedCols.incl(column)
@@ -431,9 +430,8 @@ proc effectivePkForInsert(t: DbTable, pk: string): string =
       inc t.pkSequence
       result = $t.pkSequence
 
-proc normalizedRowWithPk(t: DbTable, data: RowData, pk: string): RowData =
-  ## Returns a copy of `data` with the primary key column set to `pk`.
-  result = data
+proc normalizedRowWithPk(t: DbTable, data: var RowData, pk: string) =
+  ## Sets the primary key column on `data` to `pk` in place.
   let pkCol = t.primaryKey
   let pkDef = t.findColumn(pkCol)
   if pkDef.isNone:
@@ -441,15 +439,15 @@ proc normalizedRowWithPk(t: DbTable, data: RowData, pk: string): RowData =
   case pkDef.get.kind
   of dtInt:
     # Try to parse pk as int
-    if not result.hasKey(pkCol):
-      result[pkCol] = newIntValue(pk.parseBiggestInt.int64)
+    if not data.hasKey(pkCol):
+      data[pkCol] = newIntValue(pk.parseBiggestInt.int64)
   of dtText:
-    if not result.hasKey(pkCol):
-      result[pkCol] = newTextValue(pk)
+    if not data.hasKey(pkCol):
+      data[pkCol] = newTextValue(pk)
   else:
     # Add more types as needed
-    if not result.hasKey(pkCol):
-      result[pkCol] = newTextValue(pk)
+    if not data.hasKey(pkCol):
+      data[pkCol] = newTextValue(pk)
 
 proc matchesType(v: Value, c: ColumnDef): bool =
   case v.kind
@@ -460,7 +458,7 @@ proc matchesType(v: Value, c: ColumnDef): bool =
   of dtText: c.kind == dtText
   of dtJson: c.kind == dtJson
 
-proc validateRow(t: DbTable, data: RowData) =
+proc validateRow(t: DbTable, data: var RowData) =
   # Unknown columns
   for colName, val in data.pairs:
     let c = t.findColumn(colName)
@@ -481,41 +479,8 @@ proc validateRow(t: DbTable, data: RowData) =
       )
 
 #
-# JSON serialization helpers (for WAL payloads)
+# Schema serialization helpers (for WAL payloads)
 #
-proc cellToJson(v: Value): JsonNode =
-  case v.kind
-  of dtNull: %*{"k": "null"}
-  of dtInt: %*{"k": "int", "v": v.intVal}
-  of dtFloat: %*{"k": "float", "v": v.floatVal}
-  of dtBool: %*{"k": "bool", "v": v.boolVal}
-  of dtText: %*{"k": "text", "v": v.strVal}
-  of dtJson: %*{"k": "json", "v": v.jsonVal}
-
-proc cellFromJson(n: JsonNode): Value =
-  let k = n["k"].getStr()
-  case k
-  of "null": newNullValue()
-  of "int": newIntValue(n["v"].getBiggestInt.int64)
-  of "float": newFloatValue(n["v"].getFloat)
-  of "bool": newBoolValue(n["v"].getBool)
-  of "text": newTextValue(n["v"].getStr)
-  of "json":
-    # stored as raw JSON string
-    Value(kind: dtJson, jsonVal: n["v"].getStr)
-  else:
-    raise newException(StoreError, "invalid cell kind in WAL payload: " & k)
-
-proc rowToJson(data: RowData): JsonNode =
-  result = newJObject()
-  for k, v in data.pairs:
-    result[k] = cellToJson(v)
-
-proc rowFromJson(n: JsonNode): RowData =
-  result = initOrderedTable[string, Value]()
-  for k, v in n.pairs:
-    result[k] = cellFromJson(v)
-
 proc schemaToPayload(t: DbTable): string =
   var cols = newJArray()
   for c in t.columns:
@@ -568,13 +533,13 @@ proc tableFromPayload(tableName, payload: string): DbTable =
   t
 
 proc rowToPayload(data: RowData): string =
-  # Convert RowData to a JSON string for use as a WAL payload.
-  # This will be parsed back by `rowFromPayload`.
-  $(rowToJson(data))
+  # Binary WAL payload via flatty (same encoding the snapshot path already uses
+  # for RowData). This is parsed back by `rowFromPayload`.
+  toFlatty(data)
 
 proc rowFromPayload(payload: string): RowData =
-  # Parse a JSON string payload back into RowData. This should be the inverse of `rowToPayload`.
-  rowFromJson(parseJson(payload))
+  # Parse a flatty binary payload back into RowData. This should be the inverse of `rowToPayload`.
+  fromFlatty(payload, RowData)
 
 proc pkStringFromValue(v: Value): string =
   case v.kind
@@ -591,7 +556,7 @@ proc pkStringFromValue(v: Value): string =
   of dtJson:
     v.jsonVal
 
-proc validateForeignKeysOnInsert(s: Store, t: DbTable, data: RowData) =
+proc validateForeignKeysOnInsert(s: Store, t: DbTable, data: var RowData) =
   for fk in t.foreignKeys:
     if not data.hasKey(fk.column):
       continue
@@ -718,7 +683,7 @@ proc ensureOrderIndex(t: DbTable) =
     t.rows[rec] = rec.pk
   t.orderIndexDirty = false
 
-proc insertRowNoWal(t: DbTable, pk: string, data: RowData): string =
+proc insertRowNoWal(t: DbTable, pk: string, data: var RowData): string =
   # Insert a row into the table without writing to WAL. This is used
   # by the store-level `insertRow` proc which handles WAL logging and commit.
   let generated = (t.pkType == pkmSerial and pk.len == 0)
@@ -729,12 +694,12 @@ proc insertRowNoWal(t: DbTable, pk: string, data: RowData): string =
   if t.rowsByPk.hasKey(effectivePk):
     raise newException(StoreError, fmt"duplicate primary key '{effectivePk}' in table '{t.name}'")
 
-  let normalized = t.normalizedRowWithPk(data, effectivePk)
-  validateRow(t, normalized)
+  t.normalizedRowWithPk(data, effectivePk)
+  validateRow(t, data)
 
-  let rec = RowRecord(pk: effectivePk, cols: normalized)
+  let rec = RowRecord(pk: effectivePk, cols: data)
   t.rowsByPk[effectivePk] = rec
-  t.addToEqIndexes(effectivePk, normalized) # NEW
+  t.addToEqIndexes(effectivePk, data) # NEW
   t.orderIndexDirty = true
 
   # avoid parseInt on hot path for auto-serial inserts
@@ -808,8 +773,9 @@ proc loadSnapshotIntoStore(s: Store, snap: SnapshotOnDisk) =
     t.ensureForeignKeyIndexes()
     if td.pkType == pkmSerial:
       t.pkSequence = td.pkSequence
-    for (pk, data) in td.rows:
-      discard t.insertRowNoWal(pk, data)
+    for i in 0 ..< td.rows.len:
+      var data = td.rows[i][1]
+      discard t.insertRowNoWal(td.rows[i][0], data)
     s.tables[t.name] = t
 
 proc saveSnapshotIfEnabled(s: Store) =
@@ -923,7 +889,8 @@ proc isEmpty*(t: DbTable): bool =
 
 proc insertRow*(t: DbTable, pk: string, data: RowData) =
   # direct table mutation: no WAL here (store-level proc logs)
-  discard t.insertRowNoWal(pk, data)
+  var d = data
+  discard t.insertRowNoWal(pk, d)
 
 proc deleteRow*(t: DbTable, pk: string): bool {.discardable.} =
   # direct table mutation: no WAL here (store-level proc logs)
@@ -960,19 +927,21 @@ proc insertRow*(s: Store, tableName: string, pk: string, data: RowData) =
   if t.rowsByPk.hasKey(effectivePk):
     raise newException(StoreError, fmt"duplicate primary key '{effectivePk}' in table '{t.name}'")
 
-  let normalized = t.normalizedRowWithPk(data, effectivePk)
-  validateRow(t, normalized)
-  s.validateForeignKeysOnInsert(t, normalized)
+  var d = data
+  t.normalizedRowWithPk(d, effectivePk)
+  validateRow(t, d)
+  s.validateForeignKeysOnInsert(t, d)
 
-  let lsn = s.appendWalIfEnabled(woInsertRow, tableName, effectivePk, rowToPayload(data))
-  discard t.insertRowNoWal(effectivePk, data)
+  let lsn = s.appendWalIfEnabled(woInsertRow, tableName, effectivePk, rowToPayload(d))
+  discard t.insertRowNoWal(effectivePk, d)
   s.markCommitted(lsn)
 
 proc insertRow*(t: DbTable, data: RowData): string =
   ## direct table mutation: no WAL here (store-level proc logs)
   if t.pkType != pkmSerial:
     raise newException(StoreError, "insertRow(data) requires a serial primary key table")
-  result = t.insertRowNoWal("", data)
+  var d = data
+  result = t.insertRowNoWal("", d)
 
 proc insertRow*(s: Store, tableName: string, data: RowData): string {.discardable.}=
   if unlikely(not s.tables.hasKey(tableName)):
@@ -986,12 +955,13 @@ proc insertRow*(s: Store, tableName: string, data: RowData): string {.discardabl
   if t.rowsByPk.hasKey(effectivePk):
     raise newException(StoreError, fmt"duplicate primary key '{effectivePk}' in table '{t.name}'")
 
-  let normalized = t.normalizedRowWithPk(data, effectivePk)
-  validateRow(t, normalized)
-  s.validateForeignKeysOnInsert(t, normalized)
+  var d = data
+  t.normalizedRowWithPk(d, effectivePk)
+  validateRow(t, d)
+  s.validateForeignKeysOnInsert(t, d)
 
-  let lsn = s.appendWalIfEnabled(woInsertRow, tableName, effectivePk, rowToPayload(data))
-  discard t.insertRowNoWal(effectivePk, data)
+  let lsn = s.appendWalIfEnabled(woInsertRow, tableName, effectivePk, rowToPayload(d))
+  discard t.insertRowNoWal(effectivePk, d)
   s.tables[tableName] = t
   s.markCommitted(lsn)
   result = effectivePk
@@ -1054,7 +1024,8 @@ proc applyWalEntry(s: Store, e: WalEntry) =
     if unlikely(not s.tables.hasKey(e.table)):
       raise newException(StoreError, "WAL replay: table not found: " & e.table)
     var t = s.tables[e.table]
-    discard t.insertRowNoWal(e.pk, rowFromPayload(e.payload))
+    var row = rowFromPayload(e.payload)
+    discard t.insertRowNoWal(e.pk, row)
     s.tables[e.table] = t
   of woDeleteRow:
     if likely(s.tables.hasKey(e.table)):

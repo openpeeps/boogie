@@ -73,6 +73,9 @@ type
     schema: TableSchema
     byName: Table[string, ColumnSchema]
     pkValues: HashSet[string]
+    colCache: Table[string, seq[JsonNode]]
+      # in-memory cache of parsed column values, keyed by column name. Columns
+      # are parsed once from disk on first use and kept in sync on insert.
 
   ColumnarStore* = object
     rootDir*: string
@@ -164,7 +167,8 @@ proc makeTable(schema: TableSchema): ColumnarTable =
   result = ColumnarTable(
     schema: schema,
     byName: initTable[string, ColumnSchema](),
-    pkValues: initHashSet[string]()
+    pkValues: initHashSet[string](),
+    colCache: initTable[string, seq[JsonNode]]()
   )
   for c in schema.columns:
     result.byName[c.name] = c
@@ -200,6 +204,15 @@ proc loadColumnValues(path: string): seq[JsonNode] =
     if line.len == 0: continue
     result.add(parseJson(line))
 
+proc columnValues(t: ColumnarTable, s: ColumnarStore, table, col: string): seq[JsonNode] =
+  ## Returns the parsed values for a column, loading them from disk on first use
+  ## and caching them in the table for subsequent scans/aggregates.
+  if t.colCache.hasKey(col):
+    return t.colCache[col]
+  let vals = loadColumnValues(s.columnPath(table, col))
+  t.colCache[col] = vals
+  vals
+
 proc appendColumnValues(path: string, values: seq[JsonNode]) =
   # Note: This simple append logic assumes that each value can be serialized
   # to a single line of JSON text. In a production system, you would want to
@@ -212,6 +225,14 @@ proc appendColumnValues(path: string, values: seq[JsonNode]) =
     f.writeLine($v)
 
 proc cmpJson(a, b: JsonNode): int =
+  if a.kind == JInt and b.kind == JInt:
+    return cmp(a.getInt(), b.getInt())
+  if a.kind == JFloat and b.kind == JFloat:
+    let x = a.getFloat()
+    let y = b.getFloat()
+    if x < y: return -1
+    if x > y: return 1
+    return 0
   if a.kind in {JInt, JFloat} and b.kind in {JInt, JFloat}:
     let x = (if a.kind == JInt: float(a.getInt()) else: a.getFloat())
     let y = (if b.kind == JInt: float(b.getInt()) else: b.getFloat())
@@ -348,6 +369,8 @@ proc insertBatchInternal(s: var ColumnarStore, table: string, rows: seq[JsonNode
 
   for c in t.schema.columns:
     appendColumnValues(s.columnPath(table, c.name), buffer[c.name])
+    if t.colCache.hasKey(c.name):
+      t.colCache[c.name].add(buffer[c.name])
 
   for k in newPk:
     t.pkValues.incl(k)
@@ -439,23 +462,28 @@ proc scan*(s: ColumnarStore, table: string,
     if not t.byName.hasKey(c):
       raise newException(ColumnarError, fmt"Unknown column: {c}")
 
-  var vectors = initTable[string, seq[JsonNode]]()
-  for c in needed:
-    vectors[c] = loadColumnValues(s.columnPath(table, c))
+  # Resolve filter and projection columns once (cached), avoiding per-row
+  # lookups in the vector table.
+  var fCols: seq[(Filter, seq[JsonNode])]
+  for flt in filters:
+    fCols.add((flt, t.columnValues(s, table, flt.column)))
+  var projCols: seq[(string, seq[JsonNode])]
+  for c in projectedColumns:
+    projCols.add((c, t.columnValues(s, table, c)))
 
   let n = int(t.schema.rowCount)
   result = @[]
   for i in 0..<n:
     var ok = true
-    for flt in filters:
-      if i >= vectors[flt.column].len or not passesFilter(vectors[flt.column][i], flt):
+    for (flt, col) in fCols:
+      if i >= col.len or not passesFilter(col[i], flt):
         ok = false
         break
     if not ok: continue
 
     var row = newJObject()
-    for c in projectedColumns:
-      row[c] = if i < vectors[c].len: vectors[c][i] else: newJNull()
+    for (c, col) in projCols:
+      row[c] = if i < col.len: col[i] else: newJNull()
     result.add(row)
 
     if limit > 0 and result.len >= limit:
@@ -479,22 +507,28 @@ proc aggregate*(s: ColumnarStore, table: string, specs: seq[AggregateSpec],
     if not t.byName.hasKey(c):
       raise newException(ColumnarError, fmt"Unknown column: {c}")
 
-  var vectors = initTable[string, seq[JsonNode]]()
-  for c in needed:
-    vectors[c] = loadColumnValues(s.columnPath(table, c))
+  var fCols: seq[(Filter, seq[JsonNode])]
+  for flt in filters:
+    fCols.add((flt, t.columnValues(s, table, flt.column)))
+  var aggCols: seq[(AggregateSpec, seq[JsonNode])]
+  for sp in specs:
+    if sp.kind != akCount:
+      aggCols.add((sp, t.columnValues(s, table, sp.column)))
+    else:
+      aggCols.add((sp, @[]))
 
   var matched: seq[int] = @[]
   let n = int(t.schema.rowCount)
   for i in 0..<n:
     var ok = true
-    for flt in filters:
-      if i >= vectors[flt.column].len or not passesFilter(vectors[flt.column][i], flt):
+    for (flt, col) in fCols:
+      if i >= col.len or not passesFilter(col[i], flt):
         ok = false
         break
     if ok: matched.add(i)
 
   result = newJObject()
-  for sp in specs:
+  for (sp, col) in aggCols:
     let key = if sp.alias.len > 0: sp.alias else: sp.kind.repr & "_" & sp.column
     case sp.kind
     of akCount:
@@ -502,7 +536,7 @@ proc aggregate*(s: ColumnarStore, table: string, specs: seq[AggregateSpec],
     of akSum, akAvg:
       var sum = 0.0
       for i in matched:
-        let v = vectors[sp.column][i]
+        let v = col[i]
         if v.kind == JInt: sum += float(v.getInt())
         elif v.kind == JFloat: sum += v.getFloat()
       if sp.kind == akSum:
@@ -513,9 +547,9 @@ proc aggregate*(s: ColumnarStore, table: string, specs: seq[AggregateSpec],
       if matched.len == 0:
         result[key] = newJNull()
       else:
-        var best = vectors[sp.column][matched[0]]
+        var best = col[matched[0]]
         for i in matched[1..^1]:
-          let cur = vectors[sp.column][i]
+          let cur = col[i]
           if (sp.kind == akMin and cmpJson(cur, best) < 0) or
              (sp.kind == akMax and cmpJson(cur, best) > 0):
             best = cur

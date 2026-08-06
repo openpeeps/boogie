@@ -21,208 +21,227 @@
 - In-memory or On-disk storage modes
 - Primitive data types (`string`, `int`, `float`, `bool`, `json`, `null`)
 
-What's included?
-| Store Type        | Description |
-|-------------------|-------------|
-| **Key/Value Store**   | A simple key-value store implementation with WAL support |
-| **RDBMS Store**       | A relational wal-based database with support for **schemas**, **primary keys** and typed columns (However, it currently lacks explicit support for foreign keys, joins, or advanced relational features (relations between tables)) |
-| **Vector Store**      | Vector store implementation with WAL support |
-| **Columnar Store**    | Columnar storage engine for analytics workloads with WAL support |
-| **Graph Store**       | A simple graph database with support for nodes, relationships, and basic graph queries (e.g., neighbors, shortest path) with WAL support |
+#### What's included?
+
+1. **Key/Value Store** - A simple Key-Value store implementation with WAL support
+2. **RDBMS Store** - A relational WAL-based database with support for **schemas**, **primary keys**, typed columns and **foreign keys** with `RESTRICT` delete actions
+3. **Vector Store** - Vector store implementation with WAL support, including nearest-neighbor search (cosine / dot / L2)
+4. **Columnar Store** - Columnar storage engine for analytics workloads with WAL support and in-memory column caching
+5. **Graph Store** - A simple graph database with support for nodes, relationships, and basic graph queries (e.g., neighbors, BFS) with WAL support
+6. **Document Store** - A flexible document store on top of the WAL, storing JSON (or BSON) documents
 
 >[!NOTE]
 > Boogie is an experimental project mostly made with the chatbot for fun and learning. It is still in early stages, so expect data loss and breaking changes. Use at your own risk.
 
-This can be used as a simple embedded database for your Nim applications. If you want, you can use [openpeeps/e2ee](https://github.com/openpeeps/e2ee) to encrypt the data before inserting it into Boogie database.
+This can be used as a simple embedded database for your Nim applications. If you want,
+you can use [openpeeps/e2ee](https://github.com/openpeeps/e2ee) to encrypt the data before
+inserting it into Boogie database.
+
+## Examples
+
+Every store supports an in-memory mode and a disk-backed mode with WAL, group
+commits, and periodic checkpoints. Benchmark numbers come from the bundled test
+suites (`nim r -d:release tests/testX.nim`) on the author's development machine.
+
+### Key/Value Store
+
+```nim
+import boogie/stores/kv
+import std/options
+
+let kv = newInMemoryKvStore()      # or newKvStore("mydb", ksmDisk, enableWal = true)
+kv.put("greeting", "hello")
+kv.put("user:1", "alice")
+if kv.hasKey("greeting"):
+  echo kv.get("greeting").get()    # "hello"
+discard kv.delete("user:1")        # true
+for k, v in kv.pairsUnordered:     # unordered iteration
+  echo k, " -> ", v
+```
+
+| Operation | ops/s |
+|---|---|
+| put (memory) | ~2.98 M |
+| get (memory) | ~4.62 M |
+| delete (memory) | ~5.29 M |
+| put (disk + WAL) | ~0.97 M |
+| get (disk + WAL) | ~7.59 M |
+| delete (disk + WAL) | ~1.33 M |
 
 ### RDBMS Store
-Notes
-- Use `smInMemory` for fast, ephemeral stores: `let store = newInMemoryStore()`
-- Use `getRow`, `allRows`, or `where` for data access
-- Foreign key violations and type mismatches raise StoreError
-- WAL and snapshots ensure durability and fast recovery
 
-
-Here is an example of using the RDBMS store to create a table, insert some data, and query it:
 ```nim
 import boogie/stores/rdbms
+import std/options
 
-# Define columns
-let userIdCol = newColumn("id", dtInt, false)
-let userNameCol = newColumn("name", dtText, false)
-let userEmailCol = newColumn("email", dtText, true)
+let store = newStore("blogdata", smDisk, enableWal = true, checkpointEveryOps = 10)
 
-let postIdCol = newColumn("id", dtInt, false)
-let postUserIdCol = newColumn("user_id", dtInt, false)
-let postContentCol = newColumn("content", dtText, false)
-
-# Create tables
 let users = newTable(
   name = "users",
   primaryKey = "id",
-  columns = [userIdCol, userNameCol, userEmailCol],
+  columns = [
+    newColumn("id", dtInt, false),
+    newColumn("name", dtText, false),
+    newColumn("email", dtText, true)
+  ],
   primaryKeyMode = pkmSerial
 )
+store.createTableIfNotExist(users)
 
-let fkUser = newForeignKey(
-  name = "fk_post_user",
-  column = "user_id",
-  refTable = "users",
-  refColumn = "id"
-)
-
-let posts = newTable(
-  name = "posts",
-  primaryKey = "id",
-  columns = [postIdCol, postUserIdCol, postContentCol],
-  primaryKeyMode = pkmSerial,
-  foreignKeys = [fkUser]
-)
-
-# Create a disk-backed store with WAL and checkpointing
-let store = newStore("blogdata", smDisk, enableWal = true, checkpointEveryOps = 10)
-
-# Register tables
-store.createTable(users)
-store.createTable(posts)
-
-# Insert a user (auto-increment PK)
+# Auto-increment primary key
 let userPk = store.insertRow("users", row({
   "name": newTextValue("Alice"),
   "email": newTextValue("alice@example.com")
 }))
 
-# Insert a post for Alice
-let postPk = store.insertRow("posts", row({
-  "user_id": newIntValue(userPk.parseInt64),
-  "content": newTextValue("Hello, world!")
-}))
+# Explicit primary key
+store.insertRow("users", "42", row({"name": newTextValue("Bob")}))
 
-# Query users by name (with index)
-users.createIndex("name")
-for pk, row in users.where("name", newTextValue("Alice")):
-  echo "User: ", pk, " -> ", row
+# Point lookup + indexed equality search
+echo store.getRow("users", userPk).isSome
+let usersT = store.getTable("users").get()
+usersT.createIndex("name")
+for (pk, r) in usersT.where("name", newTextValue("Alice")):
+  echo pk, " -> ", r
 
-# Query all posts for Alice
-for pk, row in posts.where("user_id", newIntValue(userPk.parseInt64)):
-  echo "Post: ", pk, " -> ", row
-
-# Delete user (will fail if posts exist due to FK restrict)
-try:
-  store.deleteRow("users", userPk)
-except StoreError as e:
-  echo "Delete failed: ", e.msg
-
-# Force a checkpoint (snapshot)
+discard store.deleteRow("users", userPk)
 store.checkpoint()
 ```
 
-### Key/Value Store
-Boogie also provides a simple key-value store implementation with WAL support.
-```nim
-import boogie/stores/kv
-
-let kv = newKVStore("./mykv.db", StorageMode.ksmDisk,
-            enableWal = true,
-            checkpointEveryOps = 50'u32)
-
-kv.put("name", "Alice")
-assert kv.get("name") == "Alice"
-
-kv.delete("name")
-assert kv.hasKey("name") == false
-```
+| Operation | ops/s |
+|---|---|
+| insert | ~0.24 M |
+| lookup (by pk) | ~0.90 M |
+| ordered scan | ~0.13 M |
 
 ### Vector Store
 
+```nim
+import boogie/stores/vectorstore
+import std/options
+
+let vs = newInMemoryVectorStore()  # or newVectorStore("vecdb", smDisk, enableWal = true)
+vs.createCollection(newCollection("embeddings", 3))
+vs.insert("embeddings", "doc-1", @[0.1'f32, 0.2, 0.3])
+vs.insert("embeddings", "doc-2", @[0.9'f32, 0.8, 0.7])
+
+echo vs.get("embeddings", "doc-1").isSome
+let q = @[0.11'f32, 0.19, 0.31]
+for (pk, score) in vs.nearest("embeddings", q, k = 2, dmCosine):
+  echo pk, " (", score, ")"
+```
+
+| Operation | ops/s |
+|---|---|
+| insert | ~1.07 M |
+| get | ~6.13 M |
+| delete | ~5.22 M |
+| nearest (k=10, dim=32, 20k vectors) | ~2.13 K queries/s |
 
 ### Columnar Store
 
+```nim
+import boogie/stores/columnar
+import std/json
+
+var s = openColumnarStore("analytics")
+
+s.createTable(TableSchema(
+  name: "events",
+  primaryKey: "id",
+  rowCount: 0,
+  columns: @[
+    ColumnSchema(name: "id", kind: ctInt64, nullable: false, codec: ccNone),
+    ColumnSchema(name: "user", kind: ctString, nullable: false, codec: ccNone),
+    ColumnSchema(name: "amount", kind: ctFloat64, nullable: false, codec: ccNone)
+  ]
+))
+
+s.insertBatch("events", @[
+  %*{"id": 1, "user": "alice", "amount": 10.5},
+  %*{"id": 2, "user": "bob", "amount": 25.0}
+])
+
+# Projection + filter
+let rows = s.scan("events", @["id", "user"], filters = @[
+  Filter(column: "amount", op: foGt, value: newJFloat(10.0))
+])
+
+# Aggregation
+let ag = s.aggregate("events", @[
+  AggregateSpec(column: "", kind: akCount, alias: "cnt"),
+  AggregateSpec(column: "amount", kind: akAvg, alias: "avg_amount")
+])
+echo ag["cnt"].getInt()          # 2
+```
+
+Columns are parsed from disk once and cached in memory, so repeated scans/filters
+over the same columns are much faster than the first (cold) scan.
+
+| Operation | ops/s |
+|---|---|
+| insert (batch) | ~0.39 M |
+| scan (cold, first load) | ~0.41 M |
+| scan (warm, cached) | ~2.89 M |
+| filter (cached) | ~3.99 M |
 
 ### Graph Store
 
->[!NOTE]
->Check the [tests](https://github.com/openpeeps/boogie/tree/main/src/boogie/tests) for more examples.
+```nim
+import boogie/stores/graphstore
+import std/json
 
-## Benchmarks
-Here you can find some benchmarks for the available stores. You can run it yourself by cloning the repo and running `nimble test -d:release` (note `-d:release` flag is required for accurate benchmarks)
+var gs = openGraphStore("graphdb")
 
-#### RDBMS Store Benchmarks
-```
-[Suite] No WAL + memory store tests
-Database opened in 0.000 seconds
-  [OK] init database without WAL
-  [OK] create table
-Insert: 0.594 s for 100000 rows
-  [OK] insert rows
-Lookup: 0.076 s for 100000 gets (hits=100000)
-  [OK] lookup rows
-Ordered scan: 0.978 s for 100000 rows
-  [OK] ordered scan
-Unsorted scan: 0.067 s for 100000 rows
-  [OK] ordered scan #2
-Where scan: 0.065 s for 3334 matches
-  [OK] where scan
+var tx = beginTx(gs)
+let alice = createNode(tx, @["Person"], %*{"name": "Alice"})
+let bob   = createNode(tx, @["Person"], %*{"name": "Bob"})
+discard createRelationship(tx, alice, bob, "KNOWS", %*{"since": 2024})
+commit(tx)
 
-[Suite] No WAL + disk store tests
-Database opened in 0.000 seconds
-  [OK] init database without WAL
-  [OK] create table
-Insert: 0.502 s for 100000 rows
-  [OK] insert rows
-Lookup: 0.108 s for 100000 gets (hits=100000)
-  [OK] lookup rows
-Ordered scan: 0.754 s for 100000 rows
-  [OK] ordered scan
-Unsorted scan: 0.103 s for 100000 rows
-  [OK] ordered scan #2
-Where scan: 0.081 s for 3334 matches
-  [OK] where scan
+echo gs.neighbors(alice)          # @[bob]
+for r in gs.outgoing(alice, "KNOWS"):
+  echo r.toId
+for n in gs.findNodesByLabel("Person"):
+  echo n.id
+echo gs.traverseBfs(alice, maxDepth = 2).len
 
-[Suite] WAL + disk store tests
-Database opened in 0.001 seconds
-  [OK] init database without WAL
-  [OK] create table
-Insert: 0.056 s for 10000 rows
-  [OK] insert rows
-Lookup: 0.010 s for 10000 gets (hits=10000)
-  [OK] lookup rows
-Ordered scan: 0.075 s for 10000 rows
-  [OK] ordered scan
-Unsorted scan: 0.010 s for 10000 rows
-  [OK] ordered scan #2
-Where scan: 0.008 s for 334 matches
-  [OK] where scan
-
-[Suite] WAL + memory store tests
-Database opened in 0.000 seconds
-  [OK] init database without WAL
-  [OK] create table
-Insert: 0.046 s for 10000 rows
-  [OK] insert rows
-Lookup: 0.010 s for 10000 gets (hits=10000)
-  [OK] lookup rows
-Ordered scan: 0.076 s for 10000 rows
-  [OK] ordered scan
-Unsorted scan: 0.010 s for 10000 rows
-  [OK] ordered scan #2
-Where scan: 0.008 s for 334 matches
-  [OK] where scan
-
-[Suite] WAL functions tests
-Recovered rows: 1000
-  [OK] WAL crash recovery
+closeGraphStore(gs)
 ```
 
-As you can see, the performance of the RDBMS store is quite good, especially when using the WAL. The in-memory store is faster than the disk store, but the disk store provides durability and crash recovery. The WAL also significantly improves the performance of inserts and lookups.
+| Operation | ops/s |
+|---|---|
+| commit (nodes + rels) | ~0.10 M |
+| getNode | ~8.3 M |
+| neighbors | ~4.2 M |
+| findNodesByLabel (5k nodes) | ~341 µs |
 
-#### Key/Value Store Benchmarks
-todo
+### Document Store
 
-### Todos
-- [x] Add support for multiple tables
-- [x] Add basic tests and benchmarks
+```nim
+import boogie/stores/docstore
+import std/json, std/options
 
+var store = openDocumentStore("doctest", name = "documents", defaultEncoding = deJson)
+store.insert("k1", %*{"name": "Alice", "age": 30})
+store.upsert("k1", %*{"name": "Alice", "age": 31})
+
+if store.hasKey("k1"):
+  echo store.get("k1").get()["age"]   # 31
+discard store.delete("k1")
+store.checkpoint()
+```
+
+| Operation | ops/s |
+|---|---|
+| insert | ~0.54 M |
+| get | ~2.01 M |
+| lookup | ~4.96 M |
+| delete | ~0.02 M |
+
+> [!TIP]
+> Run the full test + benchmark suites with `nimble test -d:release` (the `-d:release`
+> flag is required for accurate benchmarks).
 
 ### ❤ Contributions & Support
 - 🐛 Found a bug? [Create a new Issue](https://github.com/openpeeps/boogie/issues)

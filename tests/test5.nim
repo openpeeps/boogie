@@ -1,4 +1,4 @@
-import std/[unittest, os, times, json, sequtils]
+import std/[unittest, os, times, json, sequtils, strformat]
 import ../src/boogie/stores/graphstore
 
 proc mkTestDir(name: string): string =
@@ -145,3 +145,73 @@ suite "graphstore":
     discard createRelationship(tx, 111'u64, 222'u64, "BROKEN", %*{})
     expect(GraphError):
       commit(tx)
+
+suite "graphstore benchmarks":
+  test "commit throughput (nodes + rels in batches)":
+    const NBatches = 200
+    const BatchSize = 50
+    let dir = mkTestDir("bench-write")
+    var gs = openGraphStore(dir)
+
+    var t0 = cpuTime()
+    var ops = 0
+    for b in 0..<NBatches:
+      var tx = beginTx(gs)
+      var prev: uint64 = 0
+      for i in 0..<BatchSize:
+        let nid = createNode(tx, @["Node"], %*{"b": b, "i": i})
+        if prev != 0:
+          discard createRelationship(tx, prev, nid, "NEXT", %*{})
+        prev = nid
+      commit(tx)
+      ops += BatchSize * 2 - 1
+
+    let secs = cpuTime() - t0
+    let rate = float(ops) / max(secs, 1e-9)
+    echo fmt"[bench][graph] commit(nodes+rels)={rate:>10.0f} ops/s"
+    check rate > 0
+
+    closeGraphStore(gs)
+    cleanupTestDir(dir)
+
+  test "read throughput (getNode / neighbors / label)":
+    const N = 5000
+    let dir = mkTestDir("bench-read")
+    var gs = openGraphStore(dir)
+
+    var tx = beginTx(gs)
+    var prev: uint64 = 0
+    for i in 1..N:
+      let nid = createNode(tx, @["Person"], %*{"i": i})
+      if prev != 0:
+        discard createRelationship(tx, prev, nid, "KNOWS", %*{})
+      prev = nid
+    commit(tx)
+
+    var node: GraphNode
+    var t0 = cpuTime()
+    for i in 1..N:
+      discard getNode(gs, uint64(i), node)
+    let getSecs = cpuTime() - t0
+    let getRate = float(N) / max(getSecs, 1e-9)
+
+    var count = 0
+    t0 = cpuTime()
+    for i in 1..N:
+      count += neighbors(gs, uint64(i)).len
+    let neighSecs = cpuTime() - t0
+    let neighRate = float(N) / max(neighSecs, 1e-9)
+
+    var labelCount = 0
+    t0 = cpuTime()
+    labelCount = findNodesByLabel(gs, "Person").len
+    let labelSecs = cpuTime() - t0
+
+    echo fmt"[bench][graph] getNode={getRate:>10.0f} ops/s neighbors={neighRate:>10.0f} ops/s findNodesByLabel(N={N})={labelSecs * 1e6:>10.1f} us"
+    check getRate > 0
+    check neighRate > 0
+    check labelCount == N
+    check count > 0
+
+    closeGraphStore(gs)
+    cleanupTestDir(dir)

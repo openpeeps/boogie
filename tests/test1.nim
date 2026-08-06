@@ -80,6 +80,27 @@ suite "No WAL + memory store tests":
     let tWhere = cpuTime() - t5
     echo fmt"Where scan: {tWhere:.3f} s for {matches} matches"
 
+  test "equality index (createIndex + where)":
+    # regression: the equality index built by createIndex must return every
+    # matching row (previously mapped every key to an empty pk set)
+    let usersT = db.getTable("users").get()
+    usersT.createIndex("name")
+    usersT.createIndex("age")
+
+    let byName = usersT.where("name", newTextValue("User"))
+    check byName.len == N
+
+    # results must actually match the filter
+    for (_, r) in byName:
+      check r["name"] == newTextValue("User")
+
+    # non-indexed columns still work after indexes exist
+    let byActive = usersT.where("active", newBoolValue(true))
+    check byActive.len > 0
+
+    # no match returns empty
+    check usersT.where("name", newTextValue("nobody")).len == 0
+
 suite "No WAL + disk store tests":
   var db: Store
   test "init database without WAL":

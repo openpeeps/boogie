@@ -111,3 +111,31 @@ suite "VectorStore benchmarks":
     check insertOps > 0
     check getOps > 0
     check delOps > 0
+
+  test "nearest neighbor search throughput":
+    const N = 20000
+    const dim = 32
+    const K = 10
+    const Q = 200
+    let collName = "bench"
+    let vs = newInMemoryVectorStore()
+    vs.createCollection(newCollection(collName, dim))
+
+    for i in 0..<N:
+      var vec = newSeq[float32](dim)
+      for d in 0..<dim:
+        vec[d] = float32((i * 31 + d * 7) mod 1000) / 100.0'f32
+      vs.insert(collName, "id" & $i, vec)
+
+    var t0 = cpuTime()
+    for q in 0..<Q:
+      var query = newSeq[float32](dim)
+      for d in 0..<dim:
+        query[d] = float32((q * 17 + d * 13) mod 1000) / 100.0'f32
+      discard vs.nearest(collName, query, K, dmCosine)
+    let secs = cpuTime() - t0
+    let ops = float(Q) / max(secs, 1e-9)
+
+    echo fmt"[bench][vectorstore] nearest(k={K}, dim={dim}, n={N})= {ops:>10.0f} queries/s"
+
+    check ops > 0
