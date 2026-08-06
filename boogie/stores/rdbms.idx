@@ -41,23 +41,23 @@ nim	`$`	boogie/stores/rdbms.html#$,Value	proc `$`(v: Value): string		339
 nim	row	boogie/stores/rdbms.html#row,openArray[]	proc row(pairs: openArray[(string, Value)]): RowData		349
 nim	hasTable	boogie/stores/rdbms.html#hasTable,Store,string	proc hasTable(s: Store; name: string): bool		354
 nim	createIndex	boogie/stores/rdbms.html#createIndex,DbTable,string	proc createIndex(t: DbTable; column: string)		405
-nim	checkpoint	boogie/stores/rdbms.html#checkpoint,Store	proc checkpoint(s: Store)		877
-nim	getTable	boogie/stores/rdbms.html#getTable,Store,string	proc getTable(s: Store; name: string): Option[DbTable]		887
-nim	createTable	boogie/stores/rdbms.html#createTable,Store,DbTable	proc createTable(s: Store; t: DbTable)		892
-nim	createTableIfNotExist	boogie/stores/rdbms.html#createTableIfNotExist,Store,DbTable	proc createTableIfNotExist(s: Store; t: DbTable)		900
-nim	dropTable	boogie/stores/rdbms.html#dropTable,Store,string	proc dropTable(s: Store; name: string)		905
-nim	isEmpty	boogie/stores/rdbms.html#isEmpty,DbTable	proc isEmpty(t: DbTable): bool		920
-nim	insertRow	boogie/stores/rdbms.html#insertRow,DbTable,string,RowData	proc insertRow(t: DbTable; pk: string; data: RowData)		924
-nim	deleteRow	boogie/stores/rdbms.html#deleteRow,DbTable,string	proc deleteRow(t: DbTable; pk: string): bool		928
-nim	getRow	boogie/stores/rdbms.html#getRow,DbTable,string	proc getRow(t: DbTable; pk: string): Option[RowData]		932
-nim	allRows	boogie/stores/rdbms.html#allRows.i,DbTable	iterator allRows(t: DbTable): (string, RowData)		940
-nim	allRowsByPk	boogie/stores/rdbms.html#allRowsByPk.i,DbTable	iterator allRowsByPk(t: DbTable): (string, RowData)		947
-nim	insertRow	boogie/stores/rdbms.html#insertRow,Store,string,string,RowData	proc insertRow(s: Store; tableName: string; pk: string; data: RowData)		952
-nim	insertRow	boogie/stores/rdbms.html#insertRow,DbTable,RowData	proc insertRow(t: DbTable; data: RowData): string		971
-nim	insertRow	boogie/stores/rdbms.html#insertRow,Store,string,RowData	proc insertRow(s: Store; tableName: string; data: RowData): string		977
-nim	deleteRow	boogie/stores/rdbms.html#deleteRow,Store,string,string	proc deleteRow(s: Store; tableName: string; pk: string): bool		999
-nim	getRow	boogie/stores/rdbms.html#getRow,Store,string,string	proc getRow(s: Store; tableName: string; pk: string): Option[RowData]		1015
+nim	checkpoint	boogie/stores/rdbms.html#checkpoint,Store	proc checkpoint(s: Store)		843
+nim	getTable	boogie/stores/rdbms.html#getTable,Store,string	proc getTable(s: Store; name: string): Option[DbTable]		853
+nim	createTable	boogie/stores/rdbms.html#createTable,Store,DbTable	proc createTable(s: Store; t: DbTable)		858
+nim	createTableIfNotExist	boogie/stores/rdbms.html#createTableIfNotExist,Store,DbTable	proc createTableIfNotExist(s: Store; t: DbTable)		866
+nim	dropTable	boogie/stores/rdbms.html#dropTable,Store,string	proc dropTable(s: Store; name: string)		871
+nim	isEmpty	boogie/stores/rdbms.html#isEmpty,DbTable	proc isEmpty(t: DbTable): bool		886
+nim	insertRow	boogie/stores/rdbms.html#insertRow,DbTable,string,RowData	proc insertRow(t: DbTable; pk: string; data: RowData)		890
+nim	deleteRow	boogie/stores/rdbms.html#deleteRow,DbTable,string	proc deleteRow(t: DbTable; pk: string): bool		895
+nim	getRow	boogie/stores/rdbms.html#getRow,DbTable,string	proc getRow(t: DbTable; pk: string): Option[RowData]		899
+nim	allRows	boogie/stores/rdbms.html#allRows.i,DbTable	iterator allRows(t: DbTable): (string, RowData)		907
+nim	allRowsByPk	boogie/stores/rdbms.html#allRowsByPk.i,DbTable	iterator allRowsByPk(t: DbTable): (string, RowData)		914
+nim	insertRow	boogie/stores/rdbms.html#insertRow,Store,string,string,RowData	proc insertRow(s: Store; tableName: string; pk: string; data: RowData)		919
+nim	insertRow	boogie/stores/rdbms.html#insertRow,DbTable,RowData	proc insertRow(t: DbTable; data: RowData): string		939
+nim	insertRow	boogie/stores/rdbms.html#insertRow,Store,string,RowData	proc insertRow(s: Store; tableName: string; data: RowData): string		946
+nim	deleteRow	boogie/stores/rdbms.html#deleteRow,Store,string,string	proc deleteRow(s: Store; tableName: string; pk: string): bool		969
+nim	getRow	boogie/stores/rdbms.html#getRow,Store,string,string	proc getRow(s: Store; tableName: string; pk: string): Option[RowData]		985
 nimgrp	==	boogie/stores/rdbms.html#==-procs-all	proc		158
-nimgrp	insertrow	boogie/stores/rdbms.html#insertRow-procs-all	proc		924
-nimgrp	deleterow	boogie/stores/rdbms.html#deleteRow-procs-all	proc		928
-nimgrp	getrow	boogie/stores/rdbms.html#getRow-procs-all	proc		932
+nimgrp	insertrow	boogie/stores/rdbms.html#insertRow-procs-all	proc		890
+nimgrp	deleterow	boogie/stores/rdbms.html#deleteRow-procs-all	proc		895
+nimgrp	getrow	boogie/stores/rdbms.html#getRow-procs-all	proc		899

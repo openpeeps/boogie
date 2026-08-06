@@ -94,6 +94,10 @@
   <li><a class="reference" href="#dropCollection%2CVectorStore%2Cstring" title="dropCollection(s: VectorStore; name: string)">dropCollection(s: VectorStore; name: string)</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">exportCollection
+  <li><a class="reference" href="#exportCollection%2CVectorStore%2Cstring%2Cstring" title="exportCollection(s: VectorStore; collection: string; path: string)">exportCollection(s: VectorStore; collection: string; path: string)</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">get
   <li><a class="reference" href="#get%2CVectorCollection%2Cstring" title="get(c: VectorCollection; pk: string): Option[seq[float32]]">get(c: VectorCollection; pk: string): Option[seq[float32]]</a></li>
 <li><a class="reference" href="#get%2CVectorStore%2Cstring%2Cstring" title="get(s: VectorStore; collection, pk: string): Option[seq[float32]]">get(s: VectorStore; collection, pk: string): Option[seq[float32]]</a></li>
@@ -195,7 +199,9 @@
   <span class="Identifier">dimension</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
   <dd>
     
-    Represents a collection of vectors, identified by a name and a fixed dimension. Each vector is associated with a primary key (pk) for lookup.
+    <p>Represents a collection of vectors, identified by a name and a fixed dimension. Each vector is associated with a primary key (pk) for lookup.</p>
+<p>Vectors are stored in a single flat <tt class="docutils literal"><span class="pre"><span class="Identifier">vecs</span></span></tt> buffer (stride = <tt class="docutils literal"><span class="pre"><span class="Identifier">dimension</span></span></tt>) with parallel <tt class="docutils literal"><span class="pre"><span class="Identifier">pks</span></span></tt>/<tt class="docutils literal"><span class="pre"><span class="Identifier">norms</span></span></tt> arrays for cache-friendly brute-force scans. <tt class="docutils literal"><span class="pre"><span class="Identifier">byPk</span></span></tt> maps a primary key to its row index; deletes use swap-with-last to keep the arrays dense.</p>
+
     
   </dd>
 </div>
@@ -279,6 +285,19 @@
   <dd>
     
     Drops the specified collection from the vector store, logging the operation in the WAL if enabled
+    
+  </dd>
+</div>
+
+</div>
+<div id="exportCollection-procs-all">
+  <div id="exportCollection,VectorStore,string,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#exportCollection%2CVectorStore%2Cstring%2Cstring"><span class="Identifier">exportCollection</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a><span class="Other">;</span> <span class="Identifier">collection</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">VectorStoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Exports the specified collection to a file in a simple text format, where each line contains the primary key and the corresponding vector serialized as a JSON array
     
   </dd>
 </div>
@@ -450,7 +469,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-05-14 10:15:02 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-06 12:11:16 UTC</small>
       </div>
     </div>
   </div>
