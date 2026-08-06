@@ -104,9 +104,9 @@
 <ul class="simple nested-toc-section">newKvStore
   <li><a class="reference" href="#newKvStore%2Cstring%2CKvStorageMode%2Cbool%2Cuint32%2Cuint32" title="newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;
            checkpointEveryOps: uint32 = 0'u32;
-           walFlushEveryOps: uint32 = 1000'u32): KvStore">newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;
+           walFlushEveryOps: uint32 = 1000'u32; lazyReads = false): KvStore">newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;
            checkpointEveryOps: uint32 = 0'u32;
-           walFlushEveryOps: uint32 = 1000'u32): KvStore</a></li>
+           walFlushEveryOps: uint32 = 1000'u32; lazyReads = false): KvStore</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">put
@@ -115,6 +115,10 @@
 </ul>
 <ul class="simple nested-toc-section">recoverFromWal
   <li><a class="reference" href="#recoverFromWal%2CKvStore" title="recoverFromWal(s: KvStore)">recoverFromWal(s: KvStore)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">retainedValueBytes
+  <li><a class="reference" href="#retainedValueBytes%2CKvStore" title="retainedValueBytes(s: KvStore): int64">retainedValueBytes(s: KvStore): int64</a></li>
 
 </ul>
 
@@ -185,7 +189,8 @@
     <div id="checkpoint-procs-all">
   <div id="checkpoint,KvStore">
   <dt><pre><span class="Keyword">proc</span> <a href="#checkpoint%2CKvStore"><span class="Identifier">checkpoint</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#KvStore"><span class="Identifier">KvStore</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
-    <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span>
+                              <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Forces a checkpoint (snapshot) to be taken immediately. This can be used to ensure that all operations up to the current LSN are persisted to disk, which can speed up recovery time in case of a crash. If WAL is enabled, the WAL is flushed before taking the snapshot to ensure durability.
@@ -211,8 +216,8 @@
 </div>
 <div id="get-procs-all">
   <div id="get,KvStore,string">
-  <dt><pre><span class="Keyword">proc</span> <a href="#get%2CKvStore%2Cstring"><span class="Identifier">get</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#KvStore"><span class="Identifier">KvStore</span></a><span class="Other">;</span> <span class="Identifier">key</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">Option</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#get%2CKvStore%2Cstring"><span class="Identifier">get</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#KvStore"><span class="Identifier">KvStore</span></a><span class="Other">;</span> <span class="Identifier">key</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">Option</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Retrieves the value for the given key, if it exists. Returns <tt class="docutils literal"><span class="pre"><span class="Identifier">none</span></span></tt> if the key is not found.
@@ -271,12 +276,14 @@
   <div id="newKvStore,string,KvStorageMode,bool,uint32,uint32">
   <dt><pre><span class="Keyword">proc</span> <a href="#newKvStore%2Cstring%2CKvStorageMode%2Cbool%2Cuint32%2Cuint32"><span class="Identifier">newKvStore</span></a><span class="Other">(</span><span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">mode</span><span class="Other">:</span> <a href="#KvStorageMode"><span class="Identifier">KvStorageMode</span></a> <span class="Other">=</span> <span class="Identifier">ksmDisk</span><span class="Other">;</span>
                 <span class="Identifier">enableWal</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">;</span> <span class="Identifier">checkpointEveryOps</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span class="Other">=</span> <span class="DecNumber">0'u32</span><span class="Other">;</span>
-                <span class="Identifier">walFlushEveryOps</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span class="Other">=</span> <span class="DecNumber">1000'u32</span><span class="Other">)</span><span class="Other">:</span> <a href="#KvStore"><span class="Identifier">KvStore</span></a> {.
+                <span class="Identifier">walFlushEveryOps</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span class="Other">=</span> <span class="DecNumber">1000'u32</span><span class="Other">;</span> <span class="Identifier">lazyReads</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span><span class="Other">:</span> <a href="#KvStore"><span class="Identifier">KvStore</span></a> {.
     <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KvStoreError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    Creates a new key-value store. If <tt class="docutils literal"><span class="pre"><span class="Identifier">mode</span></span></tt> is <tt class="docutils literal"><span class="pre"><span class="Identifier">ksmDisk</span></span></tt>, a file-based store is created at the given <tt class="docutils literal"><span class="pre"><span class="Identifier">path</span></span></tt>. If <tt class="docutils literal"><span class="pre"><span class="Identifier">enableWal</span></span></tt> is true, write-ahead logging is enabled for durability. The <tt class="docutils literal"><span class="pre"><span class="Identifier">checkpointEveryOps</span></span></tt> parameter controls how often a checkpoint (snapshot) is taken after a certain number of operations, while <tt class="docutils literal"><span class="pre"><span class="Identifier">walFlushEveryOps</span></span></tt> controls how often the WAL is flushed to disk.
+    <p>Creates a new key-value store. If <tt class="docutils literal"><span class="pre"><span class="Identifier">mode</span></span></tt> is <tt class="docutils literal"><span class="pre"><span class="Identifier">ksmDisk</span></span></tt>, a file-based store is created at the given <tt class="docutils literal"><span class="pre"><span class="Identifier">path</span></span></tt>. If <tt class="docutils literal"><span class="pre"><span class="Identifier">enableWal</span></span></tt> is true, write-ahead logging is enabled for durability. The <tt class="docutils literal"><span class="pre"><span class="Identifier">checkpointEveryOps</span></span></tt> parameter controls how often a checkpoint (snapshot) is taken after a certain number of operations, while <tt class="docutils literal"><span class="pre"><span class="Identifier">walFlushEveryOps</span></span></tt> controls how often the WAL is flushed to disk.</p>
+<p>With <tt class="docutils literal"><span class="pre"><span class="Identifier">lazyReads</span> <span class="Operator">=</span> <span class="Identifier">true</span></span></tt> the store keeps only a key -&gt; offset index in memory (WAL-only durability, no snapshots) and reads values back from the WAL on demand. This trades read latency for a small memory footprint on large datasets.</p>
+
     
   </dd>
 </div>
@@ -298,12 +305,23 @@
 </div>
 <div id="recoverFromWal-procs-all">
   <div id="recoverFromWal,KvStore">
-  <dt><pre><span class="Keyword">proc</span> <a href="#recoverFromWal%2CKvStore"><span class="Identifier">recoverFromWal</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#KvStore"><span class="Identifier">KvStore</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">KvStoreError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span>
-    <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span>
-                                <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#recoverFromWal%2CKvStore"><span class="Identifier">recoverFromWal</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#KvStore"><span class="Identifier">KvStore</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">KvStoreError</span><span class="Other">,</span>
+    <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">,</span>
+                                <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
+    
+  </dd>
+</div>
+
+</div>
+<div id="retainedValueBytes-procs-all">
+  <div id="retainedValueBytes,KvStore">
+  <dt><pre><span class="Keyword">proc</span> <a href="#retainedValueBytes%2CKvStore"><span class="Identifier">retainedValueBytes</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#KvStore"><span class="Identifier">KvStore</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int64</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Total bytes of value payloads currently held in memory. In lazy-read mode this is always 0 — values live in the WAL and are read back on demand.
     
   </dd>
 </div>
@@ -317,8 +335,8 @@
   <dl class="item">
     <div id="pairsUnordered-iterators-all">
   <div id="pairsUnordered.i,KvStore">
-  <dt><pre><span class="Keyword">iterator</span> <a href="#pairsUnordered.i%2CKvStore"><span class="Identifier">pairsUnordered</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#KvStore"><span class="Identifier">KvStore</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">iterator</span> <a href="#pairsUnordered.i%2CKvStore"><span class="Identifier">pairsUnordered</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#KvStore"><span class="Identifier">KvStore</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">)</span> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Iterates over all key-value pairs in the store in no particular order.
@@ -337,7 +355,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-06 12:11:16 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-06 13:24:00 UTC</small>
       </div>
     </div>
   </div>

@@ -1,17 +1,21 @@
 nimTitle	wal	boogie/wal.html	module boogie/wal		0
-nim	woCreateTable	boogie/wal.html#woCreateTable	WalOp.woCreateTable		30
-nim	woDropTable	boogie/wal.html#woDropTable	WalOp.woDropTable		30
-nim	woInsertRow	boogie/wal.html#woInsertRow	WalOp.woInsertRow		30
-nim	woDeleteRow	boogie/wal.html#woDeleteRow	WalOp.woDeleteRow		30
-nim	woUpdateRow	boogie/wal.html#woUpdateRow	WalOp.woUpdateRow		30
-nim	WalOp	boogie/wal.html#WalOp	enum WalOp		30
-nim	WalEntry	boogie/wal.html#WalEntry	object WalEntry		38
-nim	Wal	boogie/wal.html#Wal	object Wal		53
-nim	WalError	boogie/wal.html#WalError	object WalError		72
-nim	WalMagic	boogie/wal.html#WalMagic	let WalMagic		74
-nim	openWal	boogie/wal.html#openWal,string	proc openWal(path: string): Wal		208
-nim	flush	boogie/wal.html#flush,Wal	proc flush(w: var Wal)		218
-nim	append	boogie/wal.html#append,Wal,WalEntry,bool	proc append(w: var Wal; entry: WalEntry; sync: bool = true): uint64		232
-nim	replay	boogie/wal.html#replay,Wal,proc(WalEntry)	proc replay(w: Wal; onEntry: proc (e: WalEntry))		246
-nim	reset	boogie/wal.html#reset,Wal	proc reset(w: var Wal)		260
-nim	entries	boogie/wal.html#entries.i,Wal	iterator entries(w: Wal): WalEntry		268
+nim	woCreateTable	boogie/wal.html#woCreateTable	WalOp.woCreateTable		35
+nim	woDropTable	boogie/wal.html#woDropTable	WalOp.woDropTable		35
+nim	woInsertRow	boogie/wal.html#woInsertRow	WalOp.woInsertRow		35
+nim	woDeleteRow	boogie/wal.html#woDeleteRow	WalOp.woDeleteRow		35
+nim	woUpdateRow	boogie/wal.html#woUpdateRow	WalOp.woUpdateRow		35
+nim	WalOp	boogie/wal.html#WalOp	enum WalOp		35
+nim	WalEntry	boogie/wal.html#WalEntry	object WalEntry		43
+nim	Wal	boogie/wal.html#Wal	object Wal		64
+nim	WalError	boogie/wal.html#WalError	object WalError		85
+nim	WalMagic	boogie/wal.html#WalMagic	let WalMagic		87
+nim	openWal	boogie/wal.html#openWal,string	proc openWal(path: string): Wal		321
+nim	openLog	boogie/wal.html#openLog,Wal	proc openLog(w: var Wal)		338
+nim	logPos	boogie/wal.html#logPos,Wal	proc logPos(w: Wal): int64		343
+nim	flush	boogie/wal.html#flush,Wal	proc flush(w: var Wal)		350
+nim	append	boogie/wal.html#append,Wal,WalEntry,bool	proc append(w: var Wal; entry: WalEntry; sync: bool = true): uint64		373
+nim	replay	boogie/wal.html#replay,Wal,proc(WalEntry)	proc replay(w: Wal; onEntry: proc (e: WalEntry))		387
+nim	readEntryAt	boogie/wal.html#readEntryAt,Wal,int64	proc readEntryAt(w: Wal; offset: int64): WalEntry		401
+nim	reset	boogie/wal.html#reset,Wal	proc reset(w: var Wal)		413
+nim	entries	boogie/wal.html#entries.i,Wal	iterator entries(w: Wal): WalEntry		424
+nim	entriesWithOffsets	boogie/wal.html#entriesWithOffsets.i,Wal	iterator entriesWithOffsets(w: Wal): (int64, WalEntry)		439

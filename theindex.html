@@ -303,6 +303,10 @@
 <li><a class="reference external"
           data-doc-search-tag="wal: iterator entries(w: Wal): WalEntry" href="boogie/wal.html#entries.i%2CWal">wal: iterator entries(w: Wal): WalEntry</a></li>
           </ul></dd>
+<dt><a name="entriesWithOffsets" href="#entriesWithOffsets"><span>entriesWithOffsets:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="wal: iterator entriesWithOffsets(w: Wal): (int64, WalEntry)" href="boogie/wal.html#entriesWithOffsets.i%2CWal">wal: iterator entriesWithOffsets(w: Wal): (int64, WalEntry)</a></li>
+          </ul></dd>
 <dt><a name="exportCollection" href="#exportCollection"><span>exportCollection:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc exportCollection(s: VectorStore; collection: string; path: string)" href="boogie/stores/vectorstore.html#exportCollection%2CVectorStore%2Cstring%2Cstring">vectorstore: proc exportCollection(s: VectorStore; collection: string; path: string)</a></li>
@@ -441,7 +445,7 @@
        enc: DocumentEncoding = deJson)" href="boogie/stores/docstore.html#insert%2CDocumentStore%2Cstring%2CJsonNode%2CDocumentEncoding">docstore: proc insert(store: var DocumentStore; key: string; doc: JsonNode; sync = true;
        enc: DocumentEncoding = deJson)</a></li>
           <li><a class="reference external"
-          data-doc-search-tag="vectorstore: proc insert(s: VectorStore; collection, pk: string; vec: seq[float32])" href="boogie/stores/vectorstore.html#insert%2CVectorStore%2Cstring%2Cstring%2Cseq%5Bfloat32%5D">vectorstore: proc insert(s: VectorStore; collection, pk: string; vec: seq[float32])</a></li>
+          data-doc-search-tag="vectorstore: proc insert(s: VectorStore; collection, pk: string; vec: seq[float32]; partition = &quot;&quot;)" href="boogie/stores/vectorstore.html#insert%2CVectorStore%2Cstring%2Cstring%2Cseq%5Bfloat32%5D%2Cstring">vectorstore: proc insert(s: VectorStore; collection, pk: string; vec: seq[float32]; partition = &quot;&quot;)</a></li>
           </ul></dd>
 <dt><a name="insertBatch" href="#insertBatch"><span>insertBatch:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -520,16 +524,26 @@
           data-doc-search-tag="docstore: proc len(store: DocumentStore): int" href="boogie/stores/docstore.html#len%2CDocumentStore">docstore: proc len(store: DocumentStore): int</a></li>
           <li><a class="reference external"
           data-doc-search-tag="kv: proc len(s: KvStore): int" href="boogie/stores/kv.html#len%2CKvStore">kv: proc len(s: KvStore): int</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc len(c: VectorCollection): int" href="boogie/stores/vectorstore.html#len%2CVectorCollection">vectorstore: proc len(c: VectorCollection): int</a></li>
+          </ul></dd>
+<dt><a name="logPos" href="#logPos"><span>logPos:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="wal: proc logPos(w: Wal): int64" href="boogie/wal.html#logPos%2CWal">wal: proc logPos(w: Wal): int64</a></li>
           </ul></dd>
 <dt><a name="nearest" href="#nearest"><span>nearest:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc nearest(c: VectorCollection; query: seq[float32]; k: int;
-        metric: DistanceMetric = dmCosine): seq[(string, float32)]" href="boogie/stores/vectorstore.html#nearest%2CVectorCollection%2Cseq%5Bfloat32%5D%2Cint%2CDistanceMetric">vectorstore: proc nearest(c: VectorCollection; query: seq[float32]; k: int;
-        metric: DistanceMetric = dmCosine): seq[(string, float32)]</a></li>
+        metric: DistanceMetric = dmCosine; partition = &quot;&quot;): seq[
+    (string, float32)]" href="boogie/stores/vectorstore.html#nearest%2CVectorCollection%2Cseq%5Bfloat32%5D%2Cint%2CDistanceMetric%2Cstring">vectorstore: proc nearest(c: VectorCollection; query: seq[float32]; k: int;
+        metric: DistanceMetric = dmCosine; partition = &quot;&quot;): seq[
+    (string, float32)]</a></li>
           <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc nearest(s: VectorStore; collection: string; query: seq[float32]; k: int;
-        metric: DistanceMetric = dmCosine): seq[(string, float32)]" href="boogie/stores/vectorstore.html#nearest%2CVectorStore%2Cstring%2Cseq%5Bfloat32%5D%2Cint%2CDistanceMetric">vectorstore: proc nearest(s: VectorStore; collection: string; query: seq[float32]; k: int;
-        metric: DistanceMetric = dmCosine): seq[(string, float32)]</a></li>
+        metric: DistanceMetric = dmCosine; partition = &quot;&quot;): seq[
+    (string, float32)]" href="boogie/stores/vectorstore.html#nearest%2CVectorStore%2Cstring%2Cseq%5Bfloat32%5D%2Cint%2CDistanceMetric%2Cstring">vectorstore: proc nearest(s: VectorStore; collection: string; query: seq[float32]; k: int;
+        metric: DistanceMetric = dmCosine; partition = &quot;&quot;): seq[
+    (string, float32)]</a></li>
           </ul></dd>
 <dt><a name="neighbors" href="#neighbors"><span>neighbors:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -581,9 +595,9 @@
 <li><a class="reference external"
           data-doc-search-tag="kv: proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;
            checkpointEveryOps: uint32 = 0'u32;
-           walFlushEveryOps: uint32 = 1000'u32): KvStore" href="boogie/stores/kv.html#newKvStore%2Cstring%2CKvStorageMode%2Cbool%2Cuint32%2Cuint32">kv: proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;
+           walFlushEveryOps: uint32 = 1000'u32; lazyReads = false): KvStore" href="boogie/stores/kv.html#newKvStore%2Cstring%2CKvStorageMode%2Cbool%2Cuint32%2Cuint32">kv: proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;
            checkpointEveryOps: uint32 = 0'u32;
-           walFlushEveryOps: uint32 = 1000'u32): KvStore</a></li>
+           walFlushEveryOps: uint32 = 1000'u32; lazyReads = false): KvStore</a></li>
           </ul></dd>
 <dt><a name="newNullValue" href="#newNullValue"><span>newNullValue:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -637,6 +651,10 @@
 <li><a class="reference external"
           data-doc-search-tag="graphstore: proc openGraphStore(rootDir: string): GraphStore" href="boogie/stores/graphstore.html#openGraphStore%2Cstring">graphstore: proc openGraphStore(rootDir: string): GraphStore</a></li>
           </ul></dd>
+<dt><a name="openLog" href="#openLog"><span>openLog:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="wal: proc openLog(w: var Wal)" href="boogie/wal.html#openLog%2CWal">wal: proc openLog(w: var Wal)</a></li>
+          </ul></dd>
 <dt><a name="openWal" href="#openWal"><span>openWal:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: proc openWal(path: string): Wal" href="boogie/wal.html#openWal%2Cstring">wal: proc openWal(path: string): Wal</a></li>
@@ -652,6 +670,10 @@
 <dt><a name="pairsUnordered" href="#pairsUnordered"><span>pairsUnordered:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="kv: iterator pairsUnordered(s: KvStore): (string, string)" href="boogie/stores/kv.html#pairsUnordered.i%2CKvStore">kv: iterator pairsUnordered(s: KvStore): (string, string)</a></li>
+          </ul></dd>
+<dt><a name="partitionSize" href="#partitionSize"><span>partitionSize:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc partitionSize(c: VectorCollection; partition: string): int" href="boogie/stores/vectorstore.html#partitionSize%2CVectorCollection%2Cstring">vectorstore: proc partitionSize(c: VectorCollection; partition: string): int</a></li>
           </ul></dd>
 <dt><a name="pkmManual" href="#pkmManual"><span>pkmManual:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -675,6 +697,10 @@
                                sync = true; enc: DocumentEncoding = deJson)" href="boogie/stores/docstore.html#putObj%2CDocumentStore%2Cstring%2CT%2CDocumentEncoding">docstore: proc putObj[T: object | ref object](store: var DocumentStore; key: string; value: T;
                                sync = true; enc: DocumentEncoding = deJson)</a></li>
           </ul></dd>
+<dt><a name="readEntryAt" href="#readEntryAt"><span>readEntryAt:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="wal: proc readEntryAt(w: Wal; offset: int64): WalEntry" href="boogie/wal.html#readEntryAt%2CWal%2Cint64">wal: proc readEntryAt(w: Wal; offset: int64): WalEntry</a></li>
+          </ul></dd>
 <dt><a name="recoverFromWal" href="#recoverFromWal"><span>recoverFromWal:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="docstore: proc recoverFromWal(s: var DocumentStore)" href="boogie/stores/docstore.html#recoverFromWal%2CDocumentStore">docstore: proc recoverFromWal(s: var DocumentStore)</a></li>
@@ -696,6 +722,10 @@
 <dt><a name="reset" href="#reset"><span>reset:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: proc reset(w: var Wal)" href="boogie/wal.html#reset%2CWal">wal: proc reset(w: var Wal)</a></li>
+          </ul></dd>
+<dt><a name="retainedValueBytes" href="#retainedValueBytes"><span>retainedValueBytes:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="kv: proc retainedValueBytes(s: KvStore): int64" href="boogie/stores/kv.html#retainedValueBytes%2CKvStore">kv: proc retainedValueBytes(s: KvStore): int64</a></li>
           </ul></dd>
 <dt><a name="rollback" href="#rollback"><span>rollback:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -841,7 +871,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-06 12:11:16 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-06 13:24:00 UTC</small>
       </div>
     </div>
   </div>

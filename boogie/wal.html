@@ -74,7 +74,8 @@
                                  ## However, once entries are flushed to disk, they are durable and will be replayed on recovery.">Wal</a></li>
 <li><a class="reference" href="#WalEntry" title="WalEntry = object
   lsn*: uint64               ## Log Sequence Number, a monotonically increasing identifier for each log entry
-  tsUnix*: int64             ## Timestamp of the log entry in Unix time (seconds since epoch)
+  tsUnix*: int64 ## Timestamp of the log entry in Unix time (seconds since epoch). Stamped once per
+                 ## flush batch so group commits do not pay a clock read per append.
   op*: WalOp                 ## The type of operation (e.g. insert, update, delete)
   table*: string             ## The name of the affected table
   pk*: string                ## The primary key of the affected row (if applicable)
@@ -90,7 +91,7 @@
   <details open>
     <summary><a class="reference reference-toplevel" href="#9" id="59">Lets</a></summary>
     <ul class="simple simple-toc-section">
-      <li><a class="reference" href="#WalMagic" title="WalMagic = &quot;BOGWAL2\x00&quot;">WalMagic</a></li>
+      <li><a class="reference" href="#WalMagic" title="WalMagic = &quot;BOGWAL3\x00&quot;">WalMagic</a></li>
 
     </ul>
   </details>
@@ -107,8 +108,20 @@
   <li><a class="reference" href="#flush%2CWal" title="flush(w: var Wal)">flush(w: var Wal)</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">logPos
+  <li><a class="reference" href="#logPos%2CWal" title="logPos(w: Wal): int64">logPos(w: Wal): int64</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">openLog
+  <li><a class="reference" href="#openLog%2CWal" title="openLog(w: var Wal)">openLog(w: var Wal)</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">openWal
   <li><a class="reference" href="#openWal%2Cstring" title="openWal(path: string): Wal">openWal(path: string): Wal</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">readEntryAt
+  <li><a class="reference" href="#readEntryAt%2CWal%2Cint64" title="readEntryAt(w: Wal; offset: int64): WalEntry">readEntryAt(w: Wal; offset: int64): WalEntry</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">replay
@@ -131,6 +144,10 @@
   <li><a class="reference" href="#entries.i%2CWal" title="entries(w: Wal): WalEntry">entries(w: Wal): WalEntry</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">entriesWithOffsets
+  <li><a class="reference" href="#entriesWithOffsets.i%2CWal" title="entriesWithOffsets(w: Wal): (int64, WalEntry)">entriesWithOffsets(w: Wal): (int64, WalEntry)</a></li>
+
+</ul>
 
     </ul>
   </details>
@@ -144,7 +161,8 @@
     <div id="tocRoot"></div>
     
     <p class="module-desc"><p>This module implements a simple write-ahead log (WAL) for durability in the Boogie database. The WAL is designed to be simple and efficient, supporting group commits and crash recovery.</p>
-<p>The WAL file format is binary and consists of a magic signature, followed by a sequence of log entries. Each entry includes a log sequence number (LSN), a timestamp, an operation type, the affected table and primary key, and a payload (e.g. the row data for inserts/updates).</p>
+<p>The WAL file format is binary and consists of a magic signature, followed by a sequence of framed log records. Each record is wrapped as <tt class="docutils literal"><span class="pre"><span class="Operator">@</span> <span class="Operator">&lt;</span><span class="Identifier">u32</span> <span class="Identifier">len</span><span class="Operator">&gt;</span> <span class="Operator">&lt;</span><span class="Identifier">u32</span> <span class="Identifier">crc32</span><span class="Operator">&gt;</span> <span class="Operator">&lt;</span><span class="Identifier">body</span><span class="Operator">&gt;</span></span></tt>, where the body is the entry fields (LSN, timestamp, operation, table, primary key, payload). A successful flush ends with a <tt class="docutils literal"><span class="pre"><span class="Operator">!</span> <span class="Operator">&lt;</span><span class="Identifier">u64</span> <span class="Identifier">lastLsn</span><span class="Operator">&gt;</span></span></tt> footer, giving O(1) recovery of the next LSN on open and a well-defined boundary after every group commit.</p>
+<p>The log file handle is kept open across flushes (lazily opened on first use) to avoid the open/close syscall cost per flush, and a whole batch is written as one buffered write.</p>
 <p>The main types are:</p>
 <ul class="simple"><li><tt class="docutils literal"><span class="pre"><span class="Identifier">WalOp</span></span></tt>: an enum of the supported operations (create table, drop table, insert row, delete row, update row)</li>
 <li><tt class="docutils literal"><span class="pre"><span class="Identifier">WalEntry</span></span></tt>: a record representing a single log entry</li>
@@ -153,7 +171,7 @@
 <p>The WAL supports the following operations:</p>
 <ul class="simple"><li><tt class="docutils literal"><span class="pre"><span class="Identifier">openWal</span><span class="Punctuation">(</span><span class="Identifier">path</span><span class="Punctuation">)</span></span></tt>: opens or creates a WAL file at the given path</li>
 <li><tt class="docutils literal"><span class="pre"><span class="Identifier">append</span><span class="Punctuation">(</span><span class="Identifier">wal</span><span class="Punctuation">,</span> <span class="Identifier">entry</span><span class="Punctuation">,</span> <span class="Identifier">sync</span><span class="Punctuation">)</span></span></tt>: appends an entry to the WAL, optionally flushing to disk immediately</li>
-<li><tt class="docutils literal"><span class="pre"><span class="Identifier">flush</span><span class="Punctuation">(</span><span class="Identifier">wal</span><span class="Punctuation">)</span></span></tt>: flushes any pending entries to disk</li>
+<li><tt class="docutils literal"><span class="pre"><span class="Identifier">flush</span><span class="Punctuation">(</span><span class="Identifier">wal</span><span class="Punctuation">)</span></span></tt>: flushes any pending entries to disk as one batch</li>
 <li><tt class="docutils literal"><span class="pre"><span class="Identifier">replay</span><span class="Punctuation">(</span><span class="Identifier">wal</span><span class="Punctuation">,</span> <span class="Identifier">onEntry</span><span class="Punctuation">)</span></span></tt>: replays the WAL entries by calling the provided callback for each entry</li>
 <li><tt class="docutils literal"><span class="pre"><span class="Identifier">reset</span><span class="Punctuation">(</span><span class="Identifier">wal</span><span class="Punctuation">)</span></span></tt>: resets the WAL by clearing pending entries and writing a new header</li>
 <li><tt class="docutils literal"><span class="pre"><span class="Identifier">entries</span><span class="Punctuation">(</span><span class="Identifier">wal</span><span class="Punctuation">)</span></span></tt>: an iterator over all entries in the WAL file</li>
@@ -186,7 +204,8 @@
 <div id="WalEntry">
   <dt><pre><a href="#WalEntry"><span class="Identifier">WalEntry</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
   <span class="Identifier">lsn</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">uint64</span>               <span class="Comment">## Log Sequence Number, a monotonically increasing identifier for each log entry</span>
-  <span class="Identifier">tsUnix</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int64</span>             <span class="Comment">## Timestamp of the log entry in Unix time (seconds since epoch)</span>
+  <span class="Identifier">tsUnix</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int64</span> <span class="Comment">## Timestamp of the log entry in Unix time (seconds since epoch). Stamped once per</span>
+                 <span class="Comment">## flush batch so group commits do not pay a clock read per append.</span>
   <span class="Identifier">op</span><span class="Operator">*</span><span class="Other">:</span> <a href="#WalOp"><span class="Identifier">WalOp</span></a>                 <span class="Comment">## The type of operation (e.g. insert, update, delete)</span>
   <span class="Identifier">table</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>             <span class="Comment">## The name of the affected table</span>
   <span class="Identifier">pk</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>                <span class="Comment">## The primary key of the affected row (if applicable)</span>
@@ -221,7 +240,7 @@
   <h1><a class="toc-backref" href="#9">Lets</a></h1>
   <dl class="item">
     <div id="WalMagic">
-  <dt><pre><a href="#WalMagic"><span class="Identifier">WalMagic</span></a> <span class="Other">=</span> <span class="StringLit">&quot;BOGWAL2\x00&quot;</span></pre></dt>
+  <dt><pre><a href="#WalMagic"><span class="Identifier">WalMagic</span></a> <span class="Other">=</span> <span class="StringLit">&quot;BOGWAL3\x00&quot;</span></pre></dt>
   <dd>
     
     magic string to identify our WAL files and version, also serves as a simple integrity check on open
@@ -240,7 +259,7 @@
     <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    Appends a new entry to the WAL. The entry is assigned the next LSN and timestamp, and added to the pending entries buffer.
+    Appends a new entry to the WAL. The entry is assigned the next LSN and added to the pending entries buffer. Timestamps are stamped once per flush batch instead of per append.
     
   </dd>
 </div>
@@ -248,11 +267,33 @@
 </div>
 <div id="flush-procs-all">
   <div id="flush,Wal">
-  <dt><pre><span class="Keyword">proc</span> <a href="#flush%2CWal"><span class="Identifier">flush</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#Wal"><span class="Identifier">Wal</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span>
-                         <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#flush%2CWal"><span class="Identifier">flush</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#Wal"><span class="Identifier">Wal</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span>
+                         <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    Flushes any pending entries to disk. This is typically called after a group of operations have been appended
+    Flushes any pending entries to disk as a single batch, then writes the batch footer. The log file handle stays open across calls.
+    
+  </dd>
+</div>
+
+</div>
+<div id="logPos-procs-all">
+  <div id="logPos,Wal">
+  <dt><pre><span class="Keyword">proc</span> <a href="#logPos%2CWal"><span class="Identifier">logPos</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <a href="#Wal"><span class="Identifier">Wal</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int64</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    File offset where the next appended record will be written, or -1 if the persistent log handle is not yet open. With <tt class="docutils literal"><span class="pre"><span class="Identifier">sync</span></span></tt> appends this is the record's stable offset.
+    
+  </dd>
+</div>
+
+</div>
+<div id="openLog-procs-all">
+  <div id="openLog,Wal">
+  <dt><pre><span class="Keyword">proc</span> <a href="#openLog%2CWal"><span class="Identifier">openLog</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#Wal"><span class="Identifier">Wal</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Eagerly opens the persistent log handle, positioned at the current end of the file. Used by lazy-read stores that need <tt class="docutils literal"><span class="pre"><span class="Identifier">logPos</span></span></tt> before the first append.
     
   </dd>
 </div>
@@ -267,6 +308,18 @@
     <p>Opens or creates a WAL file at the given path. If the file already exists, it reads the header and computes the next LSN based on the existing entries.</p>
 <p>If the file does not exist or is empty, it initializes a new WAL file with the correct header and starts with LSN 1.</p>
 
+    
+  </dd>
+</div>
+
+</div>
+<div id="readEntryAt-procs-all">
+  <div id="readEntryAt,Wal,int64">
+  <dt><pre><span class="Keyword">proc</span> <a href="#readEntryAt%2CWal%2Cint64"><span class="Identifier">readEntryAt</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <a href="#Wal"><span class="Identifier">Wal</span></a><span class="Other">;</span> <span class="Identifier">offset</span><span class="Other">:</span> <span class="Identifier">int64</span><span class="Other">)</span><span class="Other">:</span> <a href="#WalEntry"><span class="Identifier">WalEntry</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Random-access read of a single entry by its record's file offset. The offset is the record start (as returned by <tt class="docutils literal"><span class="pre"><span class="Identifier">logPos</span></span></tt>); the CRC frame makes the read self-contained.
     
   </dd>
 </div>
@@ -316,6 +369,19 @@
 </div>
 
 </div>
+<div id="entriesWithOffsets-iterators-all">
+  <div id="entriesWithOffsets.i,Wal">
+  <dt><pre><span class="Keyword">iterator</span> <a href="#entriesWithOffsets.i%2CWal"><span class="Identifier">entriesWithOffsets</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <a href="#Wal"><span class="Identifier">Wal</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Other">(</span><span class="Identifier">int64</span><span class="Other">,</span> <a href="#WalEntry"><span class="Identifier">WalEntry</span></a><span class="Other">)</span> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    An iterator over all entries in the WAL file together with the file offset of each entry's record. Used by lazy-read stores to build a key -&gt; offset index during recovery.
+    
+  </dd>
+</div>
+
+</div>
 
   </dl>
 </div>
@@ -326,7 +392,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-06 12:11:16 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-06 13:23:59 UTC</small>
       </div>
     </div>
   </div>

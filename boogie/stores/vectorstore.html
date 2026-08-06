@@ -112,16 +112,24 @@
 
 </ul>
 <ul class="simple nested-toc-section">insert
-  <li><a class="reference" href="#insert%2CVectorStore%2Cstring%2Cstring%2Cseq%5Bfloat32%5D" title="insert(s: VectorStore; collection, pk: string; vec: seq[float32])">insert(s: VectorStore; collection, pk: string; vec: seq[float32])</a></li>
+  <li><a class="reference" href="#insert%2CVectorStore%2Cstring%2Cstring%2Cseq%5Bfloat32%5D%2Cstring" title="insert(s: VectorStore; collection, pk: string; vec: seq[float32]; partition = &quot;&quot;)">insert(s: VectorStore; collection, pk: string; vec: seq[float32]; partition = &quot;&quot;)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">len
+  <li><a class="reference" href="#len%2CVectorCollection" title="len(c: VectorCollection): int">len(c: VectorCollection): int</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">nearest
-  <li><a class="reference" href="#nearest%2CVectorCollection%2Cseq%5Bfloat32%5D%2Cint%2CDistanceMetric" title="nearest(c: VectorCollection; query: seq[float32]; k: int;
-        metric: DistanceMetric = dmCosine): seq[(string, float32)]">nearest(c: VectorCollection; query: seq[float32]; k: int;
-        metric: DistanceMetric = dmCosine): seq[(string, float32)]</a></li>
-<li><a class="reference" href="#nearest%2CVectorStore%2Cstring%2Cseq%5Bfloat32%5D%2Cint%2CDistanceMetric" title="nearest(s: VectorStore; collection: string; query: seq[float32]; k: int;
-        metric: DistanceMetric = dmCosine): seq[(string, float32)]">nearest(s: VectorStore; collection: string; query: seq[float32]; k: int;
-        metric: DistanceMetric = dmCosine): seq[(string, float32)]</a></li>
+  <li><a class="reference" href="#nearest%2CVectorCollection%2Cseq%5Bfloat32%5D%2Cint%2CDistanceMetric%2Cstring" title="nearest(c: VectorCollection; query: seq[float32]; k: int;
+        metric: DistanceMetric = dmCosine; partition = &quot;&quot;): seq[
+    (string, float32)]">nearest(c: VectorCollection; query: seq[float32]; k: int;
+        metric: DistanceMetric = dmCosine; partition = &quot;&quot;): seq[
+    (string, float32)]</a></li>
+<li><a class="reference" href="#nearest%2CVectorStore%2Cstring%2Cseq%5Bfloat32%5D%2Cint%2CDistanceMetric%2Cstring" title="nearest(s: VectorStore; collection: string; query: seq[float32]; k: int;
+        metric: DistanceMetric = dmCosine; partition = &quot;&quot;): seq[
+    (string, float32)]">nearest(s: VectorStore; collection: string; query: seq[float32]; k: int;
+        metric: DistanceMetric = dmCosine; partition = &quot;&quot;): seq[
+    (string, float32)]</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">newCollection
@@ -138,6 +146,10 @@
                walFlushEveryOps: uint32 = 1000'u32): VectorStore">newVectorStore(path: string; mode: VectorStorageMode = smDisk;
                enableWal: bool = true; checkpointEveryOps: uint32 = 0'u32;
                walFlushEveryOps: uint32 = 1000'u32): VectorStore</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">partitionSize
+  <li><a class="reference" href="#partitionSize%2CVectorCollection%2Cstring" title="partitionSize(c: VectorCollection; partition: string): int">partitionSize(c: VectorCollection; partition: string): int</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">recoverFromWal
@@ -201,6 +213,7 @@
     
     <p>Represents a collection of vectors, identified by a name and a fixed dimension. Each vector is associated with a primary key (pk) for lookup.</p>
 <p>Vectors are stored in a single flat <tt class="docutils literal"><span class="pre"><span class="Identifier">vecs</span></span></tt> buffer (stride = <tt class="docutils literal"><span class="pre"><span class="Identifier">dimension</span></span></tt>) with parallel <tt class="docutils literal"><span class="pre"><span class="Identifier">pks</span></span></tt>/<tt class="docutils literal"><span class="pre"><span class="Identifier">norms</span></span></tt> arrays for cache-friendly brute-force scans. <tt class="docutils literal"><span class="pre"><span class="Identifier">byPk</span></span></tt> maps a primary key to its row index; deletes use swap-with-last to keep the arrays dense.</p>
+<p>Rows can be grouped into named <tt class="docutils literal"><span class="pre"><span class="Identifier">partitions</span></span></tt> (locality scopes, like KoutenDB rings). A <tt class="docutils literal"><span class="pre"><span class="Identifier">nearest</span></span></tt> query may name a partition to score only that bounded candidate set instead of scanning the whole collection. <tt class="docutils literal"><span class="pre"><span class="Identifier">rowPartition</span></span></tt> is the per-row partition label (&quot;&quot; = none), kept in sync with <tt class="docutils literal"><span class="pre"><span class="Identifier">partitions</span></span></tt>, which maps a partition name to its dense row indices.</p>
 
     
   </dd>
@@ -239,7 +252,8 @@
     <div id="checkpoint-procs-all">
   <div id="checkpoint,VectorStore">
   <dt><pre><span class="Keyword">proc</span> <a href="#checkpoint%2CVectorStore"><span class="Identifier">checkpoint</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
-    <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span>
+                                  <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Manually triggers a checkpoint by flushing the WAL and saving a snapshot to disk, ensuring that all committed operations are persisted and the WAL is truncated up to the checkpoint LSN. This can be used to reduce recovery time after a crash by minimizing the number of WAL entries that need to be replayed.
@@ -349,37 +363,52 @@
 
 </div>
 <div id="insert-procs-all">
-  <div id="insert,VectorStore,string,string,seq[float32]">
-  <dt><pre><span class="Keyword">proc</span> <a href="#insert%2CVectorStore%2Cstring%2Cstring%2Cseq%5Bfloat32%5D"><span class="Identifier">insert</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a><span class="Other">;</span> <span class="Identifier">collection</span><span class="Other">,</span> <span class="Identifier">pk</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">vec</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">float32</span><span class="Other">]</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span>
-    <span class="Identifier">VectorStoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
+  <div id="insert,VectorStore,string,string,seq[float32],string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#insert%2CVectorStore%2Cstring%2Cstring%2Cseq%5Bfloat32%5D%2Cstring"><span class="Identifier">insert</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a><span class="Other">;</span> <span class="Identifier">collection</span><span class="Other">,</span> <span class="Identifier">pk</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">vec</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">float32</span><span class="Other">]</span><span class="Other">;</span>
+            <span class="Identifier">partition</span> <span class="Other">=</span> <span class="StringLit">&quot;&quot;</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">VectorStoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span>
+                                       <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
     <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+                              <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    Inserts a vector into the specified collection with the given primary key (pk). The vector is validated against the collection's dimension, and the operation is logged in the WAL if enabled
+    Inserts a vector into the specified collection with the given primary key (pk). The vector is validated against the collection's dimension, and the operation is logged in the WAL if enabled. An optional <tt class="docutils literal"><span class="pre"><span class="Identifier">partition</span></span></tt> groups the vector into a named locality scope that <tt class="docutils literal"><span class="pre"><span class="Identifier">nearest</span></span></tt> can restrict a search to (like a KoutenDB ring), bounding the scanned candidate set.
+    
+  </dd>
+</div>
+
+</div>
+<div id="len-procs-all">
+  <div id="len,VectorCollection">
+  <dt><pre><span class="Keyword">proc</span> <a href="#len%2CVectorCollection"><span class="Identifier">len</span></a><span class="Other">(</span><span class="Identifier">c</span><span class="Other">:</span> <a href="#VectorCollection"><span class="Identifier">VectorCollection</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Number of vectors in the collection
     
   </dd>
 </div>
 
 </div>
 <div id="nearest-procs-all">
-  <div id="nearest,VectorCollection,seq[float32],int,DistanceMetric">
-  <dt><pre><span class="Keyword">proc</span> <a href="#nearest%2CVectorCollection%2Cseq%5Bfloat32%5D%2Cint%2CDistanceMetric"><span class="Identifier">nearest</span></a><span class="Other">(</span><span class="Identifier">c</span><span class="Other">:</span> <a href="#VectorCollection"><span class="Identifier">VectorCollection</span></a><span class="Other">;</span> <span class="Identifier">query</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">float32</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">k</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span>
-             <span class="Identifier">metric</span><span class="Other">:</span> <a href="#DistanceMetric"><span class="Identifier">DistanceMetric</span></a> <span class="Other">=</span> <span class="Identifier">dmCosine</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">float32</span><span class="Other">)</span><span class="Other">]</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">VectorStoreError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <div id="nearest,VectorCollection,seq[float32],int,DistanceMetric,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#nearest%2CVectorCollection%2Cseq%5Bfloat32%5D%2Cint%2CDistanceMetric%2Cstring"><span class="Identifier">nearest</span></a><span class="Other">(</span><span class="Identifier">c</span><span class="Other">:</span> <a href="#VectorCollection"><span class="Identifier">VectorCollection</span></a><span class="Other">;</span> <span class="Identifier">query</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">float32</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">k</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span>
+             <span class="Identifier">metric</span><span class="Other">:</span> <a href="#DistanceMetric"><span class="Identifier">DistanceMetric</span></a> <span class="Other">=</span> <span class="Identifier">dmCosine</span><span class="Other">;</span> <span class="Identifier">partition</span> <span class="Other">=</span> <span class="StringLit">&quot;&quot;</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span>
+    <span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">float32</span><span class="Other">)</span><span class="Other">]</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">VectorStoreError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    Finds the k nearest vectors to the query in the collection using the given distance metric. The result is a sequence of tuples containing the primary key and the corresponding similarity score or distance, sorted by relevance according to the specified metric.
+    <p>Finds the k nearest vectors to the query in the collection using the given distance metric. The result is a sequence of tuples containing the primary key and the corresponding similarity score or distance, sorted by relevance according to the specified metric.</p>
+<p>If <tt class="docutils literal"><span class="pre"><span class="Identifier">partition</span></span></tt> is non-empty, only vectors in that partition are scored, bounding the candidate set to the partition's rows instead of scanning the whole collection.</p>
+
     
   </dd>
 </div>
-<div id="nearest,VectorStore,string,seq[float32],int,DistanceMetric">
-  <dt><pre><span class="Keyword">proc</span> <a href="#nearest%2CVectorStore%2Cstring%2Cseq%5Bfloat32%5D%2Cint%2CDistanceMetric"><span class="Identifier">nearest</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a><span class="Other">;</span> <span class="Identifier">collection</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">query</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">float32</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">k</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span>
-             <span class="Identifier">metric</span><span class="Other">:</span> <a href="#DistanceMetric"><span class="Identifier">DistanceMetric</span></a> <span class="Other">=</span> <span class="Identifier">dmCosine</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">float32</span><span class="Other">)</span><span class="Other">]</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">VectorStoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+<div id="nearest,VectorStore,string,seq[float32],int,DistanceMetric,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#nearest%2CVectorStore%2Cstring%2Cseq%5Bfloat32%5D%2Cint%2CDistanceMetric%2Cstring"><span class="Identifier">nearest</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a><span class="Other">;</span> <span class="Identifier">collection</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">query</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">float32</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">k</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span>
+             <span class="Identifier">metric</span><span class="Other">:</span> <a href="#DistanceMetric"><span class="Identifier">DistanceMetric</span></a> <span class="Other">=</span> <span class="Identifier">dmCosine</span><span class="Other">;</span> <span class="Identifier">partition</span> <span class="Other">=</span> <span class="StringLit">&quot;&quot;</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span>
+    <span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">float32</span><span class="Other">)</span><span class="Other">]</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">VectorStoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+                         <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    Finds the k nearest vectors to the query in the specified collection using the given distance metric
+    Finds the k nearest vectors to the query in the specified collection using the given distance metric. An optional <tt class="docutils literal"><span class="pre"><span class="Identifier">partition</span></span></tt> restricts the search to a bounded candidate set within the collection.
     
   </dd>
 </div>
@@ -400,8 +429,8 @@
 <div id="newInMemoryVectorStore-procs-all">
   <div id="newInMemoryVectorStore">
   <dt><pre><span class="Keyword">proc</span> <a href="#newInMemoryVectorStore"><span class="Identifier">newInMemoryVectorStore</span></a><span class="Other">(</span><span class="Other">)</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">VectorStoreError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span>
-    <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">JsonParsingError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">JsonParsingError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
+    <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
@@ -417,12 +446,23 @@
                     <span class="Identifier">enableWal</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">;</span> <span class="Identifier">checkpointEveryOps</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span class="Other">=</span> <span class="DecNumber">0'u32</span><span class="Other">;</span>
                     <span class="Identifier">walFlushEveryOps</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span class="Other">=</span> <span class="DecNumber">1000'u32</span><span class="Other">)</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span>
     <span class="Identifier">VectorStoreError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">JsonParsingError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span>
-    <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span>
+                                 <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Creates a new <tt class="docutils literal"><span class="pre"><span class="Identifier">VectorStore</span></span></tt> instance with the specified storage mode, WAL settings, and checkpointing configuration.
+    
+  </dd>
+</div>
+
+</div>
+<div id="partitionSize-procs-all">
+  <div id="partitionSize,VectorCollection,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#partitionSize%2CVectorCollection%2Cstring"><span class="Identifier">partitionSize</span></a><span class="Other">(</span><span class="Identifier">c</span><span class="Other">:</span> <a href="#VectorCollection"><span class="Identifier">VectorCollection</span></a><span class="Other">;</span> <span class="Identifier">partition</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Number of vectors in the named partition — the candidate set size for a partition-scoped <tt class="docutils literal"><span class="pre"><span class="Identifier">nearest</span></span></tt>. Returns 0 if the partition does not exist.
     
   </dd>
 </div>
@@ -432,7 +472,8 @@
   <div id="recoverFromWal,VectorStore">
   <dt><pre><span class="Keyword">proc</span> <a href="#recoverFromWal%2CVectorStore"><span class="Identifier">recoverFromWal</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">VectorStoreError</span><span class="Other">,</span>
     <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">JsonParsingError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
-    <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span>
+                                      <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
@@ -469,7 +510,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-06 12:11:16 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-06 13:24:00 UTC</small>
       </div>
     </div>
   </div>
