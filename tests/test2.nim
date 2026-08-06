@@ -48,6 +48,31 @@ suite "KeyValue Store WAL + memory store tests":
       check v in ["1", "2"]
     check keys.len == 2
 
+  test "lazy-read disk store (offset-based)":
+    let dbPath = "tests" / "data" / "bench_kvstore_lazy"
+    block:
+      let kv = newKvStore(dbPath, ksmDisk, enableWal = true, lazyReads = true)
+      kv.put("a", "1")
+      kv.put("b", "2")
+      kv.put("c", "3")
+      check kv.get("a").get() == "1"
+      check kv.get("b").get() == "2"
+      check kv.get("c").get() == "3"
+      check kv.delete("b")
+      check not kv.hasKey("b")
+      var n = 0
+      for (k, v) in kv.pairsUnordered:
+        inc n
+        check v in ["1", "2", "3"]
+      check n == 2
+    block:
+      let kv2 = newKvStore(dbPath, ksmDisk, enableWal = true, lazyReads = true)
+      check kv2.get("a").get() == "1"
+      check kv2.get("c").get() == "3"
+      check not kv2.hasKey("b")
+      kv2.put("c", "33")
+      check kv2.get("c").get() == "33"
+
 suite "KeyValue Store throughput benchmarks":
   test "in-memory put/get/delete ops per second":
     const n = 100_000
@@ -115,3 +140,35 @@ suite "KeyValue Store throughput benchmarks":
       check putOps > 0
       check getOps > 0
       check delOps > 0
+
+  test "lazy-read keeps values on disk (not in memory)":
+    const N = 50000
+    const V = 256
+    let value = newString(V)
+    let eagerPath = "tests" / "data" / "mem_kv_eager"
+    let lazyPath = "tests" / "data" / "mem_kv_lazy"
+
+    # eager: values retained in memory
+    block:
+      let kv = newKvStore(eagerPath, ksmDisk, enableWal = true, walFlushEveryOps = 1000)
+      for i in 0..<N:
+        kv.put("k" & $i, value)
+      kv.checkpoint()
+      let retained = kv.retainedValueBytes()
+      echo fmt"[bench][kv][mem] eager retains {float(retained) / 1_048_576.0:>8.2f} MiB of values in RAM (N={N}, value={V}B)"
+      check retained >= N * V
+
+    # lazy: only the key -> offset index retained
+    block:
+      let kv = newKvStore(lazyPath, ksmDisk, enableWal = true, lazyReads = true)
+      for i in 0..<N:
+        kv.put("k" & $i, value)
+      echo fmt"[bench][kv][mem] lazy retains {kv.retainedValueBytes()} bytes of values in RAM (index only)"
+      check kv.retainedValueBytes() == 0
+
+      var t0 = cpuTime()
+      for i in 0..<N:
+        discard kv.get("k" & $i)
+      let lazyGetSecs = cpuTime() - t0
+      let lazyGetRate = float(N) / max(lazyGetSecs, 1e-9)
+      echo fmt"[bench][kv][latency] lazy get (disk offset read)={lazyGetRate:>10.0f} ops/s"

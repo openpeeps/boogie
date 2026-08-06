@@ -40,11 +40,19 @@ type
     ## parallel `pks`/`norms` arrays for cache-friendly brute-force scans. `byPk`
     ## maps a primary key to its row index; deletes use swap-with-last to keep the
     ## arrays dense.
+    ##
+    ## Rows can be grouped into named `partitions` (locality scopes, like KoutenDB
+    ## rings). A `nearest` query may name a partition to score only that bounded
+    ## candidate set instead of scanning the whole collection. `rowPartition` is
+    ## the per-row partition label ("" = none), kept in sync with `partitions`,
+    ## which maps a partition name to its dense row indices.
     name*: string
     dimension*: int
     vecs: seq[float32]
     pks: seq[string]
     norms: seq[float32]
+    rowPartition: seq[string]
+    partitions: Table[string, seq[int]]
     byPk: Table[string, int]
 
   VectorStore* {.acyclic.} = ref object
@@ -72,7 +80,7 @@ type
     collections: seq[tuple[
       name: string,
       dimension: int,
-      rows: seq[(string, seq[float32])]
+      rows: seq[(string, seq[float32], string)]
     ]]
 
 # fwd
@@ -98,6 +106,8 @@ proc newCollection*(name: string, dimension: int): VectorCollection =
     vecs: @[],
     pks: @[],
     norms: @[],
+    rowPartition: @[],
+    partitions: initTable[string, seq[int]](),
     byPk: initTable[string, int]()
   )
 
@@ -136,32 +146,59 @@ proc vectorNorm(v: seq[float32]): float32 =
     s += x * x
   sqrt(s)
 
-proc insertNoWal(c: VectorCollection, pk: string, vec: seq[float32]) =
+proc removeIndexAt(p: var seq[int], i: int) =
+  ## Swap-remove the given row index from a partition's index list (O(1)).
+  for j in 0 ..< p.len:
+    if p[j] == i:
+      p[j] = p[^1]
+      p.setLen(p.len - 1)
+      return
+
+proc insertNoWal(c: VectorCollection, pk: string, vec: seq[float32], partition = "") =
   if pk.len == 0:
     raise newException(VectorStoreError, "pk cannot be empty")
   c.validateVector(vec)
   if c.byPk.hasKey(pk):
     raise newException(VectorStoreError, fmt"duplicate primary key '{pk}' in '{c.name}'")
-  c.byPk[pk] = c.pks.len
+  let idx = c.pks.len
+  c.byPk[pk] = idx
   c.vecs.add(vec)
   c.pks.add(pk)
   c.norms.add(vectorNorm(vec))
+  c.rowPartition.add(partition)
+  if partition.len > 0:
+    c.partitions.mgetOrPut(partition, @[]).add(idx)
 
 proc deleteNoWal(c: VectorCollection, pk: string): bool =
   if not c.byPk.hasKey(pk):
     return false
   let i = c.byPk[pk]
   let last = c.pks.high
+
+  # remove the deleted row from its partition's index list
+  let part = c.rowPartition[i]
+  if part.len > 0 and c.partitions.hasKey(part):
+    c.partitions[part].removeIndexAt(i)
+    if c.partitions[part].len == 0:
+      c.partitions.del(part)
+
   if i != last:
     copyMem(addr c.vecs[i * c.dimension], addr c.vecs[last * c.dimension],
       c.dimension * sizeof(float32))
     c.pks[i] = c.pks[last]
     c.norms[i] = c.norms[last]
+    # the moved row keeps its own partition label; fix its index in that list
+    let movedPart = c.rowPartition[last]
+    c.rowPartition[i] = movedPart
+    if movedPart.len > 0 and c.partitions.hasKey(movedPart):
+      c.partitions[movedPart].removeIndexAt(last)
+      c.partitions[movedPart].add(i)
     c.byPk[c.pks[i]] = i
   c.byPk.del(pk)
   c.vecs.setLen(last * c.dimension)
   c.pks.setLen(last)
   c.norms.setLen(last)
+  c.rowPartition.setLen(last)
   true
 
 proc get*(c: VectorCollection, pk: string): Option[seq[float32]] =
@@ -175,18 +212,27 @@ iterator all*(c: VectorCollection): (string, seq[float32]) =
   for i in 0 ..< c.pks.len:
     yield (c.pks[i], c.vecs[i * c.dimension ..< i * c.dimension + c.dimension])
 
-proc vecToPayload(v: seq[float32]): string =
+proc vecToPayload(v: seq[float32], partition = ""): string =
   var a = newJArray()
   for x in v:
     a.add(%x)
-  $a
+  $(%*{"v": a, "p": partition})
 
-proc vecFromPayload(payload: string): seq[float32] =
+proc vecFromPayload(payload: string): (seq[float32], string) =
   let n = parseJson(payload)
-  if n.kind != JArray:
+  case n.kind
+  of JArray:
+    # legacy payload: bare vector array
+    for x in n.items:
+      result[0].add(float32(x.getFloat()))
+  of JObject:
+    if not n.hasKey("v"):
+      raise newException(VectorStoreError, "invalid WAL payload for vector")
+    for x in n["v"].items:
+      result[0].add(float32(x.getFloat()))
+    result[1] = n["p"].getStr("")
+  else:
     raise newException(VectorStoreError, "invalid WAL payload for vector")
-  for x in n.items:
-    result.add(float32(x.getFloat()))
 
 proc schemaToPayload(c: VectorCollection): string =
   $(%*{"dimension": c.dimension})
@@ -220,23 +266,25 @@ proc appendWalIfEnabled(s: VectorStore, op: WalOp, table, pk, payload: string): 
   lsn
 
 proc buildSnapshot(s: VectorStore): SnapshotOnDisk =
-  result.version = 1'u32
+  result.version = 2'u32
   result.checkpointLsn = s.checkpointLsn
   for _, c in s.collections.pairs:
-    var rows: seq[(string, seq[float32])] = @[]
-    for pk, vec in c.all:
-      rows.add((pk, vec))
+    var rows: seq[(string, seq[float32], string)] = @[]
+    for i in 0 ..< c.pks.len:
+      rows.add((c.pks[i],
+        c.vecs[i * c.dimension ..< i * c.dimension + c.dimension],
+        c.rowPartition[i]))
     result.collections.add((name: c.name, dimension: c.dimension, rows: rows))
 
 proc loadSnapshotIntoStore(s: VectorStore, snap: SnapshotOnDisk) =
-  if snap.version != 1'u32:
+  if snap.version != 2'u32:
     raise newException(VectorStoreError, "unsupported snapshot version")
   s.collections = initSortedTable[string, VectorCollection]()
   s.checkpointLsn = snap.checkpointLsn
   for cd in snap.collections:
     var c = newCollection(cd.name, cd.dimension)
-    for (pk, vec) in cd.rows:
-      c.insertNoWal(pk, vec)
+    for (pk, vec, part) in cd.rows:
+      c.insertNoWal(pk, vec, part)
     s.collections[c.name] = c
 
 proc saveSnapshotIfEnabled(s: VectorStore) =
@@ -283,7 +331,8 @@ proc applyWalEntry(s: VectorStore, e: WalEntry) =
     if not s.collections.hasKey(e.table):
       raise newException(VectorStoreError, "WAL replay: collection not found: " & e.table)
     let c = s.collections[e.table]
-    c.insertNoWal(e.pk, vecFromPayload(e.payload))
+    let (vec, part) = vecFromPayload(e.payload)
+    c.insertNoWal(e.pk, vec, part)
   of woDeleteRow:
     if s.collections.hasKey(e.table):
       let c = s.collections[e.table]
@@ -366,14 +415,17 @@ proc dropCollection*(s: VectorStore, name: string) =
   s.dropCollectionNoWal(name)
   s.markCommitted(lsn)
 
-proc insert*(s: VectorStore, collection, pk: string, vec: seq[float32]) =
+proc insert*(s: VectorStore, collection, pk: string, vec: seq[float32], partition = "") =
   ## Inserts a vector into the specified collection with the given primary key (pk). The vector is
-  ## validated against the collection's dimension, and the operation is logged in the WAL if enabled
+  ## validated against the collection's dimension, and the operation is logged in the WAL if enabled.
+  ## An optional `partition` groups the vector into a named locality scope that `nearest` can
+  ## restrict a search to (like a KoutenDB ring), bounding the scanned candidate set.
   if not s.collections.hasKey(collection):
     raise newException(VectorStoreError, fmt"collection not found: {collection}")
   let c = s.collections[collection]
-  let lsn = s.appendWalIfEnabled(woInsertRow, collection, pk, vecToPayload(vec))
-  c.insertNoWal(pk, vec)
+  let payload = if s.hasWal: vecToPayload(vec, partition) else: ""
+  let lsn = s.appendWalIfEnabled(woInsertRow, collection, pk, payload)
+  c.insertNoWal(pk, vec, partition)
   s.markCommitted(lsn)
 
 proc delete*(s: VectorStore, collection, pk: string): bool =
@@ -484,11 +536,15 @@ proc keepTopK(h: var seq[(string, float32)], k: int, item: (string, float32),
     siftDown(h, 0, h.high, higherIsBetter)
 
 proc nearest*(c: VectorCollection, query: seq[float32],
-          k: int, metric: DistanceMetric = dmCosine): seq[(string, float32)] =
+          k: int, metric: DistanceMetric = dmCosine, partition = ""): seq[(string, float32)] =
   ## Finds the k nearest vectors to the query in the collection using the given
   ## distance metric. The result is a sequence of tuples containing the primary
   ## key and the corresponding similarity score or distance, sorted by relevance
   ## according to the specified metric.
+  ##
+  ## If `partition` is non-empty, only vectors in that partition are scored,
+  ## bounding the candidate set to the partition's rows instead of scanning the
+  ## whole collection.
   if k <= 0:
     return
   c.validateVector(query)
@@ -498,7 +554,7 @@ proc nearest*(c: VectorCollection, query: seq[float32],
   let dim = c.dimension
 
   var heap = newSeqOfCap[(string, float32)](k)
-  for i in 0 ..< c.pks.len:
+  template scoreAndKeep(i: int) =
     let score = case metric
       of dmCosine:
         let norm = c.norms[i]
@@ -508,6 +564,13 @@ proc nearest*(c: VectorCollection, query: seq[float32],
       of dmL2: l2sqFlat(c.vecs, i * dim, query)         # lower is better
     keepTopK(heap, k, (c.pks[i], score), higherIsBetter)
 
+  if partition.len > 0:
+    for i in c.partitions.getOrDefault(partition):
+      scoreAndKeep(i)
+  else:
+    for i in 0 ..< c.pks.len:
+      scoreAndKeep(i)
+
   result = move(heap)
   result.sort(proc(a, b: (string, float32)): int =
     if higherIsBetter:
@@ -516,13 +579,23 @@ proc nearest*(c: VectorCollection, query: seq[float32],
       if a[1] < b[1]: -1 elif a[1] > b[1]: 1 else: 0
   )
 
+proc len*(c: VectorCollection): int =
+  ## Number of vectors in the collection
+  c.pks.len
+
+proc partitionSize*(c: VectorCollection, partition: string): int =
+  ## Number of vectors in the named partition — the candidate set size for a
+  ## partition-scoped `nearest`. Returns 0 if the partition does not exist.
+  c.partitions.getOrDefault(partition).len
+
 proc nearest*(s: VectorStore, collection: string, query: seq[float32],
-        k: int, metric: DistanceMetric = dmCosine): seq[(string, float32)] =
+        k: int, metric: DistanceMetric = dmCosine, partition = ""): seq[(string, float32)] =
   ## Finds the k nearest vectors to the query in the specified
-  ## collection using the given distance metric
+  ## collection using the given distance metric. An optional `partition`
+  ## restricts the search to a bounded candidate set within the collection.
   if not s.collections.hasKey(collection):
     raise newException(VectorStoreError, fmt"collection not found: {collection}")
-  s.collections[collection].nearest(query, k, metric)
+  s.collections[collection].nearest(query, k, metric, partition)
 
 proc exportCollection*(s: VectorStore, collection: string, path: string) =
   ## Exports the specified collection to a file in a simple text format, where each

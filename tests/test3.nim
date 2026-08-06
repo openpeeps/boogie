@@ -50,6 +50,52 @@ suite "VectorStore nearest neighbor search":
     check res[0][0] == "a"
     check res[1][0] == "c" or res[1][0] == "b"
 
+  test "partition-scoped nearest bounds the candidate set":
+    let vs = newInMemoryVectorStore()
+    let coll = newCollection("embeddings", 2)
+    vs.createCollection(coll)
+    vs.insert("embeddings", "a", @[1.0'f32, 0.0], "t1")
+    vs.insert("embeddings", "b", @[0.0'f32, 1.0], "t2")
+    vs.insert("embeddings", "c", @[0.8'f32, 0.8], "t1")
+
+    let c = vs.getCollection("embeddings").get()
+    check c.len == 3
+    check c.partitionSize("t1") == 2
+    check c.partitionSize("t2") == 1
+
+    # global scan sees all three
+    check vs.nearest("embeddings", @[1.0'f32, 0.0], 3, dmCosine).len == 3
+    # t1-scoped scan sees only t1 rows, best first
+    let res = vs.nearest("embeddings", @[1.0'f32, 0.0], 3, dmCosine, "t1")
+    check res.len == 2
+    check res[0][0] == "a"
+    check res[1][0] == "c"
+    # unknown partition -> empty
+    check vs.nearest("embeddings", @[1.0'f32, 0.0], 3, dmCosine, "nope").len == 0
+
+    # deletes keep the partition index in sync (incl. swap-with-last)
+    check vs.delete("embeddings", "c")
+    check c.partitionSize("t1") == 1
+    check vs.delete("embeddings", "a")
+    check c.partitionSize("t1") == 0
+    check c.partitionSize("t2") == 1
+    check c.get("b").isSome
+
+  test "partitions survive WAL replay and snapshot reload":
+    let path = testDir / "vecpart"
+    block:
+      var vs = newVectorStore(path, smDisk, enableWal = true, checkpointEveryOps = 1)
+      vs.createCollection(newCollection("embeddings", 2))
+      vs.insert("embeddings", "a", @[1.0'f32, 0.0], "t1")
+      vs.insert("embeddings", "b", @[0.0'f32, 1.0], "t2")
+      vs.checkpoint()
+    block:
+      let vs = newVectorStore(path, smDisk, enableWal = true)
+      let c = vs.getCollection("embeddings").get()
+      check c.partitionSize("t1") == 1
+      check c.partitionSize("t2") == 1
+      check vs.nearest("embeddings", @[1.0'f32, 0.0], 2, dmCosine, "t1").len == 1
+
 suite "VectorStore WAL/snapshot recovery":
   test "disk WAL + recovery":
     let path = testDir / "vecwal"
@@ -139,3 +185,47 @@ suite "VectorStore benchmarks":
     echo fmt"[bench][vectorstore] nearest(k={K}, dim={dim}, n={N})= {ops:>10.0f} queries/s"
 
     check ops > 0
+
+  test "partition-scoped nearest reduces scanned vectors":
+    const N = 20000
+    const P = 100
+    const dim = 32
+    const K = 10
+    const Q = 200
+    let collName = "bench-part"
+    let vs = newInMemoryVectorStore()
+    vs.createCollection(newCollection(collName, dim))
+
+    for i in 0..<N:
+      var vec = newSeq[float32](dim)
+      for d in 0..<dim:
+        vec[d] = float32((i * 31 + d * 7) mod 1000) / 100.0'f32
+      vs.insert(collName, "id" & $i, vec, "p" & $(i mod P))
+
+    var t0 = cpuTime()
+    for q in 0..<Q:
+      var query = newSeq[float32](dim)
+      for d in 0..<dim:
+        query[d] = float32((q * 17 + d * 13) mod 1000) / 100.0'f32
+      discard vs.nearest(collName, query, K, dmCosine)
+    let globalSecs = cpuTime() - t0
+    let globalRate = float(Q) / max(globalSecs, 1e-9)
+
+    t0 = cpuTime()
+    for q in 0..<Q:
+      var query = newSeq[float32](dim)
+      for d in 0..<dim:
+        query[d] = float32((q * 17 + d * 13) mod 1000) / 100.0'f32
+      discard vs.nearest(collName, query, K, dmCosine, "p" & $(q mod P))
+    let partSecs = cpuTime() - t0
+    let partRate = float(Q) / max(partSecs, 1e-9)
+
+    let c = vs.getCollection(collName).get()
+    let scannedGlobal = c.len
+    let scannedPart = c.partitionSize("p0")
+    let reduction = 1.0 - float(scannedPart) / float(scannedGlobal)
+
+    echo fmt"[bench][vectorstore] nearest global={globalRate:>9.0f} q/s part={partRate:>9.0f} q/s scanned {scannedGlobal}->{scannedPart} ({reduction * 100:>5.1f}% reduction)"
+    check globalRate > 0
+    check partRate > 0
+    check scannedPart < scannedGlobal

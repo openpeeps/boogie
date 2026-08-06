@@ -5,7 +5,7 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/boogie
 
-import std/[tables, options, strformat, os]
+import std/[tables, options, os]
 import pkg/flatty
 import ../wal
 
@@ -42,6 +42,13 @@ type
     walFlushEveryOps: uint32
     pendingWalOps: uint32
 
+    lazyReads: bool
+      ## In lazy-read mode values are not retained in memory: `valueOffsets`
+      ## maps each key to its record's byte offset in the WAL, and `get` reads
+      ## the value back from disk on demand. WAL-only durability (no snapshots),
+      ## trading read latency for a small memory footprint on large datasets.
+    valueOffsets: Table[string, int64]
+
 type
   KvSnapshotOnDisk = tuple
     version: uint32
@@ -63,7 +70,7 @@ proc writeTextAtomic(path, content: string) =
 proc putNoWal(s: KvStore, key, value: string) =
   if key.len == 0:
     raise newException(KvStoreError, "key cannot be empty")
-  s.dataByKey[key] = value
+  s.dataByKey[key] = if s.lazyReads: "" else: value
 
 proc deleteNoWal(s: KvStore, key: string): bool =
   if not s.dataByKey.hasKey(key):
@@ -117,6 +124,17 @@ proc appendWalIfEnabled(s: KvStore, op: WalOp, key, payload: string): uint64 =
   # Appends an operation to the WAL if it is enabled
   if not s.hasWal:
     return 0'u64
+  if s.lazyReads:
+    # sync append so the record's file offset is known immediately, and record
+    # it for offset-based reads
+    let off = s.wal.logPos()
+    let lsn = s.wal.append(
+      WalEntry(op: op, table: KvTableName, pk: key, payload: payload),
+      sync = true
+    )
+    if op == woInsertRow:
+      s.valueOffsets[key] = off
+    return lsn
   let lsn = s.wal.append(
     WalEntry(op: op, table: KvTableName, pk: key, payload: payload),
     sync = false
@@ -153,12 +171,17 @@ proc applyWalEntry(s: KvStore, e: WalEntry) =
 # Public API
 #
 proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = true,
-        checkpointEveryOps: uint32 = 0'u32, walFlushEveryOps: uint32 = 1000'u32): KvStore =
+        checkpointEveryOps: uint32 = 0'u32, walFlushEveryOps: uint32 = 1000'u32,
+        lazyReads = false): KvStore =
   ## Creates a new key-value store. If `mode` is `ksmDisk`, a file-based
   ## store is created at the given `path`. If `enableWal` is true, write-ahead
   ## logging is enabled for durability. The `checkpointEveryOps` parameter controls
   ## how often a checkpoint (snapshot) is taken after a certain number of operations,
   ## while `walFlushEveryOps` controls how often the WAL is flushed to disk.
+  ##
+  ## With `lazyReads = true` the store keeps only a key -> offset index in memory
+  ## (WAL-only durability, no snapshots) and reads values back from the WAL on
+  ## demand. This trades read latency for a small memory footprint on large datasets.
   var
     dbPath: string
     hasDb: bool
@@ -171,7 +194,7 @@ proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = 
   of ksmDisk:
     if path.len == 0:
       raise newException(KvStoreError, "path cannot be empty in disk mode")
-    hasDb = true
+    hasDb = not lazyReads
     dbPath = path.changeFileExt(".db")
     if enableWal:
       hasWal = true
@@ -185,7 +208,9 @@ proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = 
     hasDbFile: hasDb,
     dbPath: dbPath,
     checkpointEveryOps: checkpointEveryOps,
-    walFlushEveryOps: walFlushEveryOps
+    walFlushEveryOps: walFlushEveryOps,
+    lazyReads: lazyReads,
+    valueOffsets: initTable[string, int64]()
   )
 
   recoverFromWal(result)
@@ -217,10 +242,16 @@ proc put*(s: KvStore, key, value: string) =
 proc get*(s: KvStore, key: string): Option[string] =
   ## Retrieves the value for the given key, if it exists.
   ## Returns `none` if the key is not found.
-  if s.dataByKey.hasKey(key):
-    some(s.dataByKey[key])
+  if s.lazyReads:
+    if s.valueOffsets.hasKey(key):
+      some(s.wal.readEntryAt(s.valueOffsets[key]).payload)
+    else:
+      none(string)
   else:
-    none(string)
+    if s.dataByKey.hasKey(key):
+      some(s.dataByKey[key])
+    else:
+      none(string)
 
 proc hasKey*(s: KvStore, key: string): bool =
   ## Checks if the given key exists in the store.
@@ -233,6 +264,8 @@ proc delete*(s: KvStore, key: string): bool {.discardable.} =
   ## Returns true if the key was found and deleted, false if the key was not found.
   let lsn = s.appendWalIfEnabled(woDeleteRow, key, "")
   let removed = s.deleteNoWal(key)
+  if s.lazyReads:
+    s.valueOffsets.del(key)
   s.markCommitted(lsn)
   removed
 
@@ -244,10 +277,22 @@ proc isEmpty*(s: KvStore): bool =
   ## Checks if the store is empty (contains no key-value pairs).
   s.dataByKey.len == 0
 
+proc retainedValueBytes*(s: KvStore): int64 =
+  ## Total bytes of value payloads currently held in memory. In lazy-read mode
+  ## this is always 0 — values live in the WAL and are read back on demand.
+  if s.lazyReads:
+    return 0'i64
+  for _, v in s.dataByKey:
+    result += int64(v.len)
+
 iterator pairsUnordered*(s: KvStore): (string, string) =
   ## Iterates over all key-value pairs in the store in no particular order.
-  for k, v in s.dataByKey.pairs:
-    yield (k, v)
+  if s.lazyReads:
+    for k in s.dataByKey.keys:
+      yield (k, s.wal.readEntryAt(s.valueOffsets[k]).payload)
+  else:
+    for k, v in s.dataByKey.pairs:
+      yield (k, v)
 
 proc recoverFromWal*(s: KvStore) =
   ## Recovers the in-memory state of the store by replaying any WAL entries
@@ -259,6 +304,30 @@ proc recoverFromWal*(s: KvStore) =
   s.checkpointLsn = 0'u64
   s.pendingOps = 0'u32
   s.pendingWalOps = 0'u32
+
+  if s.lazyReads:
+    # WAL-only recovery: build the key set + key -> offset index without
+    # retaining values in memory.
+    s.valueOffsets = initTable[string, int64]()
+    if s.hasWal:
+      for (off, e) in s.wal.entriesWithOffsets:
+        if e.lsn <= s.checkpointLsn:
+          continue
+        case e.op
+        of woInsertRow:
+          s.valueOffsets[e.pk] = off
+          s.dataByKey[e.pk] = ""
+        of woDeleteRow:
+          s.valueOffsets.del(e.pk)
+          s.dataByKey.del(e.pk)
+        else:
+          raise newException(KvStoreError, "WAL replay: unsupported op for kvstore: " & $e.op)
+        s.checkpointLsn = e.lsn
+    s.wal.openLog()
+    s.flushWalIfNeeded(force = true)
+    s.pendingOps = 0'u32
+    s.pendingWalOps = 0'u32
+    return
 
   s.loadSnapshotIfPresent()
 

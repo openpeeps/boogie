@@ -15,7 +15,7 @@
 
 ## 😍 Key Features
 - BTrees storage and Hash Tables for fast lookups
-- Write-ahead log (WAL) for durability and crash recovery
+- Write-ahead log (WAL) for durability and crash recovery, with batched group commits, CRC32 record framing, and O(1) LSN recovery
 - Simple API for inserting, updating, deleting, and querying records
 - Configurable options for performance tuning, such as batch sizes and flush intervals
 - In-memory or On-disk storage modes
@@ -23,9 +23,9 @@
 
 #### What's included?
 
-1. **Key/Value Store** - A simple Key-Value store implementation with WAL support
+1. **Key/Value Store** - A simple Key-Value store implementation with WAL support, plus an optional lazy-read mode that keeps values on disk
 2. **RDBMS Store** - A relational WAL-based database with support for **schemas**, **primary keys**, typed columns and **foreign keys** with `RESTRICT` delete actions
-3. **Vector Store** - Vector store implementation with WAL support, including nearest-neighbor search (cosine / dot / L2)
+3. **Vector Store** - Vector store implementation with WAL support and nearest-neighbor search (cosine / dot / L2), including named partitions that bound a search to a locality scope
 4. **Columnar Store** - Columnar storage engine for analytics workloads with WAL support and in-memory column caching
 5. **Graph Store** - A simple graph database with support for nodes, relationships, and basic graph queries (e.g., neighbors, BFS) with WAL support
 6. **Document Store** - A flexible document store on top of the WAL, storing JSON (or BSON) documents
@@ -49,24 +49,30 @@ suites (`nim r -d:release tests/testX.nim`) on the author's development machine.
 import boogie/stores/kv
 import std/options
 
-let kv = newInMemoryKvStore()      # or newKvStore("mydb", ksmDisk, enableWal = true)
-kv.put("greeting", "hello")
-kv.put("user:1", "alice")
-if kv.hasKey("greeting"):
-  echo kv.get("greeting").get()    # "hello"
-discard kv.delete("user:1")        # true
-for k, v in kv.pairsUnordered:     # unordered iteration
+let kvStore = newInMemoryKvStore()  # or newKvStore("mydb", ksmDisk, enableWal = true)
+kvStore.put("greeting", "hello")
+kvStore.put("user:1", "alice")
+if kvStore.hasKey("greeting"):
+  echo kvStore.get("greeting").get()   # "hello"
+discard kvStore.delete("user:1")       # true
+for k, v in kvStore.pairsUnordered:    # unordered iteration
   echo k, " -> ", v
 ```
 
+> For very large datasets, `newKvStore("mydb", ksmDisk, enableWal = true, lazyReads = true)`
+> keeps only a key → offset index in memory and reads values back from the WAL on demand.
+> Values are never resident in RAM (0 bytes retained for 50k×256B in the benchmark), at the
+> cost of a disk seek+read per `get` instead of a memory lookup.
+
 | Operation | ops/s |
 |---|---|
-| put (memory) | ~2.98 M |
-| get (memory) | ~4.62 M |
-| delete (memory) | ~5.29 M |
-| put (disk + WAL) | ~0.97 M |
-| get (disk + WAL) | ~7.59 M |
-| delete (disk + WAL) | ~1.33 M |
+| put (memory) | ~3.13 M |
+| get (memory) | ~4.75 M |
+| delete (memory) | ~4.08 M |
+| put (disk + WAL) | ~1.39 M |
+| get (disk + WAL) | ~7.52 M |
+| delete (disk + WAL) | ~2.18 M |
+| get (disk, lazy offset read) | ~0.06 M |
 
 ### RDBMS Store
 
@@ -110,9 +116,9 @@ store.checkpoint()
 
 | Operation | ops/s |
 |---|---|
-| insert | ~0.24 M |
-| lookup (by pk) | ~0.90 M |
-| ordered scan | ~0.13 M |
+| insert | ~0.27 M |
+| lookup (by pk) | ~0.89 M |
+| ordered scan | ~0.12 M |
 
 ### Vector Store
 
@@ -122,21 +128,29 @@ import std/options
 
 let vs = newInMemoryVectorStore()  # or newVectorStore("vecdb", smDisk, enableWal = true)
 vs.createCollection(newCollection("embeddings", 3))
-vs.insert("embeddings", "doc-1", @[0.1'f32, 0.2, 0.3])
-vs.insert("embeddings", "doc-2", @[0.9'f32, 0.8, 0.7])
+vs.insert("embeddings", "doc-1", @[0.1'f32, 0.2, 0.3], "tenant-7")
+vs.insert("embeddings", "doc-2", @[0.9'f32, 0.8, 0.7], "tenant-7")
 
 echo vs.get("embeddings", "doc-1").isSome
 let q = @[0.11'f32, 0.19, 0.31]
-for (pk, score) in vs.nearest("embeddings", q, k = 2, dmCosine):
+# scope the search to a partition to bound the scanned candidate set
+for (pk, score) in vs.nearest("embeddings", q, k = 2, dmCosine, "tenant-7"):
   echo pk, " (", score, ")"
 ```
 
+> Vectors can be grouped into named **partitions** (a locality scope, like a ring in
+> [KoutenDB](https://github.com/puffball1567/koutendb)). A partition-scoped `nearest`
+> scores only that partition's rows: with 20k vectors across 100 partitions it scans
+> 200 instead of 20,000 (99% reduction) and runs ~50x faster in the benchmark.
+> `collection.partitionSize("tenant-7")` reports the bounded candidate set size.
+
 | Operation | ops/s |
 |---|---|
-| insert | ~1.07 M |
-| get | ~6.13 M |
-| delete | ~5.22 M |
-| nearest (k=10, dim=32, 20k vectors) | ~2.13 K queries/s |
+| insert | ~3.22 M |
+| get | ~6.68 M |
+| delete | ~4.95 M |
+| nearest (k=10, dim=32, 20k vectors) | ~2.17 K queries/s |
+| nearest, partition-scoped (1/100 candidate set) | ~116 K queries/s |
 
 ### Columnar Store
 
@@ -180,10 +194,10 @@ over the same columns are much faster than the first (cold) scan.
 
 | Operation | ops/s |
 |---|---|
-| insert (batch) | ~0.39 M |
-| scan (cold, first load) | ~0.41 M |
-| scan (warm, cached) | ~2.89 M |
-| filter (cached) | ~3.99 M |
+| insert (batch) | ~0.37 M |
+| scan (cold, first load) | ~0.43 M |
+| scan (warm, cached) | ~3.01 M |
+| filter (cached) | ~3.92 M |
 
 ### Graph Store
 
@@ -211,10 +225,10 @@ closeGraphStore(gs)
 
 | Operation | ops/s |
 |---|---|
-| commit (nodes + rels) | ~0.10 M |
-| getNode | ~8.3 M |
-| neighbors | ~4.2 M |
-| findNodesByLabel (5k nodes) | ~341 µs |
+| commit (nodes + rels) | ~0.11 M |
+| getNode | ~6 M |
+| neighbors | ~4 M |
+| findNodesByLabel (5k nodes) | ~330 µs |
 
 ### Document Store
 
@@ -234,10 +248,10 @@ store.checkpoint()
 
 | Operation | ops/s |
 |---|---|
-| insert | ~0.54 M |
-| get | ~2.01 M |
-| lookup | ~4.96 M |
-| delete | ~0.02 M |
+| insert | ~0.61 M |
+| get | ~1.99 M |
+| lookup | ~4.88 M |
+| delete | ~0.21 M |
 
 > [!TIP]
 > Run the full test + benchmark suites with `nimble test -d:release` (the `-d:release`
