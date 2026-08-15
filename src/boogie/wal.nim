@@ -84,7 +84,7 @@ type
 
   WalError* = object of CatchableError
 
-let WalMagic* = "BOGWAL3\0"
+const WalMagic* = "BOGWAL3\0"
   ## magic string to identify our WAL files and version,
   ## also serves as a simple integrity check on open
 
@@ -238,7 +238,7 @@ proc readU64Le(f: File, outv: var uint64): bool =
 proc writeHeader(path: string) =
   let f = open(path, fmWrite)
   defer: f.close()
-  writeExact(f, unsafeAddr WalMagic[0], WalMagic.len)
+  writeExact(f, cast[pointer](cstring(WalMagic)), WalMagic.len)
   f.flushFile()
 
 proc ensureWalFile(path: string) =
@@ -347,9 +347,11 @@ proc logPos*(w: Wal): int64 =
   if w.log == nil: -1'i64
   else: w.log.handle.getFilePos()
 
-proc flush*(w: var Wal) =
-  ## Flushes any pending entries to disk as a single batch, then writes the
-  ## batch footer. The log file handle stays open across calls.
+proc flushImpl(w: var Wal, clear: bool) =
+  ## Flushes pending entries to disk as a single batch, then writes the batch
+  ## footer. `clear = false` skips clearing `pendingEntries` so no GC'd string
+  ## is destroyed - used by crash/exit flushes where the allocator may already
+  ## be tearing down.
   if w.pendingEntries.len == 0:
     return
 
@@ -368,7 +370,18 @@ proc flush*(w: var Wal) =
 
   f.write(buf)
   f.flushFile()
-  w.pendingEntries.setLen(0)
+  if clear:
+    w.pendingEntries.setLen(0)
+
+proc flush*(w: var Wal) =
+  ## Flushes any pending entries to disk as a single batch, then writes the
+  ## batch footer. The log file handle stays open across calls.
+  flushImpl(w, true)
+
+proc flushNoClear*(w: var Wal) =
+  ## Like `flush` but leaves the pending entries untouched (no destruction).
+  ## For one-shot crash/exit durability where the allocator may be unsafe.
+  flushImpl(w, false)
 
 proc append*(w: var Wal, entry: WalEntry, sync: bool = true): uint64 =
   ## Appends a new entry to the WAL. The entry is assigned the next

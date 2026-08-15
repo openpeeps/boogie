@@ -10,6 +10,8 @@ import std/[tables, options, strformat,
 
 import pkg/[flatty, sorta]
 import ../wal
+import ../concurrency
+import ../crashsafe
 
 ## This module implements a simple WAL-based embedded database for Nim.
 ## It provides a Store type that manages multiple tables, each with a defined schema and supports 
@@ -84,7 +86,7 @@ type
     refColumn*: string
     onDelete*: ForeignKeyAction
 
-  DbTable* {.acyclic.} = ref object
+  DbTable* = ref object
     ## Represents a table in the store, including its schema and data.
     name*: string
       ## Name of the table
@@ -112,8 +114,10 @@ type
       # equality indexes for columns. Maps column name to a mapping of cell value keys to sets of primary keys.
     foreignKeys*: seq[ForeignKeyDef]
       # foreign key constraints owned by this table.
+    slot: TableSlot[RdbWriteTask]
+      ## Per-table concurrency slot; nil unless the store is concurrent.
 
-  Store* {.acyclic.} = ref object
+  Store* = ref object
     ## Represents the main store, containing multiple tables and managing persistence and WAL.
     tables: tables.Table[string, DbTable]
       # mapping of table names to DbTable objects representing the tables in the store
@@ -145,12 +149,26 @@ type
       # number of mutation operations since the last WAL flush. This is used to trigger
       # automatic WAL flushes after a certain number of operations, as configured by
       # `walFlushEveryOps`
+    cc: ConcurrentState[RdbWriteTask]
+      ## Store-level concurrency state; nil unless `enableConcurrency = true`.
 
   StoreError* = object of CatchableError
+
+  RdbWriteOp = enum
+    roInsert, roDelete
+
+  RdbWriteTask = object
+    ## Write task carried across threads (value types only, no shared refs).
+    kind: RdbWriteOp
+    pk: string
+    data: RowData
 
 # fwd declarations
 proc recoverFromWal*(s: Store)
 proc where*(t: DbTable, column: string, value: Value): seq[(string, RowData)]
+proc insertRowNoWal(t: DbTable, pk: string, data: var RowData): string
+proc deleteRowNoWal(t: DbTable, pk: string): bool
+proc rowToPayload(data: RowData): string
 
 proc cmp(a, b: RowRecord): int = cmp(a.pk, b.pk)
 proc extract(r: RowRecord): string = r.pk
@@ -193,7 +211,8 @@ proc writeTextAtomic(path, content: string) =
 
 proc newStore*(path: string, mode: StorageMode = smDisk,
     enableWal: bool = true, checkpointEveryOps: uint32 = 0'u32,
-    walFlushEveryOps: uint32 = 1000'u32
+    walFlushEveryOps: uint32 = 1000'u32,
+    enableConcurrency: static bool = false
   ): Store =
   ## Create a new Store instance. Use `smInMemory` for an in-memory
   ## store (no persistence) or `smDisk` for a disk-backed store.
@@ -202,6 +221,9 @@ proc newStore*(path: string, mode: StorageMode = smDisk,
   ##   - 1    => flush every op (old behavior / strongest durability)
   ##   - 1000 => group commit (faster inserts)
   ##   - 0    => flush only on checkpoint/close/recovery-end
+  ##
+  ## With `enableConcurrency = true` reads are concurrent per table and writes
+  ## are serialized per table through a bounded worker pool (WAL-only durability).
   var
     dbPath: string
     hasDb: bool
@@ -220,6 +242,10 @@ proc newStore*(path: string, mode: StorageMode = smDisk,
       hasWal = true
       walObj = openWal(path)
 
+  when enableConcurrency:
+    static: doAssert compileOption("threads"), "concurrency requires --threads:on"
+    hasDb = false
+
   result = Store(
     storageMode: mode,
     hasWal: hasWal,
@@ -229,8 +255,41 @@ proc newStore*(path: string, mode: StorageMode = smDisk,
     checkpointEveryOps: checkpointEveryOps,
     walFlushEveryOps: walFlushEveryOps,
   )
+
+  when enableConcurrency:
+    result.cc = newConcurrentState[RdbWriteTask](
+      proc(ctx: pointer, slot: TableSlot[RdbWriteTask], op: RdbWriteTask) {.gcsafe.} =
+        let s = cast[Store](ctx)
+        let t = cast[DbTable](slot.owner)
+        case op.kind
+        of roInsert:
+          var d = op.data
+          discard t.insertRowNoWal(op.pk, d)
+          if s.hasWal:
+            s.cc.appendWal(s.wal,
+              WalEntry(op: woInsertRow, table: t.name, pk: op.pk, payload: rowToPayload(op.data)),
+              int(s.walFlushEveryOps))
+        of roDelete:
+          discard t.deleteRowNoWal(op.pk)
+          if s.hasWal:
+            s.cc.appendWal(s.wal,
+              WalEntry(op: woDeleteRow, table: t.name, pk: op.pk, payload: ""),
+              int(s.walFlushEveryOps))
+      ,
+      cast[pointer](result)
+    )
+
   # If WAL is enabled, we need to recover the store state by replaying the WAL entries.
   recoverFromWal(result)
+
+  let s = result
+  registerStoreFlush(cast[pointer](s), proc() {.gcsafe.} =
+    if s.hasWal:
+      if s.cc != nil:
+        s.cc.flushWal(s.wal, clear = false)
+      else:
+        s.wal.flushNoClear()
+  )
 
 proc newInMemoryStore*(): Store =
   ## Create a new in-memory store (no persistence, no WAL)
@@ -353,6 +412,11 @@ proc row*(pairs: openArray[(string, Value)]): RowData =
 
 proc hasTable*(s: Store, name: string): bool =
   ## Check if the store has a table with the given name.
+  if s.cc != nil:
+    var res = false
+    withMetaRead(s.cc):
+      res = s.tables.hasKey(name)
+    return res
   s.tables.hasKey(name)
 
 proc findColumn(t: DbTable, colName: string): Option[ColumnDef] =
@@ -664,6 +728,8 @@ proc createTableNoWal(s: Store, t: DbTable) =
     raise newException(StoreError, fmt"table already exists: {t.name}")
   s.validateTableForeignKeys(t)
   t.ensureForeignKeyIndexes()
+  if s.cc != nil:
+    t.slot = newTableSlot[RdbWriteTask](cast[pointer](t))
   s.tables[t.name] = t
 
 proc dropTableNoWal(s: Store, name: string) =
@@ -771,6 +837,8 @@ proc loadSnapshotIntoStore(s: Store, snap: SnapshotOnDisk) =
   for td in snap.tables:
     var t = newTable(td.name, td.primaryKey, td.columns, td.pkType, td.foreignKeys)
     t.ensureForeignKeyIndexes()
+    if s.cc != nil:
+      t.slot = newTableSlot[RdbWriteTask](cast[pointer](t))
     if td.pkType == pkmSerial:
       t.pkSequence = td.pkSequence
     for i in 0 ..< td.rows.len:
@@ -842,21 +910,47 @@ proc markCommitted(s: Store, lsn: uint64) =
 
 proc checkpoint*(s: Store) =
   ## Force a snapshot checkpoint now.
+  if s.cc != nil:
+    s.cc.flushWal(s.wal)
+    return
   if not s.hasDbFile: return
   s.flushWalIfNeeded(force = true)
   s.saveSnapshotIfEnabled()
   s.pendingOps = 0'u32
+
+proc close*(s: Store) =
+  ## Stops the write workers (if concurrent) and flushes the WAL.
+  unregisterStoreFlush(cast[pointer](s))
+  if s.cc != nil:
+    s.cc.close(s.wal)
+  else:
+    s.flushWalIfNeeded(force = true)
 
 #
 # Public API (WAL + apply)
 #
 proc getTable*(s: Store, name: string): Option[DbTable] =
   ## Get a table by name. Returns none if not found.
+  if s.cc != nil:
+    var res: Option[DbTable]
+    withMetaRead(s.cc):
+      if s.tables.hasKey(name):
+        res = some(s.tables[name]) else: res = none(DbTable)
+    return res
   if s.tables.hasKey(name):
     some(s.tables[name]) else: none(DbTable)
 
 proc createTable*(s: Store, t: DbTable) =
   ## Create a new table in the store. This will write to the WAL and commit the transaction.
+  if s.cc != nil:
+    t.slot = newTableSlot[RdbWriteTask](cast[pointer](t))
+    withMetaWrite(s.cc):
+      s.createTableNoWal(t)
+    if s.hasWal:
+      s.cc.appendWal(s.wal,
+        WalEntry(op: woCreateTable, table: t.name, pk: "", payload: schemaToPayload(t)),
+        int(s.walFlushEveryOps))
+    return
   s.validateTableForeignKeys(t)
   t.ensureForeignKeyIndexes()
   let lsn = s.appendWalIfEnabled(woCreateTable, t.name, "", schemaToPayload(t))
@@ -870,6 +964,23 @@ proc createTableIfNotExist*(s: Store, t: DbTable) =
 
 proc dropTable*(s: Store, name: string) =
   ## Drop a table from the store. This will write to the WAL and commit the transaction.
+  if s.cc != nil:
+    withMetaWrite(s.cc):
+      for childName, child in s.tables.pairs:
+        if childName == name:
+          continue
+        for fk in child.foreignKeys:
+          if fk.refTable == name:
+            raise newException(
+              StoreError,
+              fmt"cannot drop table '{name}', referenced by foreign key '{fk.name}' in table '{childName}'"
+            )
+      s.dropTableNoWal(name)
+    if s.hasWal:
+      s.cc.appendWal(s.wal,
+        WalEntry(op: woDropTable, table: name, pk: "", payload: ""),
+        int(s.walFlushEveryOps))
+    return
   for childName, child in s.tables.pairs:
     if childName == name:
       continue
@@ -907,19 +1018,55 @@ proc getRow*(t: DbTable, pk: string): Option[RowData] =
 iterator allRows*(t: DbTable): (string, RowData) =
   ## Iterate over all rows in the table in primary key order. This will be fast
   ## if the order index is clean, but may be slower if the index needs to be rebuilt.
-  t.ensureOrderIndex()
-  for rec in t.rows.keys:
-    yield (rec.pk, rec.cols)
+  if t.slot != nil:
+    beginRead(t.slot.mu)
+    try:
+      t.ensureOrderIndex()
+      for rec in t.rows.keys:
+        yield (rec.pk, rec.cols)
+    finally:
+      endRead(t.slot.mu)
+  else:
+    t.ensureOrderIndex()
+    for rec in t.rows.keys:
+      yield (rec.pk, rec.cols)
 
 iterator allRowsByPk*(t: DbTable): (string, RowData) =
   ## Iterate over all rows in the table using the hash index (unsorted).
-  for pk, rec in t.rowsByPk.pairs:
-    yield (pk, rec.cols)
+  if t.slot != nil:
+    beginRead(t.slot.mu)
+    try:
+      for pk, rec in t.rowsByPk.pairs:
+        yield (pk, rec.cols)
+    finally:
+      endRead(t.slot.mu)
+  else:
+    for pk, rec in t.rowsByPk.pairs:
+      yield (pk, rec.cols)
 
 proc insertRow*(s: Store, tableName: string, pk: string, data: RowData) =
   ## Insert a row into the specified table with the given primary key and data. This will
   ## write to the WAL and commit the transaction. The primary key can be empty for tables with
   ## serial PK mode, in which case it will be auto-generated
+  if s.cc != nil:
+    var slot: ptr TableSlot[RdbWriteTask]
+    withMetaRead(s.cc):
+      if unlikely(not s.tables.hasKey(tableName)):
+        raise newException(StoreError, fmt"table not found: {tableName}")
+      slot = cast[ptr TableSlot[RdbWriteTask]](s.tables[tableName].slot)
+    var effectivePk: string
+    withSlotWrite(cast[TableSlot[RdbWriteTask]](slot)):
+      let t = cast[DbTable](cast[TableSlot[RdbWriteTask]](slot).owner)
+      effectivePk = t.effectivePkForInsert(pk)
+      if t.rowsByPk.hasKey(effectivePk):
+        raise newException(StoreError, fmt"duplicate primary key '{effectivePk}' in table '{t.name}'")
+      var d = data
+      t.normalizedRowWithPk(d, effectivePk)
+      validateRow(t, d)
+      s.validateForeignKeysOnInsert(t, d)
+    let mySeq = s.cc.submit(cast[TableSlot[RdbWriteTask]](slot), RdbWriteTask(kind: roInsert, pk: effectivePk, data: data))
+    cast[TableSlot[RdbWriteTask]](slot).waitApplied(mySeq)
+    return
   if unlikely(not s.tables.hasKey(tableName)):
     raise newException(StoreError, fmt"table not found: {tableName}")
   var t = s.tables[tableName]
@@ -944,6 +1091,27 @@ proc insertRow*(t: DbTable, data: RowData): string =
   result = t.insertRowNoWal("", d)
 
 proc insertRow*(s: Store, tableName: string, data: RowData): string {.discardable.}=
+  if s.cc != nil:
+    var slot: ptr TableSlot[RdbWriteTask]
+    withMetaRead(s.cc):
+      if unlikely(not s.tables.hasKey(tableName)):
+        raise newException(StoreError, fmt"table not found: {tableName}")
+      slot = cast[ptr TableSlot[RdbWriteTask]](s.tables[tableName].slot)
+      if cast[DbTable](cast[TableSlot[RdbWriteTask]](slot).owner).pkType != pkmSerial:
+        raise newException(StoreError, "insertRow(tableName, data) requires a serial primary key table")
+    var effectivePk: string
+    withSlotWrite(cast[TableSlot[RdbWriteTask]](slot)):
+      let t = cast[DbTable](cast[TableSlot[RdbWriteTask]](slot).owner)
+      effectivePk = t.effectivePkForInsert("")
+      if t.rowsByPk.hasKey(effectivePk):
+        raise newException(StoreError, fmt"duplicate primary key '{effectivePk}' in table '{t.name}'")
+      var d = data
+      t.normalizedRowWithPk(d, effectivePk)
+      validateRow(t, d)
+      s.validateForeignKeysOnInsert(t, d)
+    let mySeq = s.cc.submit(cast[TableSlot[RdbWriteTask]](slot), RdbWriteTask(kind: roInsert, pk: effectivePk, data: data))
+    cast[TableSlot[RdbWriteTask]](slot).waitApplied(mySeq)
+    return effectivePk
   if unlikely(not s.tables.hasKey(tableName)):
     raise newException(StoreError, fmt"table not found: {tableName}")
 
@@ -968,6 +1136,15 @@ proc insertRow*(s: Store, tableName: string, data: RowData): string {.discardabl
 
 proc deleteRow*(s: Store, tableName: string, pk: string): bool {.discardable.} =
   ## Delete a row by primary key. Returns true if a row was deleted, false if not found
+  if s.cc != nil:
+    var slot: ptr TableSlot[RdbWriteTask]
+    withMetaRead(s.cc):
+      if unlikely(not s.tables.hasKey(tableName)):
+        return false
+      slot = cast[ptr TableSlot[RdbWriteTask]](s.tables[tableName].slot)
+    let mySeq = s.cc.submit(cast[TableSlot[RdbWriteTask]](slot), RdbWriteTask(kind: roDelete, pk: pk))
+    cast[TableSlot[RdbWriteTask]](slot).waitApplied(mySeq)
+    return true
   if unlikely(not s.tables.hasKey(tableName)):
     return false
   var t = s.tables[tableName]
@@ -985,6 +1162,16 @@ proc deleteRow*(s: Store, tableName: string, pk: string): bool {.discardable.} =
 proc getRow*(s: Store, tableName: string, pk: string): Option[RowData] =
   ## Fetch a single row by primary key. This will be fast if the table has
   ## an order index, but will fall back to a hash lookup if not.
+  if s.cc != nil:
+    var slot: ptr TableSlot[RdbWriteTask]
+    withMetaRead(s.cc):
+      if unlikely(not s.tables.hasKey(tableName)):
+        return none(RowData)
+      slot = cast[ptr TableSlot[RdbWriteTask]](s.tables[tableName].slot)
+    var res: Option[RowData]
+    withSlotRead(cast[TableSlot[RdbWriteTask]](slot)):
+      res = cast[DbTable](cast[TableSlot[RdbWriteTask]](slot).owner).getRow(pk)
+    return res
   if unlikely(not s.tables.hasKey(tableName)):
     return none(RowData)
   s.tables[tableName].getRow(pk)
@@ -992,9 +1179,7 @@ proc getRow*(s: Store, tableName: string, pk: string): Option[RowData] =
 #
 # SQL Query-like API
 #
-proc where*(t: DbTable, column: string, value: Value): seq[(string, RowData)] =
-  ## Return all rows where the given column matches the specified value. This will be
-  ## fast if the column is indexed, but will fall back to a full scan if not.
+proc whereScan(t: DbTable, column: string, value: Value): seq[(string, RowData)] =
   if t.indexedCols.contains(column) and t.eqIndex.hasKey(column):
     let k = cellIndexKey(value)
     let colMap = t.eqIndex[column]
@@ -1008,6 +1193,16 @@ proc where*(t: DbTable, column: string, value: Value): seq[(string, RowData)] =
   for pk, rec in t.rowsByPk.pairs:
     if rec.cols.hasKey(column) and rec.cols[column] == value:
       result.add((pk, rec.cols))
+
+proc where*(t: DbTable, column: string, value: Value): seq[(string, RowData)] =
+  ## Return all rows where the given column matches the specified value. This will be
+  ## fast if the column is indexed, but will fall back to a full scan if not.
+  if t.slot != nil:
+    var res: seq[(string, RowData)]
+    withSlotRead(t.slot):
+      res = whereScan(t, column, value)
+    return res
+  whereScan(t, column, value)
 
 #
 # WAL application and recovery

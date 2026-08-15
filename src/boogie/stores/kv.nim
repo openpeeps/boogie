@@ -8,11 +8,18 @@
 import std/[tables, options, os]
 import pkg/flatty
 import ../wal
+import ../concurrency
+import ../crashsafe
 
 ## This module implements a simple key-value store with optional
 ## write-ahead logging (WAL) and disk persistence. It uses an in-memory hash map
 ## for fast lookups and a sorted index for ordered iteration. The WAL allows for durability
 ## and crash recovery, while periodic checkpoints can be taken to speed up recovery time.
+##
+## With `enableConcurrency = true` the store supports unlimited simultaneous
+## reader and writer threads: reads are served concurrently under a per-table
+## read lock, and writes are serialized through a bounded worker pool with
+## synchronous visibility and async (batched) WAL durability.
 
 type
   KvStorageMode* = enum
@@ -23,6 +30,14 @@ type
 
   KvStoreError* = object of CatchableError
     ## A catchable exception type for errors related to the key-value store operations.
+
+  KvWriteOp = enum
+    woPut, woDelete
+
+  KvWriteTask = object
+    ## Write task carried across threads (value types only, no shared refs).
+    kind: KvWriteOp
+    key, value: string
 
   KvStore* {.acyclic.} = ref object
     ## The main data structure for the key-value store
@@ -48,6 +63,11 @@ type
       ## the value back from disk on demand. WAL-only durability (no snapshots),
       ## trading read latency for a small memory footprint on large datasets.
     valueOffsets: Table[string, int64]
+
+    cc: ConcurrentState[KvWriteTask]
+      ## Store-level concurrency state; nil unless `enableConcurrency = true`.
+    slot: TableSlot[KvWriteTask]
+      ## The store's single table slot; nil unless `enableConcurrency = true`.
 
 type
   KvSnapshotOnDisk = tuple
@@ -172,7 +192,7 @@ proc applyWalEntry(s: KvStore, e: WalEntry) =
 #
 proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = true,
         checkpointEveryOps: uint32 = 0'u32, walFlushEveryOps: uint32 = 1000'u32,
-        lazyReads = false): KvStore =
+        lazyReads = false, enableConcurrency: static bool = false): KvStore =
   ## Creates a new key-value store. If `mode` is `ksmDisk`, a file-based
   ## store is created at the given `path`. If `enableWal` is true, write-ahead
   ## logging is enabled for durability. The `checkpointEveryOps` parameter controls
@@ -182,6 +202,12 @@ proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = 
   ## With `lazyReads = true` the store keeps only a key -> offset index in memory
   ## (WAL-only durability, no snapshots) and reads values back from the WAL on
   ## demand. This trades read latency for a small memory footprint on large datasets.
+  ##
+  ## With `enableConcurrency = true` the store supports unlimited simultaneous
+  ## reader and writer threads: reads are served concurrently under a read lock,
+  ## and writes are serialized through a bounded worker pool (synchronous
+  ## visibility, async batched WAL durability). Concurrent mode is WAL-only
+  ## (no snapshots).
   var
     dbPath: string
     hasDb: bool
@@ -200,6 +226,10 @@ proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = 
       hasWal = true
       walObj = openWal(path)
 
+  when enableConcurrency:
+    static: doAssert compileOption("threads"), "concurrency requires --threads:on"
+    hasDb = false
+
   result = KvStore(
     dataByKey: initTable[string, string](),
     storageMode: mode,
@@ -213,7 +243,38 @@ proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = 
     valueOffsets: initTable[string, int64]()
   )
 
+  when enableConcurrency:
+    result.slot = newTableSlot[KvWriteTask](cast[pointer](result))
+    result.cc = newConcurrentState[KvWriteTask](
+      proc(ctx: pointer, slot: TableSlot[KvWriteTask], op: KvWriteTask) {.gcsafe.} =
+        let store = cast[KvStore](ctx)
+        case op.kind
+        of woPut:
+          store.putNoWal(op.key, op.value)
+          if store.hasWal:
+            store.cc.appendWal(store.wal,
+              WalEntry(op: woInsertRow, table: KvTableName, pk: op.key, payload: op.value),
+              int(store.walFlushEveryOps))
+        of woDelete:
+          discard store.deleteNoWal(op.key)
+          if store.hasWal:
+            store.cc.appendWal(store.wal,
+              WalEntry(op: woDeleteRow, table: KvTableName, pk: op.key, payload: ""),
+              int(store.walFlushEveryOps))
+      ,
+      cast[pointer](result)
+    )
+
   recoverFromWal(result)
+
+  let s = result
+  registerStoreFlush(cast[pointer](s), proc() {.gcsafe.} =
+    if s.hasWal:
+      if s.cc != nil:
+        s.cc.flushWal(s.wal, clear = false)
+      else:
+        s.wal.flushNoClear()
+  )
 
 proc newInMemoryKvStore*(): KvStore =
   ## Creates a new in-memory key-value store with no persistence or WAL.
@@ -225,16 +286,31 @@ proc checkpoint*(s: KvStore) =
   ## ensure that all operations up to the current LSN are persisted to disk,
   ## which can speed up recovery time in case of a crash. If WAL is enabled,
   ## the WAL is flushed before taking the snapshot to ensure durability.
+  if s.cc != nil:
+    s.cc.flushWal(s.wal)
+    return
   if not s.hasDbFile:
     return
   s.flushWalIfNeeded(force = true)
   s.saveSnapshotIfEnabled()
   s.pendingOps = 0'u32
 
+proc close*(s: KvStore) =
+  ## Stops the write workers (if concurrent) and flushes the WAL.
+  unregisterStoreFlush(cast[pointer](s))
+  if s.cc != nil:
+    s.cc.close(s.wal)
+  else:
+    s.flushWalIfNeeded(force = true)
+
 proc put*(s: KvStore, key, value: string) =
   ## Inserts or updates the value for the given key. If WAL is enabled,
   ## the operation is first appended to the WAL before being applied to
   ## the in-memory store. The checkpoint LSN is updated accordingly.
+  if s.cc != nil:
+    let mySeq = s.cc.submit(s.slot, KvWriteTask(kind: woPut, key: key, value: value))
+    s.slot.waitApplied(mySeq)
+    return
   let lsn = s.appendWalIfEnabled(woInsertRow, key, value)
   s.putNoWal(key, value)
   s.markCommitted(lsn)
@@ -242,6 +318,20 @@ proc put*(s: KvStore, key, value: string) =
 proc get*(s: KvStore, key: string): Option[string] =
   ## Retrieves the value for the given key, if it exists.
   ## Returns `none` if the key is not found.
+  if s.cc != nil:
+    var res: Option[string]
+    withSlotRead(s.slot):
+      if s.lazyReads:
+        if s.valueOffsets.hasKey(key):
+          res = some(s.wal.readEntryAt(s.valueOffsets[key]).payload)
+        else:
+          res = none(string)
+      else:
+        if s.dataByKey.hasKey(key):
+          res = some(s.dataByKey[key])
+        else:
+          res = none(string)
+    return res
   if s.lazyReads:
     if s.valueOffsets.hasKey(key):
       some(s.wal.readEntryAt(s.valueOffsets[key]).payload)
@@ -255,6 +345,11 @@ proc get*(s: KvStore, key: string): Option[string] =
 
 proc hasKey*(s: KvStore, key: string): bool =
   ## Checks if the given key exists in the store.
+  if s.cc != nil:
+    var res = false
+    withSlotRead(s.slot):
+      res = s.dataByKey.hasKey(key)
+    return res
   s.dataByKey.hasKey(key)
 
 proc delete*(s: KvStore, key: string): bool {.discardable.} =
@@ -262,6 +357,10 @@ proc delete*(s: KvStore, key: string): bool {.discardable.} =
   ## operation is first appended to the WAL before being applied to the in-memory store.
   ## 
   ## Returns true if the key was found and deleted, false if the key was not found.
+  if s.cc != nil:
+    let mySeq = s.cc.submit(s.slot, KvWriteTask(kind: woDelete, key: key))
+    s.slot.waitApplied(mySeq)
+    return true
   let lsn = s.appendWalIfEnabled(woDeleteRow, key, "")
   let removed = s.deleteNoWal(key)
   if s.lazyReads:
@@ -271,10 +370,20 @@ proc delete*(s: KvStore, key: string): bool {.discardable.} =
 
 proc len*(s: KvStore): int =
   ## Returns the number of key-value pairs currently stored.
+  if s.cc != nil:
+    var res = 0
+    withSlotRead(s.slot):
+      res = s.dataByKey.len
+    return res
   s.dataByKey.len
 
 proc isEmpty*(s: KvStore): bool =
   ## Checks if the store is empty (contains no key-value pairs).
+  if s.cc != nil:
+    var res = true
+    withSlotRead(s.slot):
+      res = s.dataByKey.len == 0
+    return res
   s.dataByKey.len == 0
 
 proc retainedValueBytes*(s: KvStore): int64 =
@@ -287,7 +396,18 @@ proc retainedValueBytes*(s: KvStore): int64 =
 
 iterator pairsUnordered*(s: KvStore): (string, string) =
   ## Iterates over all key-value pairs in the store in no particular order.
-  if s.lazyReads:
+  if s.cc != nil:
+    beginRead(s.slot.mu)
+    try:
+      if s.lazyReads:
+        for k in s.dataByKey.keys:
+          yield (k, s.wal.readEntryAt(s.valueOffsets[k]).payload)
+      else:
+        for k, v in s.dataByKey.pairs:
+          yield (k, v)
+    finally:
+      endRead(s.slot.mu)
+  elif s.lazyReads:
     for k in s.dataByKey.keys:
       yield (k, s.wal.readEntryAt(s.valueOffsets[k]).payload)
   else:

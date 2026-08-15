@@ -21,7 +21,7 @@
 ## - Querying nodes by label and traversing relationships
 
 import std/[os, tables, sets, strutils, json]
-import pkg/threading/rwlock
+import ../vendor/threading/rwlock
 import ../wal
 
 type

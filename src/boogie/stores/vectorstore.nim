@@ -6,8 +6,10 @@
 #          https://github.com/openpeeps/boogie
 
 import std/[tables, options, strformat, strutils, json, os, math, algorithm]
-import pkg/[flatty, sorta]
+import pkg/flatty
 import ../wal
+import ../concurrency
+import ../crashsafe
 
 ## A simple vector store implementation with optional disk persistence and write-ahead logging (WAL) for 
 ## durability. The vector store supports multiple named collections, each with a specified dimension
@@ -17,6 +19,10 @@ import ../wal
 ## disk as a snapshot. The WAL allows for durability and crash recovery by logging all changes
 ## to the vector store before they are applied, enabling the store to be reconstructed after a
 ## crash by replaying the WAL entries.
+##
+## With `enableConcurrency = true` the store supports unlimited simultaneous reader and writer
+## threads: reads are concurrent per collection, and writes are serialized per collection through
+## a bounded worker pool (synchronous visibility, async batched WAL durability).
 
 type
   VectorStorageMode* = enum
@@ -32,7 +38,17 @@ type
     ## - `dmL2`: L2 distance (squared), where lower is more similar (range 0 to inf)
     dmCosine, dmDot, dmL2
 
-  VectorCollection* {.acyclic.} = ref object
+  VecWriteOp = enum
+    voInsert, voDelete
+
+  VecWriteTask = object
+    ## Write task carried across threads (value types only, no shared refs).
+    kind: VecWriteOp
+    pk: string
+    vec: seq[float32]
+    partition: string
+
+  VectorCollection* = ref object
     ## Represents a collection of vectors, identified by a name and a fixed dimension.
     ## Each vector is associated with a primary key (pk) for lookup.
     ##
@@ -54,10 +70,12 @@ type
     rowPartition: seq[string]
     partitions: Table[string, seq[int]]
     byPk: Table[string, int]
+    slot: TableSlot[VecWriteTask]
+      ## Per-collection concurrency slot; nil unless the store is concurrent.
 
-  VectorStore* {.acyclic.} = ref object
+  VectorStore* = ref object
     ## The main data structure for the vector store, containing multiple collections of vectors
-    collections: SortedTable[string, VectorCollection]
+    collections: Table[string, VectorCollection]
     storageMode: VectorStorageMode
     hasWal: bool
     wal: Wal
@@ -68,6 +86,8 @@ type
     checkpointEveryOps: uint32
     walFlushEveryOps: uint32
     pendingWalOps: uint32
+    cc: ConcurrentState[VecWriteTask]
+      ## Store-level concurrency state; nil unless `enableConcurrency = true`.
 
   VectorStoreError* = object of CatchableError
     ## Custom exception type for errors related to the vector store operations,
@@ -113,10 +133,23 @@ proc newCollection*(name: string, dimension: int): VectorCollection =
 
 proc hasCollection*(s: VectorStore, name: string): bool =
   ## Checks if a collection with the specified name exists in the vector store
+  if s.cc != nil:
+    var res = false
+    withMetaRead(s.cc):
+      res = s.collections.hasKey(name)
+    return res
   s.collections.hasKey(name)
 
 proc getCollection*(s: VectorStore, name: string): Option[VectorCollection] =
   ## Retrieves a collection by name from the vector store
+  if s.cc != nil:
+    var res: Option[VectorCollection]
+    withMetaRead(s.cc):
+      if s.collections.hasKey(name):
+        res = some(s.collections[name])
+      else:
+        res = none(VectorCollection)
+    return res
   if s.collections.hasKey(name):
     some(s.collections[name])
   else:
@@ -279,10 +312,12 @@ proc buildSnapshot(s: VectorStore): SnapshotOnDisk =
 proc loadSnapshotIntoStore(s: VectorStore, snap: SnapshotOnDisk) =
   if snap.version != 2'u32:
     raise newException(VectorStoreError, "unsupported snapshot version")
-  s.collections = initSortedTable[string, VectorCollection]()
+  s.collections = initTable[string, VectorCollection]()
   s.checkpointLsn = snap.checkpointLsn
   for cd in snap.collections:
     var c = newCollection(cd.name, cd.dimension)
+    if s.cc != nil:
+      c.slot = newTableSlot[VecWriteTask](cast[pointer](c))
     for (pk, vec, part) in cd.rows:
       c.insertNoWal(pk, vec, part)
     s.collections[c.name] = c
@@ -315,16 +350,30 @@ proc checkpoint*(s: VectorStore) =
   ## Manually triggers a checkpoint by flushing the WAL and saving a snapshot to disk, ensuring that all
   ## committed operations are persisted and the WAL is truncated up to the checkpoint LSN. This can be used
   ## to reduce recovery time after a crash by minimizing the number of WAL entries that need to be replayed.
+  if s.cc != nil:
+    s.cc.flushWal(s.wal)
+    return
   if not s.hasDbFile:
     return
   s.flushWalIfNeeded(force = true)
   s.saveSnapshotIfEnabled()
   s.pendingOps = 0'u32
 
+proc close*(s: VectorStore) =
+  ## Stops the write workers (if concurrent) and flushes the WAL.
+  unregisterStoreFlush(cast[pointer](s))
+  if s.cc != nil:
+    s.cc.close(s.wal)
+  else:
+    s.flushWalIfNeeded(force = true)
+
 proc applyWalEntry(s: VectorStore, e: WalEntry) =
   case e.op
   of woCreateTable:
-    s.createCollectionNoWal(collectionFromPayload(e.table, e.payload))
+    let c = collectionFromPayload(e.table, e.payload)
+    if s.cc != nil:
+      c.slot = newTableSlot[VecWriteTask](cast[pointer](c))
+    s.createCollectionNoWal(c)
   of woDropTable:
     s.dropCollectionNoWal(e.table)
   of woInsertRow:
@@ -345,7 +394,7 @@ proc recoverFromWal*(s: VectorStore) =
   ## replaying any WAL entries that have an LSN greater than the checkpoint LSN, ensuring that the
   ## vector store is up-to-date with all committed operations. This procedure is typically called
   ## during initialization of the vector store to restore its state after a crash or restart
-  s.collections = initSortedTable[string, VectorCollection]()
+  s.collections = initTable[string, VectorCollection]()
   s.checkpointLsn = 0'u64
   s.pendingOps = 0'u32
   s.pendingWalOps = 0'u32
@@ -364,9 +413,11 @@ proc recoverFromWal*(s: VectorStore) =
   s.pendingWalOps = 0'u32
 
 proc newVectorStore*(path: string, mode: VectorStorageMode = smDisk, enableWal: bool = true,
-          checkpointEveryOps: uint32 = 0'u32, walFlushEveryOps: uint32 = 1000'u32): VectorStore =
+          checkpointEveryOps: uint32 = 0'u32, walFlushEveryOps: uint32 = 1000'u32,
+          enableConcurrency: static bool = false): VectorStore =
   ## Creates a new `VectorStore` instance with the specified storage mode, WAL settings,
-  ## and checkpointing configuration.
+  ## and checkpointing configuration. With `enableConcurrency = true` reads are concurrent
+  ## per collection and writes are serialized per collection through a bounded worker pool.
   var
     dbPath: string
     hasDb: bool
@@ -380,6 +431,12 @@ proc newVectorStore*(path: string, mode: VectorStorageMode = smDisk, enableWal: 
     if path.len == 0:
       raise newException(VectorStoreError, "path cannot be empty in disk mode")
     hasDb = true
+
+  when enableConcurrency:
+    static: doAssert compileOption("threads"), "concurrency requires --threads:on"
+    hasDb = false
+
+  if mode == smDisk:
     dbPath = path.changeFileExt(".vdb")
     if enableWal:
       hasWal = true
@@ -394,7 +451,40 @@ proc newVectorStore*(path: string, mode: VectorStorageMode = smDisk, enableWal: 
     checkpointEveryOps: checkpointEveryOps,
     walFlushEveryOps: walFlushEveryOps
   )
+
+  when enableConcurrency:
+    result.cc = newConcurrentState[VecWriteTask](
+      proc(ctx: pointer, slot: TableSlot[VecWriteTask], op: VecWriteTask) {.gcsafe.} =
+        let s = cast[VectorStore](ctx)
+        let coll = cast[VectorCollection](slot.owner)
+        case op.kind
+        of voInsert:
+          coll.insertNoWal(op.pk, op.vec, op.partition)
+          if s.hasWal:
+            s.cc.appendWal(s.wal,
+              WalEntry(op: woInsertRow, table: coll.name, pk: op.pk,
+                payload: vecToPayload(op.vec, op.partition)),
+              int(s.walFlushEveryOps))
+        of voDelete:
+          discard coll.deleteNoWal(op.pk)
+          if s.hasWal:
+            s.cc.appendWal(s.wal,
+              WalEntry(op: woDeleteRow, table: coll.name, pk: op.pk, payload: ""),
+              int(s.walFlushEveryOps))
+      ,
+      cast[pointer](result)
+    )
+
   recoverFromWal(result)
+
+  let s = result
+  registerStoreFlush(cast[pointer](s), proc() {.gcsafe.} =
+    if s.hasWal:
+      if s.cc != nil:
+        s.cc.flushWal(s.wal, clear = false)
+      else:
+        s.wal.flushNoClear()
+  )
 
 proc newInMemoryVectorStore*: VectorStore =
   ## Convenience procedure to create a new in-memory vector store without
@@ -404,6 +494,15 @@ proc newInMemoryVectorStore*: VectorStore =
 proc createCollection*(s: VectorStore, c: VectorCollection) =
   ## Creates a new collection in the vector store with the specified name and dimension,
   ## logging the operation in the WAL if enabled
+  if s.cc != nil:
+    c.slot = newTableSlot[VecWriteTask](cast[pointer](c))
+    withMetaWrite(s.cc):
+      s.createCollectionNoWal(c)
+    if s.hasWal:
+      s.cc.appendWal(s.wal,
+        WalEntry(op: woCreateTable, table: c.name, pk: "", payload: schemaToPayload(c)),
+        int(s.walFlushEveryOps))
+    return
   let lsn = s.appendWalIfEnabled(woCreateTable, c.name, "", schemaToPayload(c))
   s.createCollectionNoWal(c)
   s.markCommitted(lsn)
@@ -411,6 +510,14 @@ proc createCollection*(s: VectorStore, c: VectorCollection) =
 proc dropCollection*(s: VectorStore, name: string) =
   ## Drops the specified collection from the vector store,
   ## logging the operation in the WAL if enabled
+  if s.cc != nil:
+    withMetaWrite(s.cc):
+      s.dropCollectionNoWal(name)
+    if s.hasWal:
+      s.cc.appendWal(s.wal,
+        WalEntry(op: woDropTable, table: name, pk: "", payload: ""),
+        int(s.walFlushEveryOps))
+    return
   let lsn = s.appendWalIfEnabled(woDropTable, name, "", "")
   s.dropCollectionNoWal(name)
   s.markCommitted(lsn)
@@ -420,6 +527,16 @@ proc insert*(s: VectorStore, collection, pk: string, vec: seq[float32], partitio
   ## validated against the collection's dimension, and the operation is logged in the WAL if enabled.
   ## An optional `partition` groups the vector into a named locality scope that `nearest` can
   ## restrict a search to (like a KoutenDB ring), bounding the scanned candidate set.
+  if s.cc != nil:
+    var slot: ptr TableSlot[VecWriteTask]
+    withMetaRead(s.cc):
+      if not s.collections.hasKey(collection):
+        raise newException(VectorStoreError, fmt"collection not found: {collection}")
+      slot = cast[ptr TableSlot[VecWriteTask]](s.collections[collection].slot)
+    let mySeq = s.cc.submit(cast[TableSlot[VecWriteTask]](slot),
+      VecWriteTask(kind: voInsert, pk: pk, vec: vec, partition: partition))
+    cast[TableSlot[VecWriteTask]](slot).waitApplied(mySeq)
+    return
   if not s.collections.hasKey(collection):
     raise newException(VectorStoreError, fmt"collection not found: {collection}")
   let c = s.collections[collection]
@@ -432,6 +549,15 @@ proc delete*(s: VectorStore, collection, pk: string): bool =
   ## Delete a vector from the specified collection by primary key (pk). The operation
   ## is logged in the WAL if enabled. Returns true if successfully deleted,
   ## false if the pk was not found.
+  if s.cc != nil:
+    var slot: ptr TableSlot[VecWriteTask]
+    withMetaRead(s.cc):
+      if not s.collections.hasKey(collection):
+        return false
+      slot = cast[ptr TableSlot[VecWriteTask]](s.collections[collection].slot)
+    let mySeq = s.cc.submit(cast[TableSlot[VecWriteTask]](slot), VecWriteTask(kind: voDelete, pk: pk))
+    cast[TableSlot[VecWriteTask]](slot).waitApplied(mySeq)
+    return true
   if not s.collections.hasKey(collection):
     return false
   let lsn = s.appendWalIfEnabled(woDeleteRow, collection, pk, "")
@@ -443,6 +569,16 @@ proc get*(s: VectorStore, collection, pk: string): Option[seq[float32]] =
   ## Retrieves a vector from the specified collection by primary key (pk).
   ## Returns an option containing the vector if found, or none if not found
   ## or if the collection does not exist.
+  if s.cc != nil:
+    var slot: ptr TableSlot[VecWriteTask]
+    withMetaRead(s.cc):
+      if not s.collections.hasKey(collection):
+        return none(seq[float32])
+      slot = cast[ptr TableSlot[VecWriteTask]](s.collections[collection].slot)
+    var res: Option[seq[float32]]
+    withSlotRead(cast[TableSlot[VecWriteTask]](slot)):
+      res = cast[VectorCollection](cast[TableSlot[VecWriteTask]](slot).owner).get(pk)
+    return res
   if not s.collections.hasKey(collection):
     return none(seq[float32])
   s.collections[collection].get(pk)
@@ -593,6 +729,16 @@ proc nearest*(s: VectorStore, collection: string, query: seq[float32],
   ## Finds the k nearest vectors to the query in the specified
   ## collection using the given distance metric. An optional `partition`
   ## restricts the search to a bounded candidate set within the collection.
+  if s.cc != nil:
+    var slot: ptr TableSlot[VecWriteTask]
+    withMetaRead(s.cc):
+      if not s.collections.hasKey(collection):
+        raise newException(VectorStoreError, fmt"collection not found: {collection}")
+      slot = cast[ptr TableSlot[VecWriteTask]](s.collections[collection].slot)
+    var res: seq[(string, float32)]
+    withSlotRead(cast[TableSlot[VecWriteTask]](slot)):
+      res = cast[VectorCollection](cast[TableSlot[VecWriteTask]](slot).owner).nearest(query, k, metric, partition)
+    return res
   if not s.collections.hasKey(collection):
     raise newException(VectorStoreError, fmt"collection not found: {collection}")
   s.collections[collection].nearest(query, k, metric, partition)
