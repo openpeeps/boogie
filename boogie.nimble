@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.1.1"
+version       = "0.1.2"
 author        = "George Lemon"
 description   = "A suite of WAL-based data stores"
 license       = "LGPL-3.0-or-later"
