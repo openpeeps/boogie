@@ -8,14 +8,15 @@ nim	WalOp	boogie/wal.html#WalOp	enum WalOp		35
 nim	WalEntry	boogie/wal.html#WalEntry	object WalEntry		43
 nim	Wal	boogie/wal.html#Wal	object Wal		64
 nim	WalError	boogie/wal.html#WalError	object WalError		85
-nim	WalMagic	boogie/wal.html#WalMagic	let WalMagic		87
+nim	WalMagic	boogie/wal.html#WalMagic	const WalMagic		87
 nim	openWal	boogie/wal.html#openWal,string	proc openWal(path: string): Wal		321
 nim	openLog	boogie/wal.html#openLog,Wal	proc openLog(w: var Wal)		338
 nim	logPos	boogie/wal.html#logPos,Wal	proc logPos(w: Wal): int64		343
-nim	flush	boogie/wal.html#flush,Wal	proc flush(w: var Wal)		350
-nim	append	boogie/wal.html#append,Wal,WalEntry,bool	proc append(w: var Wal; entry: WalEntry; sync: bool = true): uint64		373
-nim	replay	boogie/wal.html#replay,Wal,proc(WalEntry)	proc replay(w: Wal; onEntry: proc (e: WalEntry))		387
-nim	readEntryAt	boogie/wal.html#readEntryAt,Wal,int64	proc readEntryAt(w: Wal; offset: int64): WalEntry		401
-nim	reset	boogie/wal.html#reset,Wal	proc reset(w: var Wal)		413
-nim	entries	boogie/wal.html#entries.i,Wal	iterator entries(w: Wal): WalEntry		424
-nim	entriesWithOffsets	boogie/wal.html#entriesWithOffsets.i,Wal	iterator entriesWithOffsets(w: Wal): (int64, WalEntry)		439
+nim	flush	boogie/wal.html#flush,Wal	proc flush(w: var Wal)		376
+nim	flushNoClear	boogie/wal.html#flushNoClear,Wal	proc flushNoClear(w: var Wal)		381
+nim	append	boogie/wal.html#append,Wal,WalEntry,bool	proc append(w: var Wal; entry: WalEntry; sync: bool = true): uint64		386
+nim	replay	boogie/wal.html#replay,Wal,proc(WalEntry)	proc replay(w: Wal; onEntry: proc (e: WalEntry))		400
+nim	readEntryAt	boogie/wal.html#readEntryAt,Wal,int64	proc readEntryAt(w: Wal; offset: int64): WalEntry		414
+nim	reset	boogie/wal.html#reset,Wal	proc reset(w: var Wal)		426
+nim	entries	boogie/wal.html#entries.i,Wal	iterator entries(w: Wal): WalEntry		437
+nim	entriesWithOffsets	boogie/wal.html#entriesWithOffsets.i,Wal	iterator entriesWithOffsets(w: Wal): (int64, WalEntry)		452

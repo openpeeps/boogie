@@ -28,7 +28,7 @@
     <label for="nav-toggle" id="nav-overlay"></label>
     <div class="container">
       <h1 class="title">Index</h1>
-      Modules: <a href="index.html">boogie</a>, <a href="boogie/stores/columnar.html">boogie/stores/columnar</a>, <a href="boogie/stores/docstore.html">boogie/stores/docstore</a>, <a href="boogie/stores/graphstore.html">boogie/stores/graphstore</a>, <a href="boogie/stores/kv.html">boogie/stores/kv</a>, <a href="boogie/stores/rdbms.html">boogie/stores/rdbms</a>, <a href="boogie/stores/vectorstore.html">boogie/stores/vectorstore</a>, <a href="boogie/wal.html">boogie/wal</a>.<br/><p /><h2>API symbols</h2>
+      Modules: <a href="index.html">boogie</a>, <a href="boogie/concurrency.html">boogie/concurrency</a>, <a href="boogie/crashsafe.html">boogie/crashsafe</a>, <a href="boogie/stores/columnar.html">boogie/stores/columnar</a>, <a href="boogie/stores/docstore.html">boogie/stores/docstore</a>, <a href="boogie/stores/graphstore.html">boogie/stores/graphstore</a>, <a href="boogie/stores/kv.html">boogie/stores/kv</a>, <a href="boogie/stores/rdbms.html">boogie/stores/rdbms</a>, <a href="boogie/stores/vectorstore.html">boogie/stores/vectorstore</a>, <a href="boogie/vendor/threading/rwlock.html">boogie/vendor/threading/rwlock</a>, <a href="boogie/wal.html">boogie/wal</a>.<br/><p /><h2>API symbols</h2>
 <dl><dt><a name="%60%24%60" href="#%60%24%60"><span>`$`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="rdbms: proc `$`(v: Value): string" href="boogie/stores/rdbms.html#%24%2CValue">rdbms: proc `$`(v: Value): string</a></li>
@@ -38,6 +38,18 @@
           data-doc-search-tag="rdbms: proc `==`(a, b: RowRecord): bool" href="boogie/stores/rdbms.html#%3D%3D%2CRowRecord%2CRowRecord">rdbms: proc `==`(a, b: RowRecord): bool</a></li>
           <li><a class="reference external"
           data-doc-search-tag="rdbms: proc `==`(a, b: Value): bool" href="boogie/stores/rdbms.html#%3D%3D%2CValue%2CValue">rdbms: proc `==`(a, b: Value): bool</a></li>
+          </ul></dd>
+<dt><a name="%60%3Dcopy%60" href="#%60%3Dcopy%60"><span>`=copy`:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rwlock: proc `=copy`(dest: var RwLock; source: RwLock)" href="boogie/vendor/threading/rwlock.html#%3Dcopy%2CRwLock%2CRwLock">rwlock: proc `=copy`(dest: var RwLock; source: RwLock)</a></li>
+          </ul></dd>
+<dt><a name="%60%3Ddestroy%60" href="#%60%3Ddestroy%60"><span>`=destroy`:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rwlock: proc `=destroy`(rw: RwLock)" href="boogie/vendor/threading/rwlock.html#%3Ddestroy%2CRwLock">rwlock: proc `=destroy`(rw: RwLock)</a></li>
+          </ul></dd>
+<dt><a name="%60%3Dsink%60" href="#%60%3Dsink%60"><span>`=sink`:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rwlock: proc `=sink`(dest: var RwLock; source: RwLock)" href="boogie/vendor/threading/rwlock.html#%3Dsink%2CRwLock%2CRwLock">rwlock: proc `=sink`(dest: var RwLock; source: RwLock)</a></li>
           </ul></dd>
 <dt><a name="AggKind" href="#AggKind"><span>AggKind:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -89,9 +101,23 @@
 <li><a class="reference external"
           data-doc-search-tag="wal: proc append(w: var Wal; entry: WalEntry; sync: bool = true): uint64" href="boogie/wal.html#append%2CWal%2CWalEntry%2Cbool">wal: proc append(w: var Wal; entry: WalEntry; sync: bool = true): uint64</a></li>
           </ul></dd>
+<dt><a name="appendWal" href="#appendWal"><span>appendWal:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: proc appendWal[T](cc: ConcurrentState[T]; wal: var Wal; entry: WalEntry;
+             flushEvery: int)" href="boogie/concurrency.html#appendWal%2CConcurrentState%5BT%5D%2CWal%2CWalEntry%2Cint">concurrency: proc appendWal[T](cc: ConcurrentState[T]; wal: var Wal; entry: WalEntry;
+             flushEvery: int)</a></li>
+          </ul></dd>
+<dt><a name="beginRead" href="#beginRead"><span>beginRead:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rwlock: proc beginRead(rw: var RwLock)" href="boogie/vendor/threading/rwlock.html#beginRead%2CRwLock">rwlock: proc beginRead(rw: var RwLock)</a></li>
+          </ul></dd>
 <dt><a name="beginTx" href="#beginTx"><span>beginTx:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="graphstore: proc beginTx(s: GraphStore): GraphTx" href="boogie/stores/graphstore.html#beginTx%2CGraphStore">graphstore: proc beginTx(s: GraphStore): GraphTx</a></li>
+          </ul></dd>
+<dt><a name="beginWrite" href="#beginWrite"><span>beginWrite:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rwlock: proc beginWrite(rw: var RwLock)" href="boogie/vendor/threading/rwlock.html#beginWrite%2CRwLock">rwlock: proc beginWrite(rw: var RwLock)</a></li>
           </ul></dd>
 <dt><a name="ccDictionary" href="#ccDictionary"><span>ccDictionary:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -116,6 +142,16 @@
           data-doc-search-tag="rdbms: proc checkpoint(s: Store)" href="boogie/stores/rdbms.html#checkpoint%2CStore">rdbms: proc checkpoint(s: Store)</a></li>
           <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc checkpoint(s: VectorStore)" href="boogie/stores/vectorstore.html#checkpoint%2CVectorStore">vectorstore: proc checkpoint(s: VectorStore)</a></li>
+          </ul></dd>
+<dt><a name="close" href="#close"><span>close:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: proc close[T](cc: ConcurrentState[T]; wal: var Wal)" href="boogie/concurrency.html#close%2CConcurrentState%5BT%5D%2CWal">concurrency: proc close[T](cc: ConcurrentState[T]; wal: var Wal)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="kv: proc close(s: KvStore)" href="boogie/stores/kv.html#close%2CKvStore">kv: proc close(s: KvStore)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="rdbms: proc close(s: Store)" href="boogie/stores/rdbms.html#close%2CStore">rdbms: proc close(s: Store)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc close(s: VectorStore)" href="boogie/stores/vectorstore.html#close%2CVectorStore">vectorstore: proc close(s: VectorStore)</a></li>
           </ul></dd>
 <dt><a name="closeGraphStore" href="#closeGraphStore"><span>closeGraphStore:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -149,6 +185,14 @@
 <li><a class="reference external"
           data-doc-search-tag="columnar: enum CompressionCodec" href="boogie/stores/columnar.html#CompressionCodec">columnar: enum CompressionCodec</a></li>
           </ul></dd>
+<dt><a name="ConcurrentState" href="#ConcurrentState"><span>ConcurrentState:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: type ConcurrentState" href="boogie/concurrency.html#ConcurrentState">concurrency: type ConcurrentState</a></li>
+          </ul></dd>
+<dt><a name="consume" href="#consume"><span>consume:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: proc consume[T](r: WriteRing[T]; onTask: proc (x: T) {.closure, gcsafe.})" href="boogie/concurrency.html#consume%2CWriteRing%5BT%5D%2Cproc%28T%29">concurrency: proc consume[T](r: WriteRing[T]; onTask: proc (x: T) {.closure, gcsafe.})</a></li>
+          </ul></dd>
 <dt><a name="createCollection" href="#createCollection"><span>createCollection:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc createCollection(s: VectorStore; c: VectorCollection)" href="boogie/stores/vectorstore.html#createCollection%2CVectorStore%2CVectorCollection">vectorstore: proc createCollection(s: VectorStore; c: VectorCollection)</a></li>
@@ -168,6 +212,10 @@
           data-doc-search-tag="graphstore: proc createRelationship(tx: var GraphTx; fromId, toId: uint64; relType: string;
                    props: JsonNode = newJObject()): uint64" href="boogie/stores/graphstore.html#createRelationship%2CGraphTx%2Cuint64%2Cuint64%2Cstring%2CJsonNode">graphstore: proc createRelationship(tx: var GraphTx; fromId, toId: uint64; relType: string;
                    props: JsonNode = newJObject()): uint64</a></li>
+          </ul></dd>
+<dt><a name="createRwLock" href="#createRwLock"><span>createRwLock:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rwlock: proc createRwLock(): RwLock" href="boogie/vendor/threading/rwlock.html#createRwLock">rwlock: proc createRwLock(): RwLock</a></li>
           </ul></dd>
 <dt><a name="createTable" href="#createTable"><span>createTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -299,6 +347,14 @@
 <li><a class="reference external"
           data-doc-search-tag="rdbms: DataType.dtText" href="boogie/stores/rdbms.html#dtText">rdbms: DataType.dtText</a></li>
           </ul></dd>
+<dt><a name="endRead" href="#endRead"><span>endRead:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rwlock: proc endRead(rw: var RwLock)" href="boogie/vendor/threading/rwlock.html#endRead%2CRwLock">rwlock: proc endRead(rw: var RwLock)</a></li>
+          </ul></dd>
+<dt><a name="endWrite" href="#endWrite"><span>endWrite:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rwlock: proc endWrite(rw: var RwLock)" href="boogie/vendor/threading/rwlock.html#endWrite%2CRwLock">rwlock: proc endWrite(rw: var RwLock)</a></li>
+          </ul></dd>
 <dt><a name="entries" href="#entries"><span>entries:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: iterator entries(w: Wal): WalEntry" href="boogie/wal.html#entries.i%2CWal">wal: iterator entries(w: Wal): WalEntry</a></li>
@@ -330,6 +386,18 @@
 <dt><a name="flush" href="#flush"><span>flush:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: proc flush(w: var Wal)" href="boogie/wal.html#flush%2CWal">wal: proc flush(w: var Wal)</a></li>
+          </ul></dd>
+<dt><a name="flushAllStores" href="#flushAllStores"><span>flushAllStores:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="crashsafe: proc flushAllStores()" href="boogie/crashsafe.html#flushAllStores">crashsafe: proc flushAllStores()</a></li>
+          </ul></dd>
+<dt><a name="flushNoClear" href="#flushNoClear"><span>flushNoClear:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="wal: proc flushNoClear(w: var Wal)" href="boogie/wal.html#flushNoClear%2CWal">wal: proc flushNoClear(w: var Wal)</a></li>
+          </ul></dd>
+<dt><a name="flushWal" href="#flushWal"><span>flushWal:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: proc flushWal[T](cc: ConcurrentState[T]; wal: var Wal; clear = true)" href="boogie/concurrency.html#flushWal%2CConcurrentState%5BT%5D%2CWal">concurrency: proc flushWal[T](cc: ConcurrentState[T]; wal: var Wal; clear = true)</a></li>
           </ul></dd>
 <dt><a name="foEq" href="#foEq"><span>foEq:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -439,6 +507,10 @@
 <li><a class="reference external"
           data-doc-search-tag="rdbms: proc hasTable(s: Store; name: string): bool" href="boogie/stores/rdbms.html#hasTable%2CStore%2Cstring">rdbms: proc hasTable(s: Store; name: string): bool</a></li>
           </ul></dd>
+<dt><a name="initRwLock" href="#initRwLock"><span>initRwLock:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rwlock: proc initRwLock(rw: var RwLock)" href="boogie/vendor/threading/rwlock.html#initRwLock%2CRwLock">rwlock: proc initRwLock(rw: var RwLock)</a></li>
+          </ul></dd>
 <dt><a name="insert" href="#insert"><span>insert:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="docstore: proc insert(store: var DocumentStore; key: string; doc: JsonNode; sync = true;
@@ -462,6 +534,10 @@
           data-doc-search-tag="rdbms: proc insertRow(s: Store; tableName: string; data: RowData): string" href="boogie/stores/rdbms.html#insertRow%2CStore%2Cstring%2CRowData">rdbms: proc insertRow(s: Store; tableName: string; data: RowData): string</a></li>
           <li><a class="reference external"
           data-doc-search-tag="rdbms: proc insertRow(s: Store; tableName: string; pk: string; data: RowData)" href="boogie/stores/rdbms.html#insertRow%2CStore%2Cstring%2Cstring%2CRowData">rdbms: proc insertRow(s: Store; tableName: string; pk: string; data: RowData)</a></li>
+          </ul></dd>
+<dt><a name="installCrashHandlers" href="#installCrashHandlers"><span>installCrashHandlers:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="crashsafe: proc installCrashHandlers()" href="boogie/crashsafe.html#installCrashHandlers">crashsafe: proc installCrashHandlers()</a></li>
           </ul></dd>
 <dt><a name="isEmpty" href="#isEmpty"><span>isEmpty:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -561,6 +637,12 @@
 <li><a class="reference external"
           data-doc-search-tag="rdbms: proc newColumn(name: string; kind: DataType; nullable: bool): ColumnDef" href="boogie/stores/rdbms.html#newColumn%2Cstring%2CDataType%2Cbool">rdbms: proc newColumn(name: string; kind: DataType; nullable: bool): ColumnDef</a></li>
           </ul></dd>
+<dt><a name="newConcurrentState" href="#newConcurrentState"><span>newConcurrentState:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: proc newConcurrentState[T](apply: proc (ctx: pointer; slot: TableSlot[T]; op: T) {.
+    gcsafe.}; ctx: pointer): ConcurrentState[T]" href="boogie/concurrency.html#newConcurrentState%2Cproc%28pointer%2CTableSlot%5BT%5D%2CT%29%2Cpointer">concurrency: proc newConcurrentState[T](apply: proc (ctx: pointer; slot: TableSlot[T]; op: T) {.
+    gcsafe.}; ctx: pointer): ConcurrentState[T]</a></li>
+          </ul></dd>
 <dt><a name="newFloatValue" href="#newFloatValue"><span>newFloatValue:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="rdbms: proc newFloatValue(v: float64): Value" href="boogie/stores/rdbms.html#newFloatValue%2Cfloat64">rdbms: proc newFloatValue(v: float64): Value</a></li>
@@ -595,9 +677,11 @@
 <li><a class="reference external"
           data-doc-search-tag="kv: proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;
            checkpointEveryOps: uint32 = 0'u32;
-           walFlushEveryOps: uint32 = 1000'u32; lazyReads = false): KvStore" href="boogie/stores/kv.html#newKvStore%2Cstring%2CKvStorageMode%2Cbool%2Cuint32%2Cuint32">kv: proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;
+           walFlushEveryOps: uint32 = 1000'u32; lazyReads = false;
+           enableConcurrency: static bool = false): KvStore" href="boogie/stores/kv.html#newKvStore%2Cstring%2CKvStorageMode%2Cbool%2Cuint32%2Cuint32%2Cstaticbool">kv: proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;
            checkpointEveryOps: uint32 = 0'u32;
-           walFlushEveryOps: uint32 = 1000'u32; lazyReads = false): KvStore</a></li>
+           walFlushEveryOps: uint32 = 1000'u32; lazyReads = false;
+           enableConcurrency: static bool = false): KvStore</a></li>
           </ul></dd>
 <dt><a name="newNullValue" href="#newNullValue"><span>newNullValue:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -606,8 +690,12 @@
 <dt><a name="newStore" href="#newStore"><span>newStore:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="rdbms: proc newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
-         checkpointEveryOps: uint32 = 0'u32; walFlushEveryOps: uint32 = 1000'u32): Store" href="boogie/stores/rdbms.html#newStore%2Cstring%2CStorageMode%2Cbool%2Cuint32%2Cuint32">rdbms: proc newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
-         checkpointEveryOps: uint32 = 0'u32; walFlushEveryOps: uint32 = 1000'u32): Store</a></li>
+         checkpointEveryOps: uint32 = 0'u32;
+         walFlushEveryOps: uint32 = 1000'u32;
+         enableConcurrency: static bool = false): Store" href="boogie/stores/rdbms.html#newStore%2Cstring%2CStorageMode%2Cbool%2Cuint32%2Cuint32%2Cstaticbool">rdbms: proc newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
+         checkpointEveryOps: uint32 = 0'u32;
+         walFlushEveryOps: uint32 = 1000'u32;
+         enableConcurrency: static bool = false): Store</a></li>
           </ul></dd>
 <dt><a name="newTable" href="#newTable"><span>newTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -617,6 +705,10 @@
          primaryKeyMode: PrimaryKeyMode = pkmSerial;
          foreignKeys: openArray[ForeignKeyDef] = []): DbTable</a></li>
           </ul></dd>
+<dt><a name="newTableSlot" href="#newTableSlot"><span>newTableSlot:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: proc newTableSlot[T](owner: pointer): TableSlot[T]" href="boogie/concurrency.html#newTableSlot%2Cpointer">concurrency: proc newTableSlot[T](owner: pointer): TableSlot[T]</a></li>
+          </ul></dd>
 <dt><a name="newTextValue" href="#newTextValue"><span>newTextValue:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="rdbms: proc newTextValue(v: string): Value" href="boogie/stores/rdbms.html#newTextValue%2Cstring">rdbms: proc newTextValue(v: string): Value</a></li>
@@ -625,9 +717,15 @@
 <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc newVectorStore(path: string; mode: VectorStorageMode = smDisk;
                enableWal: bool = true; checkpointEveryOps: uint32 = 0'u32;
-               walFlushEveryOps: uint32 = 1000'u32): VectorStore" href="boogie/stores/vectorstore.html#newVectorStore%2Cstring%2CVectorStorageMode%2Cbool%2Cuint32%2Cuint32">vectorstore: proc newVectorStore(path: string; mode: VectorStorageMode = smDisk;
+               walFlushEveryOps: uint32 = 1000'u32;
+               enableConcurrency: static bool = false): VectorStore" href="boogie/stores/vectorstore.html#newVectorStore%2Cstring%2CVectorStorageMode%2Cbool%2Cuint32%2Cuint32%2Cstaticbool">vectorstore: proc newVectorStore(path: string; mode: VectorStorageMode = smDisk;
                enableWal: bool = true; checkpointEveryOps: uint32 = 0'u32;
-               walFlushEveryOps: uint32 = 1000'u32): VectorStore</a></li>
+               walFlushEveryOps: uint32 = 1000'u32;
+               enableConcurrency: static bool = false): VectorStore</a></li>
+          </ul></dd>
+<dt><a name="newWriteRing" href="#newWriteRing"><span>newWriteRing:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: proc newWriteRing[T](capacityPower = 10): WriteRing[T]" href="boogie/concurrency.html#newWriteRing%2Cint">concurrency: proc newWriteRing[T](capacityPower = 10): WriteRing[T]</a></li>
           </ul></dd>
 <dt><a name="openBSONDocument" href="#openBSONDocument"><span>openBSONDocument:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -697,9 +795,17 @@
                                sync = true; enc: DocumentEncoding = deJson)" href="boogie/stores/docstore.html#putObj%2CDocumentStore%2Cstring%2CT%2CDocumentEncoding">docstore: proc putObj[T: object | ref object](store: var DocumentStore; key: string; value: T;
                                sync = true; enc: DocumentEncoding = deJson)</a></li>
           </ul></dd>
+<dt><a name="Queued" href="#Queued"><span>Queued:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: object Queued" href="boogie/concurrency.html#Queued">concurrency: object Queued</a></li>
+          </ul></dd>
 <dt><a name="readEntryAt" href="#readEntryAt"><span>readEntryAt:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: proc readEntryAt(w: Wal; offset: int64): WalEntry" href="boogie/wal.html#readEntryAt%2CWal%2Cint64">wal: proc readEntryAt(w: Wal; offset: int64): WalEntry</a></li>
+          </ul></dd>
+<dt><a name="readWith" href="#readWith"><span>readWith:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rwlock: template readWith(a: RwLock; body: untyped)" href="boogie/vendor/threading/rwlock.html#readWith.t%2CRwLock%2Cuntyped">rwlock: template readWith(a: RwLock; body: untyped)</a></li>
           </ul></dd>
 <dt><a name="recoverFromWal" href="#recoverFromWal"><span>recoverFromWal:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -710,6 +816,10 @@
           data-doc-search-tag="rdbms: proc recoverFromWal(s: Store)" href="boogie/stores/rdbms.html#recoverFromWal%2CStore">rdbms: proc recoverFromWal(s: Store)</a></li>
           <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc recoverFromWal(s: VectorStore)" href="boogie/stores/vectorstore.html#recoverFromWal%2CVectorStore">vectorstore: proc recoverFromWal(s: VectorStore)</a></li>
+          </ul></dd>
+<dt><a name="registerStoreFlush" href="#registerStoreFlush"><span>registerStoreFlush:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="crashsafe: proc registerStoreFlush(storeId: pointer; flush: proc () {.gcsafe.})" href="boogie/crashsafe.html#registerStoreFlush%2Cpointer%2Cproc%29">crashsafe: proc registerStoreFlush(storeId: pointer; flush: proc () {.gcsafe.})</a></li>
           </ul></dd>
 <dt><a name="Relationship" href="#Relationship"><span>Relationship:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -743,6 +853,10 @@
 <li><a class="reference external"
           data-doc-search-tag="rdbms: type RowIndex" href="boogie/stores/rdbms.html#RowIndex">rdbms: type RowIndex</a></li>
           </ul></dd>
+<dt><a name="RwLock" href="#RwLock"><span>RwLock:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rwlock: object RwLock" href="boogie/vendor/threading/rwlock.html#RwLock">rwlock: object RwLock</a></li>
+          </ul></dd>
 <dt><a name="scan" href="#scan"><span>scan:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="columnar: proc scan(s: ColumnarStore; table: string; projectedColumns: seq[string];
@@ -761,6 +875,10 @@
           <li><a class="reference external"
           data-doc-search-tag="vectorstore: VectorStorageMode.smInMemory" href="boogie/stores/vectorstore.html#smInMemory">vectorstore: VectorStorageMode.smInMemory</a></li>
           </ul></dd>
+<dt><a name="stop" href="#stop"><span>stop:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: proc stop[T](r: WriteRing[T])" href="boogie/concurrency.html#stop%2CWriteRing%5BT%5D">concurrency: proc stop[T](r: WriteRing[T])</a></li>
+          </ul></dd>
 <dt><a name="StorageMode" href="#StorageMode"><span>StorageMode:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="rdbms: enum StorageMode" href="boogie/stores/rdbms.html#StorageMode">rdbms: enum StorageMode</a></li>
@@ -773,15 +891,29 @@
 <li><a class="reference external"
           data-doc-search-tag="rdbms: object StoreError" href="boogie/stores/rdbms.html#StoreError">rdbms: object StoreError</a></li>
           </ul></dd>
+<dt><a name="submit" href="#submit"><span>submit:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: proc submit[T](cc: ConcurrentState[T]; slot: TableSlot[T]; op: sink T): uint64" href="boogie/concurrency.html#submit%2CConcurrentState%5BT%5D%2CTableSlot%5BT%5D%2CsinkT">concurrency: proc submit[T](cc: ConcurrentState[T]; slot: TableSlot[T]; op: sink T): uint64</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="concurrency: proc submit[T](r: WriteRing[T]; task: sink T): int64" href="boogie/concurrency.html#submit%2CWriteRing%5BT%5D%2CsinkT">concurrency: proc submit[T](r: WriteRing[T]; task: sink T): int64</a></li>
+          </ul></dd>
 <dt><a name="TableSchema" href="#TableSchema"><span>TableSchema:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="columnar: object TableSchema" href="boogie/stores/columnar.html#TableSchema">columnar: object TableSchema</a></li>
+          </ul></dd>
+<dt><a name="TableSlot" href="#TableSlot"><span>TableSlot:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: type TableSlot" href="boogie/concurrency.html#TableSlot">concurrency: type TableSlot</a></li>
           </ul></dd>
 <dt><a name="traverseBfs" href="#traverseBfs"><span>traverseBfs:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="graphstore: proc traverseBfs(s: GraphStore; startNode: uint64; maxDepth: int; relType = &quot;&quot;): seq[
     uint64]" href="boogie/stores/graphstore.html#traverseBfs%2CGraphStore%2Cuint64%2Cint%2Cstring">graphstore: proc traverseBfs(s: GraphStore; startNode: uint64; maxDepth: int; relType = &quot;&quot;): seq[
     uint64]</a></li>
+          </ul></dd>
+<dt><a name="unregisterStoreFlush" href="#unregisterStoreFlush"><span>unregisterStoreFlush:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="crashsafe: proc unregisterStoreFlush(storeId: pointer)" href="boogie/crashsafe.html#unregisterStoreFlush%2Cpointer">crashsafe: proc unregisterStoreFlush(storeId: pointer)</a></li>
           </ul></dd>
 <dt><a name="upsert" href="#upsert"><span>upsert:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -817,6 +949,10 @@
 <li><a class="reference external"
           data-doc-search-tag="vectorstore: object VectorStoreError" href="boogie/stores/vectorstore.html#VectorStoreError">vectorstore: object VectorStoreError</a></li>
           </ul></dd>
+<dt><a name="waitApplied" href="#waitApplied"><span>waitApplied:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: proc waitApplied[T](slot: TableSlot[T]; order: uint64)" href="boogie/concurrency.html#waitApplied%2CTableSlot%5BT%5D%2Cuint64">concurrency: proc waitApplied[T](slot: TableSlot[T]; order: uint64)</a></li>
+          </ul></dd>
 <dt><a name="Wal" href="#Wal"><span>Wal:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: object Wal" href="boogie/wal.html#Wal">wal: object Wal</a></li>
@@ -831,7 +967,7 @@
           </ul></dd>
 <dt><a name="WalMagic" href="#WalMagic"><span>WalMagic:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="wal: let WalMagic" href="boogie/wal.html#WalMagic">wal: let WalMagic</a></li>
+          data-doc-search-tag="wal: const WalMagic" href="boogie/wal.html#WalMagic">wal: const WalMagic</a></li>
           </ul></dd>
 <dt><a name="WalOp" href="#WalOp"><span>WalOp:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -840,6 +976,22 @@
 <dt><a name="where" href="#where"><span>where:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="rdbms: proc where(t: DbTable; column: string; value: Value): seq[(string, RowData)]" href="boogie/stores/rdbms.html#where%2CDbTable%2Cstring%2CValue">rdbms: proc where(t: DbTable; column: string; value: Value): seq[(string, RowData)]</a></li>
+          </ul></dd>
+<dt><a name="withMetaRead" href="#withMetaRead"><span>withMetaRead:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: template withMetaRead[T](cc: ConcurrentState[T]; body: untyped)" href="boogie/concurrency.html#withMetaRead.t%2CConcurrentState%5BT%5D%2Cuntyped">concurrency: template withMetaRead[T](cc: ConcurrentState[T]; body: untyped)</a></li>
+          </ul></dd>
+<dt><a name="withMetaWrite" href="#withMetaWrite"><span>withMetaWrite:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: template withMetaWrite[T](cc: ConcurrentState[T]; body: untyped)" href="boogie/concurrency.html#withMetaWrite.t%2CConcurrentState%5BT%5D%2Cuntyped">concurrency: template withMetaWrite[T](cc: ConcurrentState[T]; body: untyped)</a></li>
+          </ul></dd>
+<dt><a name="withSlotRead" href="#withSlotRead"><span>withSlotRead:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: template withSlotRead[T](slot: TableSlot[T]; body: untyped)" href="boogie/concurrency.html#withSlotRead.t%2CTableSlot%5BT%5D%2Cuntyped">concurrency: template withSlotRead[T](slot: TableSlot[T]; body: untyped)</a></li>
+          </ul></dd>
+<dt><a name="withSlotWrite" href="#withSlotWrite"><span>withSlotWrite:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: template withSlotWrite[T](slot: TableSlot[T]; body: untyped)" href="boogie/concurrency.html#withSlotWrite.t%2CTableSlot%5BT%5D%2Cuntyped">concurrency: template withSlotWrite[T](slot: TableSlot[T]; body: untyped)</a></li>
           </ul></dd>
 <dt><a name="woCreateTable" href="#woCreateTable"><span>woCreateTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -867,11 +1019,19 @@
                   version: int32 = 1'i32): bool" href="boogie/stores/docstore.html#writeBSONDocument%2CDocumentStore%2Cstring%2Cstring%2Cint32">docstore: proc writeBSONDocument(store: DocumentStore; key, path: string;
                   version: int32 = 1'i32): bool</a></li>
           </ul></dd>
+<dt><a name="WriteRing" href="#WriteRing"><span>WriteRing:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: type WriteRing" href="boogie/concurrency.html#WriteRing">concurrency: type WriteRing</a></li>
+          </ul></dd>
+<dt><a name="writeWith" href="#writeWith"><span>writeWith:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rwlock: template writeWith(a: RwLock; body: untyped)" href="boogie/vendor/threading/rwlock.html#writeWith.t%2CRwLock%2Cuntyped">rwlock: template writeWith(a: RwLock; body: untyped)</a></li>
+          </ul></dd>
 </dl>
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-06 13:38:24 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-15 22:27:33 UTC</small>
       </div>
     </div>
   </div>

@@ -1,0 +1,5 @@
+nimTitle	crashsafe	boogie/crashsafe.html	module boogie/crashsafe		0
+nim	flushAllStores	boogie/crashsafe.html#flushAllStores	proc flushAllStores()		75
+nim	installCrashHandlers	boogie/crashsafe.html#installCrashHandlers	proc installCrashHandlers()		90
+nim	registerStoreFlush	boogie/crashsafe.html#registerStoreFlush,pointer,proc)	proc registerStoreFlush(storeId: pointer; flush: proc () {.gcsafe.})		100
+nim	unregisterStoreFlush	boogie/crashsafe.html#unregisterStoreFlush,pointer	proc unregisterStoreFlush(storeId: pointer)		108

@@ -67,7 +67,7 @@
   nullable*: bool            ## Whether the column can contain null values. If false, a value must be provided for this column on insert.">ColumnDef</a></li>
 <li><a class="reference" href="#DataType" title="DataType = enum
   dtNull, dtInt, dtFloat, dtBool, dtText, dtJson">DataType</a></li>
-<li><a class="reference" href="#DbTable" title="DbTable {.acyclic.} = ref object
+<li><a class="reference" href="#DbTable" title="DbTable = ref object
   name*: string              ## Name of the table
   primaryKey*: string
   case
@@ -90,7 +90,7 @@
 <li><a class="reference" href="#RowIndex" title="RowIndex = SortedTable[RowRecord, string]">RowIndex</a></li>
 <li><a class="reference" href="#StorageMode" title="StorageMode = enum
   smInMemory, smDisk">StorageMode</a></li>
-<li><a class="reference" href="#Store" title="Store {.acyclic.} = ref object">Store</a></li>
+<li><a class="reference" href="#Store" title="Store = ref object">Store</a></li>
 <li><a class="reference" href="#StoreError" title="StoreError = object of CatchableError">StoreError</a></li>
 <li><a class="reference" href="#Value" title="Value = object
   case kind*: DataType
@@ -126,6 +126,10 @@
 </ul>
 <ul class="simple nested-toc-section">checkpoint
   <li><a class="reference" href="#checkpoint%2CStore" title="checkpoint(s: Store)">checkpoint(s: Store)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">close
+  <li><a class="reference" href="#close%2CStore" title="close(s: Store)">close(s: Store)</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">createIndex
@@ -208,9 +212,13 @@
 
 </ul>
 <ul class="simple nested-toc-section">newStore
-  <li><a class="reference" href="#newStore%2Cstring%2CStorageMode%2Cbool%2Cuint32%2Cuint32" title="newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
-         checkpointEveryOps: uint32 = 0'u32; walFlushEveryOps: uint32 = 1000'u32): Store">newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
-         checkpointEveryOps: uint32 = 0'u32; walFlushEveryOps: uint32 = 1000'u32): Store</a></li>
+  <li><a class="reference" href="#newStore%2Cstring%2CStorageMode%2Cbool%2Cuint32%2Cuint32%2Cstaticbool" title="newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
+         checkpointEveryOps: uint32 = 0'u32;
+         walFlushEveryOps: uint32 = 1000'u32;
+         enableConcurrency: static bool = false): Store">newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
+         checkpointEveryOps: uint32 = 0'u32;
+         walFlushEveryOps: uint32 = 1000'u32;
+         enableConcurrency: static bool = false): Store</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">newTable
@@ -272,7 +280,7 @@
     <div class="section" id="6">
   <h1><a class="toc-backref" href="#6">Imports</a></h1>
   <dl class="item">
-    <a class="reference external" href="../wal.html">../wal</a>
+    <a class="reference external" href="../wal.html">../wal</a>, <a class="reference external" href="../concurrency.html">../concurrency</a>, <a class="reference external" href="../crashsafe.html">../crashsafe</a>
   </dl>
 </div>
 <div class="section" id="7">
@@ -299,7 +307,7 @@
   </dd>
 </div>
 <div id="DbTable">
-  <dt><pre><a href="#DbTable"><span class="Identifier">DbTable</span></a> {.<span class="Identifier">acyclic</span>.} <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span>
+  <dt><pre><a href="#DbTable"><span class="Identifier">DbTable</span></a> <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span>
   <span class="Identifier">name</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>              <span class="Comment">## Name of the table</span>
   <span class="Identifier">primaryKey</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
   <span class="Keyword">case</span>
@@ -374,7 +382,7 @@
   </dd>
 </div>
 <div id="Store">
-  <dt><pre><a href="#Store"><span class="Identifier">Store</span></a> {.<span class="Identifier">acyclic</span>.} <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span></pre></dt>
+  <dt><pre><a href="#Store"><span class="Identifier">Store</span></a> <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span></pre></dt>
   <dd>
     
     Represents the main store, containing multiple tables and managing persistence and WAL.
@@ -462,6 +470,18 @@
 </div>
 
 </div>
+<div id="close-procs-all">
+  <div id="close,Store">
+  <dt><pre><span class="Keyword">proc</span> <a href="#close%2CStore"><span class="Identifier">close</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span>
+                       <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Stops the write workers (if concurrent) and flushes the WAL.
+    
+  </dd>
+</div>
+
+</div>
 <div id="createIndex-procs-all">
   <div id="createIndex,DbTable,string">
   <dt><pre><span class="Keyword">proc</span> <a href="#createIndex%2CDbTable%2Cstring"><span class="Identifier">createIndex</span></a><span class="Other">(</span><span class="Identifier">t</span><span class="Other">:</span> <a href="#DbTable"><span class="Identifier">DbTable</span></a><span class="Other">;</span> <span class="Identifier">column</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">StoreError</span><span class="Other">]</span><span class="Other">,</span>
@@ -542,7 +562,7 @@
 <div id="getRow-procs-all">
   <div id="getRow,Store,string,string">
   <dt><pre><span class="Keyword">proc</span> <a href="#getRow%2CStore%2Cstring%2Cstring"><span class="Identifier">getRow</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">;</span> <span class="Identifier">tableName</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">pk</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">Option</span><span class="Other">[</span><a href="#RowData"><span class="Identifier">RowData</span></a><span class="Other">]</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Fetch a single row by primary key. This will be fast if the table has an order index, but will fall back to a hash lookup if not.
@@ -586,9 +606,10 @@
 <div id="insertRow-procs-all">
   <div id="insertRow,Store,string,RowData">
   <dt><pre><span class="Keyword">proc</span> <a href="#insertRow%2CStore%2Cstring%2CRowData"><span class="Identifier">insertRow</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">;</span> <span class="Identifier">tableName</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">data</span><span class="Other">:</span> <a href="#RowData"><span class="Identifier">RowData</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.
-    <span class="Identifier">discardable</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span>
-                          <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span>
-    <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span class="Identifier">discardable</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span>
+                          <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
+    <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
@@ -597,9 +618,9 @@
 </div>
 <div id="insertRow,Store,string,string,RowData">
   <dt><pre><span class="Keyword">proc</span> <a href="#insertRow%2CStore%2Cstring%2Cstring%2CRowData"><span class="Identifier">insertRow</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">;</span> <span class="Identifier">tableName</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">pk</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">data</span><span class="Other">:</span> <a href="#RowData"><span class="Identifier">RowData</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span>
-    <span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
-    <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span>
+    <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span>
+                                <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Insert a row into the specified table with the given primary key and data. This will write to the WAL and commit the transaction. The primary key can be empty for tables with serial PK mode, in which case it will be auto-generated
@@ -731,12 +752,11 @@
 
 </div>
 <div id="newStore-procs-all">
-  <div id="newStore,string,StorageMode,bool,uint32,uint32">
-  <dt><pre><span class="Keyword">proc</span> <a href="#newStore%2Cstring%2CStorageMode%2Cbool%2Cuint32%2Cuint32"><span class="Identifier">newStore</span></a><span class="Other">(</span><span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">mode</span><span class="Other">:</span> <a href="#StorageMode"><span class="Identifier">StorageMode</span></a> <span class="Other">=</span> <span class="Identifier">smDisk</span><span class="Other">;</span> <span class="Identifier">enableWal</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">;</span>
+  <div id="newStore,string,StorageMode,bool,uint32,uint32,staticbool">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newStore%2Cstring%2CStorageMode%2Cbool%2Cuint32%2Cuint32%2Cstaticbool"><span class="Identifier">newStore</span></a><span class="Other">(</span><span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">mode</span><span class="Other">:</span> <a href="#StorageMode"><span class="Identifier">StorageMode</span></a> <span class="Other">=</span> <span class="Identifier">smDisk</span><span class="Other">;</span> <span class="Identifier">enableWal</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">;</span>
               <span class="Identifier">checkpointEveryOps</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span class="Other">=</span> <span class="DecNumber">0'u32</span><span class="Other">;</span>
-              <span class="Identifier">walFlushEveryOps</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span class="Other">=</span> <span class="DecNumber">1000'u32</span><span class="Other">)</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+              <span class="Identifier">walFlushEveryOps</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span class="Other">=</span> <span class="DecNumber">1000'u32</span><span class="Other">;</span>
+              <span class="Identifier">enableConcurrency</span><span class="Other">:</span> <span class="Keyword">static</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a></pre></dt>
   <dd>
     
     <p>Create a new Store instance. Use <tt class="docutils literal"><span class="pre"><span class="Identifier">smInMemory</span></span></tt> for an in-memory store (no persistence) or <tt class="docutils literal"><span class="pre"><span class="Identifier">smDisk</span></span></tt> for a disk-backed store.</p>
@@ -745,6 +765,7 @@
 <li>1000 =&gt; group commit (faster inserts)</li>
 <li>0    =&gt; flush only on checkpoint/close/recovery-end</li>
 </ul>
+<p>With <tt class="docutils literal"><span class="pre"><span class="Identifier">enableConcurrency</span> <span class="Operator">=</span> <span class="Identifier">true</span></span></tt> reads are concurrent per table and writes are serialized per table through a bounded worker pool (WAL-only durability).</p>
 
     
   </dd>
@@ -854,7 +875,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-06 13:38:24 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-15 22:27:33 UTC</small>
       </div>
     </div>
   </div>
