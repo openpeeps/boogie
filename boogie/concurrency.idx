@@ -1,21 +1,33 @@
 nimTitle	concurrency	boogie/concurrency.html	module boogie/concurrency		0
-nim	Queued	boogie/concurrency.html#Queued	object Queued		39
-nim	WriteRing	boogie/concurrency.html#WriteRing	type WriteRing		46
-nim	TableSlot	boogie/concurrency.html#TableSlot	type TableSlot		61
-nim	ConcurrentState	boogie/concurrency.html#ConcurrentState	type ConcurrentState		71
-nim	newWriteRing	boogie/concurrency.html#newWriteRing,int	proc newWriteRing[T](capacityPower = 10): WriteRing[T]		86
-nim	submit	boogie/concurrency.html#submit,WriteRing[T],sinkT	proc submit[T](r: WriteRing[T]; task: sink T): int64		130
-nim	consume	boogie/concurrency.html#consume,WriteRing[T],proc(T)	proc consume[T](r: WriteRing[T]; onTask: proc (x: T) {.closure, gcsafe.})		142
-nim	stop	boogie/concurrency.html#stop,WriteRing[T]	proc stop[T](r: WriteRing[T])		167
-nim	newTableSlot	boogie/concurrency.html#newTableSlot,pointer	proc newTableSlot[T](owner: pointer): TableSlot[T]		177
-nim	submit	boogie/concurrency.html#submit,ConcurrentState[T],TableSlot[T],sinkT	proc submit[T](cc: ConcurrentState[T]; slot: TableSlot[T]; op: sink T): uint64		187
-nim	waitApplied	boogie/concurrency.html#waitApplied,TableSlot[T],uint64	proc waitApplied[T](slot: TableSlot[T]; order: uint64)		195
-nim	newConcurrentState	boogie/concurrency.html#newConcurrentState,proc(pointer,TableSlot[T],T),pointer	proc newConcurrentState[T](apply: proc (ctx: pointer; slot: TableSlot[T]; op: T) {.\n    gcsafe.}; ctx: pointer): ConcurrentState[T]		227
-nim	appendWal	boogie/concurrency.html#appendWal,ConcurrentState[T],Wal,WalEntry,int	proc appendWal[T](cc: ConcurrentState[T]; wal: var Wal; entry: WalEntry;\n             flushEvery: int)		239
-nim	flushWal	boogie/concurrency.html#flushWal,ConcurrentState[T],Wal	proc flushWal[T](cc: ConcurrentState[T]; wal: var Wal; clear = true)		255
-nim	close	boogie/concurrency.html#close,ConcurrentState[T],Wal	proc close[T](cc: ConcurrentState[T]; wal: var Wal)		266
-nim	withSlotRead	boogie/concurrency.html#withSlotRead.t,TableSlot[T],untyped	template withSlotRead[T](slot: TableSlot[T]; body: untyped)		275
-nim	withSlotWrite	boogie/concurrency.html#withSlotWrite.t,TableSlot[T],untyped	template withSlotWrite[T](slot: TableSlot[T]; body: untyped)		282
-nim	withMetaRead	boogie/concurrency.html#withMetaRead.t,ConcurrentState[T],untyped	template withMetaRead[T](cc: ConcurrentState[T]; body: untyped)		289
-nim	withMetaWrite	boogie/concurrency.html#withMetaWrite.t,ConcurrentState[T],untyped	template withMetaWrite[T](cc: ConcurrentState[T]; body: untyped)		296
-nimgrp	submit	boogie/concurrency.html#submit-procs-all	proc		130
+nim	RwLock	boogie/concurrency.html#RwLock	object RwLock		38
+nim	`=destroy`	boogie/concurrency.html#=destroy,RwLock	proc `=destroy`(rw: RwLock)		47
+nim	`=sink`	boogie/concurrency.html#=sink,RwLock,RwLock	proc `=sink`(dest: var RwLock; source: RwLock)		56
+nim	`=copy`	boogie/concurrency.html#=copy,RwLock,RwLock	proc `=copy`(dest: var RwLock; source: RwLock)		57
+nim	initRwLock	boogie/concurrency.html#initRwLock,RwLock	proc initRwLock(rw: var RwLock)		59
+nim	createRwLock	boogie/concurrency.html#createRwLock	proc createRwLock(): RwLock		64
+nim	readWith	boogie/concurrency.html#readWith.t,RwLock,untyped	template readWith(a: var RwLock; body: untyped)		70
+nim	writeWith	boogie/concurrency.html#writeWith.t,RwLock,untyped	template writeWith(a: var RwLock; body: untyped)		77
+nim	beginRead	boogie/concurrency.html#beginRead,RwLock	proc beginRead(rw: var RwLock)		84
+nim	beginWrite	boogie/concurrency.html#beginWrite,RwLock	proc beginWrite(rw: var RwLock)		91
+nim	endRead	boogie/concurrency.html#endRead,RwLock	proc endRead(rw: var RwLock)		100
+nim	endWrite	boogie/concurrency.html#endWrite,RwLock	proc endWrite(rw: var RwLock)		106
+nim	Queued	boogie/concurrency.html#Queued	object Queued		113
+nim	WriteRing	boogie/concurrency.html#WriteRing	type WriteRing		120
+nim	TableSlot	boogie/concurrency.html#TableSlot	type TableSlot		135
+nim	ConcurrentState	boogie/concurrency.html#ConcurrentState	type ConcurrentState		145
+nim	newWriteRing	boogie/concurrency.html#newWriteRing,int	proc newWriteRing[T](capacityPower = 10): WriteRing[T]		160
+nim	submit	boogie/concurrency.html#submit,WriteRing[T],sinkT	proc submit[T](r: WriteRing[T]; task: sink T): int64		204
+nim	consume	boogie/concurrency.html#consume,WriteRing[T],proc(T)	proc consume[T](r: WriteRing[T]; onTask: proc (x: T) {.closure, gcsafe.})		216
+nim	stop	boogie/concurrency.html#stop,WriteRing[T]	proc stop[T](r: WriteRing[T])		241
+nim	newTableSlot	boogie/concurrency.html#newTableSlot,pointer	proc newTableSlot[T](owner: pointer): TableSlot[T]		251
+nim	submit	boogie/concurrency.html#submit,ConcurrentState[T],TableSlot[T],sinkT	proc submit[T](cc: ConcurrentState[T]; slot: TableSlot[T]; op: sink T): uint64		261
+nim	waitApplied	boogie/concurrency.html#waitApplied,TableSlot[T],uint64	proc waitApplied[T](slot: TableSlot[T]; order: uint64)		269
+nim	newConcurrentState	boogie/concurrency.html#newConcurrentState,proc(pointer,TableSlot[T],T),pointer	proc newConcurrentState[T](apply: proc (ctx: pointer; slot: TableSlot[T]; op: T) {.\n    gcsafe.}; ctx: pointer): ConcurrentState[T]		301
+nim	appendWal	boogie/concurrency.html#appendWal,ConcurrentState[T],Wal,WalEntry,int	proc appendWal[T](cc: ConcurrentState[T]; wal: var Wal; entry: WalEntry;\n             flushEvery: int)		313
+nim	flushWal	boogie/concurrency.html#flushWal,ConcurrentState[T],Wal	proc flushWal[T](cc: ConcurrentState[T]; wal: var Wal; clear = true)		329
+nim	close	boogie/concurrency.html#close,ConcurrentState[T],Wal	proc close[T](cc: ConcurrentState[T]; wal: var Wal)		340
+nim	withSlotRead	boogie/concurrency.html#withSlotRead.t,TableSlot[T],untyped	template withSlotRead[T](slot: TableSlot[T]; body: untyped)		349
+nim	withSlotWrite	boogie/concurrency.html#withSlotWrite.t,TableSlot[T],untyped	template withSlotWrite[T](slot: TableSlot[T]; body: untyped)		356
+nim	withMetaRead	boogie/concurrency.html#withMetaRead.t,ConcurrentState[T],untyped	template withMetaRead[T](cc: ConcurrentState[T]; body: untyped)		363
+nim	withMetaWrite	boogie/concurrency.html#withMetaWrite.t,ConcurrentState[T],untyped	template withMetaWrite[T](cc: ConcurrentState[T]; body: untyped)		370
+nimgrp	submit	boogie/concurrency.html#submit-procs-all	proc		204

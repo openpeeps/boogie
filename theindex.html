@@ -28,7 +28,7 @@
     <label for="nav-toggle" id="nav-overlay"></label>
     <div class="container">
       <h1 class="title">Index</h1>
-      Modules: <a href="index.html">boogie</a>, <a href="boogie/concurrency.html">boogie/concurrency</a>, <a href="boogie/crashsafe.html">boogie/crashsafe</a>, <a href="boogie/stores/columnar.html">boogie/stores/columnar</a>, <a href="boogie/stores/docstore.html">boogie/stores/docstore</a>, <a href="boogie/stores/graphstore.html">boogie/stores/graphstore</a>, <a href="boogie/stores/kv.html">boogie/stores/kv</a>, <a href="boogie/stores/rdbms.html">boogie/stores/rdbms</a>, <a href="boogie/stores/vectorstore.html">boogie/stores/vectorstore</a>, <a href="boogie/vendor/threading/rwlock.html">boogie/vendor/threading/rwlock</a>, <a href="boogie/wal.html">boogie/wal</a>.<br/><p /><h2>API symbols</h2>
+      Modules: <a href="index.html">boogie</a>, <a href="boogie/concurrency.html">boogie/concurrency</a>, <a href="boogie/crashsafe.html">boogie/crashsafe</a>, <a href="boogie/stores/columnar.html">boogie/stores/columnar</a>, <a href="boogie/stores/docstore.html">boogie/stores/docstore</a>, <a href="boogie/stores/graphstore.html">boogie/stores/graphstore</a>, <a href="boogie/stores/kv.html">boogie/stores/kv</a>, <a href="boogie/stores/rdbms.html">boogie/stores/rdbms</a>, <a href="boogie/stores/vectorstore.html">boogie/stores/vectorstore</a>, <a href="boogie/wal.html">boogie/wal</a>.<br/><p /><h2>API symbols</h2>
 <dl><dt><a name="%60%24%60" href="#%60%24%60"><span>`$`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="rdbms: proc `$`(v: Value): string" href="boogie/stores/rdbms.html#%24%2CValue">rdbms: proc `$`(v: Value): string</a></li>
@@ -41,15 +41,15 @@
           </ul></dd>
 <dt><a name="%60%3Dcopy%60" href="#%60%3Dcopy%60"><span>`=copy`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rwlock: proc `=copy`(dest: var RwLock; source: RwLock)" href="boogie/vendor/threading/rwlock.html#%3Dcopy%2CRwLock%2CRwLock">rwlock: proc `=copy`(dest: var RwLock; source: RwLock)</a></li>
+          data-doc-search-tag="concurrency: proc `=copy`(dest: var RwLock; source: RwLock)" href="boogie/concurrency.html#%3Dcopy%2CRwLock%2CRwLock">concurrency: proc `=copy`(dest: var RwLock; source: RwLock)</a></li>
           </ul></dd>
 <dt><a name="%60%3Ddestroy%60" href="#%60%3Ddestroy%60"><span>`=destroy`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rwlock: proc `=destroy`(rw: RwLock)" href="boogie/vendor/threading/rwlock.html#%3Ddestroy%2CRwLock">rwlock: proc `=destroy`(rw: RwLock)</a></li>
+          data-doc-search-tag="concurrency: proc `=destroy`(rw: RwLock)" href="boogie/concurrency.html#%3Ddestroy%2CRwLock">concurrency: proc `=destroy`(rw: RwLock)</a></li>
           </ul></dd>
 <dt><a name="%60%3Dsink%60" href="#%60%3Dsink%60"><span>`=sink`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rwlock: proc `=sink`(dest: var RwLock; source: RwLock)" href="boogie/vendor/threading/rwlock.html#%3Dsink%2CRwLock%2CRwLock">rwlock: proc `=sink`(dest: var RwLock; source: RwLock)</a></li>
+          data-doc-search-tag="concurrency: proc `=sink`(dest: var RwLock; source: RwLock)" href="boogie/concurrency.html#%3Dsink%2CRwLock%2CRwLock">concurrency: proc `=sink`(dest: var RwLock; source: RwLock)</a></li>
           </ul></dd>
 <dt><a name="AggKind" href="#AggKind"><span>AggKind:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -109,7 +109,7 @@
           </ul></dd>
 <dt><a name="beginRead" href="#beginRead"><span>beginRead:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rwlock: proc beginRead(rw: var RwLock)" href="boogie/vendor/threading/rwlock.html#beginRead%2CRwLock">rwlock: proc beginRead(rw: var RwLock)</a></li>
+          data-doc-search-tag="concurrency: proc beginRead(rw: var RwLock)" href="boogie/concurrency.html#beginRead%2CRwLock">concurrency: proc beginRead(rw: var RwLock)</a></li>
           </ul></dd>
 <dt><a name="beginTx" href="#beginTx"><span>beginTx:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -117,7 +117,7 @@
           </ul></dd>
 <dt><a name="beginWrite" href="#beginWrite"><span>beginWrite:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rwlock: proc beginWrite(rw: var RwLock)" href="boogie/vendor/threading/rwlock.html#beginWrite%2CRwLock">rwlock: proc beginWrite(rw: var RwLock)</a></li>
+          data-doc-search-tag="concurrency: proc beginWrite(rw: var RwLock)" href="boogie/concurrency.html#beginWrite%2CRwLock">concurrency: proc beginWrite(rw: var RwLock)</a></li>
           </ul></dd>
 <dt><a name="ccDictionary" href="#ccDictionary"><span>ccDictionary:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -215,7 +215,7 @@
           </ul></dd>
 <dt><a name="createRwLock" href="#createRwLock"><span>createRwLock:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rwlock: proc createRwLock(): RwLock" href="boogie/vendor/threading/rwlock.html#createRwLock">rwlock: proc createRwLock(): RwLock</a></li>
+          data-doc-search-tag="concurrency: proc createRwLock(): RwLock" href="boogie/concurrency.html#createRwLock">concurrency: proc createRwLock(): RwLock</a></li>
           </ul></dd>
 <dt><a name="createTable" href="#createTable"><span>createTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -349,11 +349,11 @@
           </ul></dd>
 <dt><a name="endRead" href="#endRead"><span>endRead:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rwlock: proc endRead(rw: var RwLock)" href="boogie/vendor/threading/rwlock.html#endRead%2CRwLock">rwlock: proc endRead(rw: var RwLock)</a></li>
+          data-doc-search-tag="concurrency: proc endRead(rw: var RwLock)" href="boogie/concurrency.html#endRead%2CRwLock">concurrency: proc endRead(rw: var RwLock)</a></li>
           </ul></dd>
 <dt><a name="endWrite" href="#endWrite"><span>endWrite:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rwlock: proc endWrite(rw: var RwLock)" href="boogie/vendor/threading/rwlock.html#endWrite%2CRwLock">rwlock: proc endWrite(rw: var RwLock)</a></li>
+          data-doc-search-tag="concurrency: proc endWrite(rw: var RwLock)" href="boogie/concurrency.html#endWrite%2CRwLock">concurrency: proc endWrite(rw: var RwLock)</a></li>
           </ul></dd>
 <dt><a name="entries" href="#entries"><span>entries:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -509,7 +509,7 @@
           </ul></dd>
 <dt><a name="initRwLock" href="#initRwLock"><span>initRwLock:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rwlock: proc initRwLock(rw: var RwLock)" href="boogie/vendor/threading/rwlock.html#initRwLock%2CRwLock">rwlock: proc initRwLock(rw: var RwLock)</a></li>
+          data-doc-search-tag="concurrency: proc initRwLock(rw: var RwLock)" href="boogie/concurrency.html#initRwLock%2CRwLock">concurrency: proc initRwLock(rw: var RwLock)</a></li>
           </ul></dd>
 <dt><a name="insert" href="#insert"><span>insert:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -805,7 +805,7 @@
           </ul></dd>
 <dt><a name="readWith" href="#readWith"><span>readWith:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rwlock: template readWith(a: RwLock; body: untyped)" href="boogie/vendor/threading/rwlock.html#readWith.t%2CRwLock%2Cuntyped">rwlock: template readWith(a: RwLock; body: untyped)</a></li>
+          data-doc-search-tag="concurrency: template readWith(a: var RwLock; body: untyped)" href="boogie/concurrency.html#readWith.t%2CRwLock%2Cuntyped">concurrency: template readWith(a: var RwLock; body: untyped)</a></li>
           </ul></dd>
 <dt><a name="recoverFromWal" href="#recoverFromWal"><span>recoverFromWal:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -855,7 +855,7 @@
           </ul></dd>
 <dt><a name="RwLock" href="#RwLock"><span>RwLock:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rwlock: object RwLock" href="boogie/vendor/threading/rwlock.html#RwLock">rwlock: object RwLock</a></li>
+          data-doc-search-tag="concurrency: object RwLock" href="boogie/concurrency.html#RwLock">concurrency: object RwLock</a></li>
           </ul></dd>
 <dt><a name="scan" href="#scan"><span>scan:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -1025,13 +1025,13 @@
           </ul></dd>
 <dt><a name="writeWith" href="#writeWith"><span>writeWith:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rwlock: template writeWith(a: RwLock; body: untyped)" href="boogie/vendor/threading/rwlock.html#writeWith.t%2CRwLock%2Cuntyped">rwlock: template writeWith(a: RwLock; body: untyped)</a></li>
+          data-doc-search-tag="concurrency: template writeWith(a: var RwLock; body: untyped)" href="boogie/concurrency.html#writeWith.t%2CRwLock%2Cuntyped">concurrency: template writeWith(a: var RwLock; body: untyped)</a></li>
           </ul></dd>
 </dl>
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-17 17:18:54 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-19 15:25:06 UTC</small>
       </div>
     </div>
   </div>
