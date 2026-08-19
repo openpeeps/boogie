@@ -21,7 +21,7 @@
 ## - Querying nodes by label and traversing relationships
 
 import std/[os, tables, sets, strutils, json]
-import ../vendor/threading/rwlock
+import ../concurrency
 import ../wal
 
 type
@@ -56,7 +56,7 @@ type
   GraphStore* {.acyclic.} = ref object
     rootDir: string
     wal*: Wal
-    mu: RWLock
+    mu: RwLock
 
     nextNodeId: uint64
     nextRelId: uint64

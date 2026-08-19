@@ -30,10 +30,84 @@
 ## with correct refcounting (unlike a channel's raw memcpy).
 
 import std/[locks, atomics, cpuinfo]
-import ./vendor/threading/[rwlock]
 import ./wal
 
-export rwlock
+# -- RwLock (inlined, avoids the threading package dependency) ---------------
+
+type
+  RwLock* = object
+    ## Readers-writer lock. Multiple readers can acquire the lock at the same
+    ## time, but only one writer can acquire the lock at a time.
+    c: Cond
+    L: Lock
+    activeReaders, waitingWriters: int
+    isWriterActive: bool
+
+when defined(nimAllowNonVarDestructor):
+  proc `=destroy`*(rw: RwLock) {.nimcall.} =
+    let x = addr(rw)
+    deinitCond(x.c)
+    deinitLock(x.L)
+else:
+  proc `=destroy`*(rw: var RwLock) {.nimcall.} =
+    deinitCond(rw.c)
+    deinitLock(rw.L)
+
+proc `=sink`*(dest: var RwLock; source: RwLock) {.error.}
+proc `=copy`*(dest: var RwLock; source: RwLock) {.error.}
+
+proc initRwLock*(rw: var RwLock) {.inline.} =
+  ## In-place initializer for a zero-initialized `RwLock` field (embeddable).
+  initCond(rw.c)
+  initLock(rw.L)
+
+proc createRwLock*(): RwLock =
+  ## Creates a new `RwLock`.
+  result = default(RwLock)
+  initCond(result.c)
+  initLock(result.L)
+
+template readWith*(a: var RwLock, body: untyped) =
+  beginRead(a)
+  try:
+    body
+  finally:
+    endRead(a)
+
+template writeWith*(a: var RwLock, body: untyped) =
+  beginWrite(a)
+  try:
+    body
+  finally:
+    endWrite(a)
+
+proc beginRead*(rw: var RwLock) =
+  acquire(rw.L)
+  while rw.waitingWriters > 0 or rw.isWriterActive:
+    wait(rw.c, rw.L)
+  inc rw.activeReaders
+  release(rw.L)
+
+proc beginWrite*(rw: var RwLock) =
+  acquire(rw.L)
+  inc rw.waitingWriters
+  while rw.activeReaders > 0 or rw.isWriterActive:
+    wait(rw.c, rw.L)
+  dec rw.waitingWriters
+  rw.isWriterActive = true
+  release(rw.L)
+
+proc endRead*(rw: var RwLock) {.inline.} =
+  acquire(rw.L)
+  dec rw.activeReaders
+  broadcast(rw.c)
+  release(rw.L)
+
+proc endWrite*(rw: var RwLock) {.inline.} =
+  acquire(rw.L)
+  rw.isWriterActive = false
+  broadcast(rw.c)
+  release(rw.L)
 
 type
   Queued*[T] = object
