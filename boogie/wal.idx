@@ -17,6 +17,10 @@ nim	flushNoClear	boogie/wal.html#flushNoClear,Wal	proc flushNoClear(w: var Wal)	
 nim	append	boogie/wal.html#append,Wal,WalEntry,bool	proc append(w: var Wal; entry: WalEntry; sync: bool = true): uint64		386
 nim	replay	boogie/wal.html#replay,Wal,proc(WalEntry)	proc replay(w: Wal; onEntry: proc (e: WalEntry))		400
 nim	readEntryAt	boogie/wal.html#readEntryAt,Wal,int64	proc readEntryAt(w: Wal; offset: int64): WalEntry		414
-nim	reset	boogie/wal.html#reset,Wal	proc reset(w: var Wal)		426
-nim	entries	boogie/wal.html#entries.i,Wal	iterator entries(w: Wal): WalEntry		437
-nim	entriesWithOffsets	boogie/wal.html#entriesWithOffsets.i,Wal	iterator entriesWithOffsets(w: Wal): (int64, WalEntry)		452
+nim	LogReader	boogie/wal.html#LogReader	type LogReader		427
+nim	openLogReader	boogie/wal.html#openLogReader,Wal	proc openLogReader(w: Wal): LogReader		436
+nim	readAt	boogie/wal.html#readAt,LogReader,int64	proc readAt(r: LogReader; offset: int64): WalEntry		444
+nim	close	boogie/wal.html#close,LogReader	proc close(r: LogReader)		453
+nim	reset	boogie/wal.html#reset,Wal	proc reset(w: var Wal)		459
+nim	entries	boogie/wal.html#entries.i,Wal	iterator entries(w: Wal): WalEntry		470
+nim	entriesWithOffsets	boogie/wal.html#entriesWithOffsets.i,Wal	iterator entriesWithOffsets(w: Wal): (int64, WalEntry)		485

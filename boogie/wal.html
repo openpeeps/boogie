@@ -58,7 +58,8 @@
   <details open>
     <summary><a class="reference reference-toplevel" href="#7" id="57">Types</a></summary>
     <ul class="simple simple-toc-section">
-      <li><a class="reference" href="#Wal" title="Wal = object
+      <li><a class="reference" href="#LogReader" title="LogReader = ref object">LogReader</a></li>
+<li><a class="reference" href="#Wal" title="Wal = object
   path*: string              ## The file path to the WAL file on disk
   nextLsn*: uint64 ## The next LSN to be assigned to a new log entry. This is computed based
                    ## on the existing WAL file on open.
@@ -104,6 +105,10 @@
   <li><a class="reference" href="#append%2CWal%2CWalEntry%2Cbool" title="append(w: var Wal; entry: WalEntry; sync: bool = true): uint64">append(w: var Wal; entry: WalEntry; sync: bool = true): uint64</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">close
+  <li><a class="reference" href="#close%2CLogReader" title="close(r: LogReader)">close(r: LogReader)</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">flush
   <li><a class="reference" href="#flush%2CWal" title="flush(w: var Wal)">flush(w: var Wal)</a></li>
 
@@ -120,8 +125,16 @@
   <li><a class="reference" href="#openLog%2CWal" title="openLog(w: var Wal)">openLog(w: var Wal)</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">openLogReader
+  <li><a class="reference" href="#openLogReader%2CWal" title="openLogReader(w: Wal): LogReader">openLogReader(w: Wal): LogReader</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">openWal
   <li><a class="reference" href="#openWal%2Cstring" title="openWal(path: string): Wal">openWal(path: string): Wal</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">readAt
+  <li><a class="reference" href="#readAt%2CLogReader%2Cint64" title="readAt(r: LogReader; offset: int64): WalEntry">readAt(r: LogReader; offset: int64): WalEntry</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">readEntryAt
@@ -184,7 +197,15 @@
     <div class="section" id="7">
   <h1><a class="toc-backref" href="#7">Types</a></h1>
   <dl class="item">
-    <div id="Wal">
+    <div id="LogReader">
+  <dt><pre><a href="#LogReader"><span class="Identifier">LogReader</span></a> <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span></pre></dt>
+  <dd>
+    
+    A persistent read handle over a WAL file. Unlike <tt class="docutils literal"><span class="pre"><span class="Identifier">readEntryAt</span></span></tt>, which pays an open/close syscall pair per record, a <tt class="docutils literal"><span class="pre"><span class="Identifier">LogReader</span></span></tt> keeps one file descriptor open and seeks per read, making sequential or repeated random-access scans much cheaper. Used by stores whose primary data lives inside a WAL file (e.g. the log store).
+    
+  </dd>
+</div>
+<div id="Wal">
   <dt><pre><a href="#Wal"><span class="Identifier">Wal</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
   <span class="Identifier">path</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>              <span class="Comment">## The file path to the WAL file on disk</span>
   <span class="Identifier">nextLsn</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">uint64</span> <span class="Comment">## The next LSN to be assigned to a new log entry. This is computed based</span>
@@ -269,6 +290,17 @@
 </div>
 
 </div>
+<div id="close-procs-all">
+  <div id="close,LogReader">
+  <dt><pre><span class="Keyword">proc</span> <a href="#close%2CLogReader"><span class="Identifier">close</span></a><span class="Other">(</span><span class="Identifier">r</span><span class="Other">:</span> <a href="#LogReader"><span class="Identifier">LogReader</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Closes the underlying file handle. Safe to call more than once.
+    
+  </dd>
+</div>
+
+</div>
 <div id="flush-procs-all">
   <div id="flush,Wal">
   <dt><pre><span class="Keyword">proc</span> <a href="#flush%2CWal"><span class="Identifier">flush</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#Wal"><span class="Identifier">Wal</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span>
@@ -315,6 +347,18 @@
 </div>
 
 </div>
+<div id="openLogReader-procs-all">
+  <div id="openLogReader,Wal">
+  <dt><pre><span class="Keyword">proc</span> <a href="#openLogReader%2CWal"><span class="Identifier">openLogReader</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <a href="#Wal"><span class="Identifier">Wal</span></a><span class="Other">)</span><span class="Other">:</span> <a href="#LogReader"><span class="Identifier">LogReader</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span>
+                                        <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Opens a persistent read handle over the WAL file at <tt class="docutils literal"><span class="pre"><span class="Identifier">w</span><span class="Operator">.</span><span class="Identifier">path</span></span></tt>. The WAL file must already exist (e.g. created by <tt class="docutils literal"><span class="pre"><span class="Identifier">openWal</span></span></tt>).
+    
+  </dd>
+</div>
+
+</div>
 <div id="openWal-procs-all">
   <div id="openWal,string">
   <dt><pre><span class="Keyword">proc</span> <a href="#openWal%2Cstring"><span class="Identifier">openWal</span></a><span class="Other">(</span><span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <a href="#Wal"><span class="Identifier">Wal</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
@@ -324,6 +368,18 @@
     <p>Opens or creates a WAL file at the given path. If the file already exists, it reads the header and computes the next LSN based on the existing entries.</p>
 <p>If the file does not exist or is empty, it initializes a new WAL file with the correct header and starts with LSN 1.</p>
 
+    
+  </dd>
+</div>
+
+</div>
+<div id="readAt-procs-all">
+  <div id="readAt,LogReader,int64">
+  <dt><pre><span class="Keyword">proc</span> <a href="#readAt%2CLogReader%2Cint64"><span class="Identifier">readAt</span></a><span class="Other">(</span><span class="Identifier">r</span><span class="Other">:</span> <a href="#LogReader"><span class="Identifier">LogReader</span></a><span class="Other">;</span> <span class="Identifier">offset</span><span class="Other">:</span> <span class="Identifier">int64</span><span class="Other">)</span><span class="Other">:</span> <a href="#WalEntry"><span class="Identifier">WalEntry</span></a> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Reads a single entry by its record's byte offset, reusing the reader's open file handle. The offset is a record start as returned by <tt class="docutils literal"><span class="pre"><span class="Identifier">logPos</span></span></tt> (or by <tt class="docutils literal"><span class="pre"><span class="Identifier">entriesWithOffsets</span></span></tt> during recovery). The CRC frame makes each read self-contained.
     
   </dd>
 </div>
@@ -408,7 +464,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-19 16:03:23 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-24 08:50:29 UTC</small>
       </div>
     </div>
   </div>

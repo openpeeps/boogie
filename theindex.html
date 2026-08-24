@@ -152,6 +152,8 @@
           data-doc-search-tag="rdbms: proc close(s: Store)" href="boogie/stores/rdbms.html#close%2CStore">rdbms: proc close(s: Store)</a></li>
           <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc close(s: VectorStore)" href="boogie/stores/vectorstore.html#close%2CVectorStore">vectorstore: proc close(s: VectorStore)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="wal: proc close(r: LogReader)" href="boogie/wal.html#close%2CLogReader">wal: proc close(r: LogReader)</a></li>
           </ul></dd>
 <dt><a name="closeGraphStore" href="#closeGraphStore"><span>closeGraphStore:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -607,6 +609,10 @@
 <li><a class="reference external"
           data-doc-search-tag="wal: proc logPos(w: Wal): int64" href="boogie/wal.html#logPos%2CWal">wal: proc logPos(w: Wal): int64</a></li>
           </ul></dd>
+<dt><a name="LogReader" href="#LogReader"><span>LogReader:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="wal: type LogReader" href="boogie/wal.html#LogReader">wal: type LogReader</a></li>
+          </ul></dd>
 <dt><a name="nearest" href="#nearest"><span>nearest:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc nearest(c: VectorCollection; query: seq[float32]; k: int;
@@ -753,6 +759,10 @@
 <li><a class="reference external"
           data-doc-search-tag="wal: proc openLog(w: var Wal)" href="boogie/wal.html#openLog%2CWal">wal: proc openLog(w: var Wal)</a></li>
           </ul></dd>
+<dt><a name="openLogReader" href="#openLogReader"><span>openLogReader:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="wal: proc openLogReader(w: Wal): LogReader" href="boogie/wal.html#openLogReader%2CWal">wal: proc openLogReader(w: Wal): LogReader</a></li>
+          </ul></dd>
 <dt><a name="openWal" href="#openWal"><span>openWal:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: proc openWal(path: string): Wal" href="boogie/wal.html#openWal%2Cstring">wal: proc openWal(path: string): Wal</a></li>
@@ -798,6 +808,10 @@
 <dt><a name="Queued" href="#Queued"><span>Queued:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="concurrency: object Queued" href="boogie/concurrency.html#Queued">concurrency: object Queued</a></li>
+          </ul></dd>
+<dt><a name="readAt" href="#readAt"><span>readAt:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="wal: proc readAt(r: LogReader; offset: int64): WalEntry" href="boogie/wal.html#readAt%2CLogReader%2Cint64">wal: proc readAt(r: LogReader; offset: int64): WalEntry</a></li>
           </ul></dd>
 <dt><a name="readEntryAt" href="#readEntryAt"><span>readEntryAt:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -1031,7 +1045,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-19 16:03:24 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-24 08:50:30 UTC</small>
       </div>
     </div>
   </div>
