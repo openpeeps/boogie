@@ -423,6 +423,39 @@ proc readEntryAt*(w: Wal, offset: int64): WalEntry =
   if not readFrame(f, result):
     raise newException(WalError, "WAL record not found at offset " & $offset)
 
+type
+  LogReader* = ref object
+    ## A persistent read handle over a WAL file. Unlike `readEntryAt`, which
+    ## pays an open/close syscall pair per record, a `LogReader` keeps one
+    ## file descriptor open and seeks per read, making sequential or repeated
+    ## random-access scans much cheaper. Used by stores whose primary data
+    ## lives inside a WAL file (e.g. the log store).
+    path: string
+    handle: File
+
+proc openLogReader*(w: Wal): LogReader =
+  ## Opens a persistent read handle over the WAL file at `w.path`.
+  ## The WAL file must already exist (e.g. created by `openWal`).
+  result = LogReader(path: w.path, handle: open(w.path, fmRead))
+  if not readHeader(result.handle):
+    result.handle.close()
+    raise newException(WalError, "invalid WAL header (expected binary WAL v3)")
+
+proc readAt*(r: LogReader, offset: int64): WalEntry =
+  ## Reads a single entry by its record's byte offset, reusing the reader's
+  ## open file handle. The offset is a record start as returned by `logPos`
+  ## (or by `entriesWithOffsets` during recovery). The CRC frame makes each
+  ## read self-contained.
+  r.handle.setFilePos(offset)
+  if not readFrame(r.handle, result):
+    raise newException(WalError, "WAL record not found at offset " & $offset)
+
+proc close*(r: LogReader) =
+  ## Closes the underlying file handle. Safe to call more than once.
+  if r.handle != nil:
+    r.handle.close()
+    r.handle = nil
+
 proc reset*(w: var Wal) =
   ## Resets the WAL by clearing pending entries and writing a new header. This is typically called
   ## after a checkpoint to start a new WAL segment. Note that this will discard any pending
