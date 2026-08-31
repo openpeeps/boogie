@@ -152,10 +152,6 @@
   <li><a class="reference" href="#jsonToStoreValue%2CJsonNode" title="jsonToStoreValue(j: JsonNode): Value">jsonToStoreValue(j: JsonNode): Value</a></li>
 
 </ul>
-<ul class="simple nested-toc-section">migrateRdbmsSnapshotFromFlatty
-  <li><a class="reference" href="#migrateRdbmsSnapshotFromFlatty%2CStore" title="migrateRdbmsSnapshotFromFlatty(s: Store): bool">migrateRdbmsSnapshotFromFlatty(s: Store): bool</a></li>
-
-</ul>
 <ul class="simple nested-toc-section">newColumn
   <li><a class="reference" href="#newColumn%2Cstring%2CDataType%2Cbool" title="newColumn(name: string; kind: DataType; nullable: bool): ColumnDef">newColumn(name: string; kind: DataType; nullable: bool): ColumnDef</a></li>
 
@@ -171,12 +167,12 @@
 
 </ul>
 <ul class="simple nested-toc-section">newStore
-  <li><a class="reference" href="#newStore%2Cstring%2CStorageMode%2Cbool%2Cuint32%2Cuint32%2Cbool%2Cstaticbool" title="newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
+  <li><a class="reference" href="#newStore%2Cstring%2CStorageMode%2Cbool%2Cuint32%2Cuint32%2Cstaticbool" title="newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
          checkpointEveryOps: uint32 = 0'u32;
-         walFlushEveryOps: uint32 = 1000'u32; allowFlatty: bool = false;
+         walFlushEveryOps: uint32 = 1000'u32;
          enableConcurrency: static bool = false): Store">newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
          checkpointEveryOps: uint32 = 0'u32;
-         walFlushEveryOps: uint32 = 1000'u32; allowFlatty: bool = false;
+         walFlushEveryOps: uint32 = 1000'u32;
          enableConcurrency: static bool = false): Store</a></li>
 
 </ul>
@@ -193,7 +189,7 @@
 
 </ul>
 <ul class="simple nested-toc-section">recoverFromWal
-  <li><a class="reference" href="#recoverFromWal%2CStore" title="recoverFromWal(s: Store; allowFlatty = true)">recoverFromWal(s: Store; allowFlatty = true)</a></li>
+  <li><a class="reference" href="#recoverFromWal%2CStore" title="recoverFromWal(s: Store)">recoverFromWal(s: Store)</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">row
@@ -561,19 +557,6 @@
 </div>
 
 </div>
-<div id="migrateRdbmsSnapshotFromFlatty-procs-all">
-  <div id="migrateRdbmsSnapshotFromFlatty,Store">
-  <dt><pre><span class="Keyword">proc</span> <a href="#migrateRdbmsSnapshotFromFlatty%2CStore"><span class="Identifier">migrateRdbmsSnapshotFromFlatty</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span>
-    <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-
-</div>
 <div id="newColumn-procs-all">
   <div id="newColumn,string,DataType,bool">
   <dt><pre><span class="Keyword">proc</span> <a href="#newColumn%2Cstring%2CDataType%2Cbool"><span class="Identifier">newColumn</span></a><span class="Other">(</span><span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">kind</span><span class="Other">:</span> <a href="../rdbms_types.html#DataType"><span class="Identifier">DataType</span></a><span class="Other">;</span> <span class="Identifier">nullable</span><span class="Other">:</span> <span class="Identifier">bool</span><span class="Other">)</span><span class="Other">:</span> <a href="../rdbms_types.html#ColumnDef"><span class="Identifier">ColumnDef</span></a> {.
@@ -613,10 +596,10 @@
 
 </div>
 <div id="newStore-procs-all">
-  <div id="newStore,string,StorageMode,bool,uint32,uint32,bool,staticbool">
-  <dt><pre><span class="Keyword">proc</span> <a href="#newStore%2Cstring%2CStorageMode%2Cbool%2Cuint32%2Cuint32%2Cbool%2Cstaticbool"><span class="Identifier">newStore</span></a><span class="Other">(</span><span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">mode</span><span class="Other">:</span> <a href="#StorageMode"><span class="Identifier">StorageMode</span></a> <span class="Other">=</span> <span class="Identifier">smDisk</span><span class="Other">;</span> <span class="Identifier">enableWal</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">;</span>
+  <div id="newStore,string,StorageMode,bool,uint32,uint32,staticbool">
+  <dt><pre><span class="Keyword">proc</span> <a href="#newStore%2Cstring%2CStorageMode%2Cbool%2Cuint32%2Cuint32%2Cstaticbool"><span class="Identifier">newStore</span></a><span class="Other">(</span><span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">mode</span><span class="Other">:</span> <a href="#StorageMode"><span class="Identifier">StorageMode</span></a> <span class="Other">=</span> <span class="Identifier">smDisk</span><span class="Other">;</span> <span class="Identifier">enableWal</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">;</span>
               <span class="Identifier">checkpointEveryOps</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span class="Other">=</span> <span class="DecNumber">0'u32</span><span class="Other">;</span>
-              <span class="Identifier">walFlushEveryOps</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span class="Other">=</span> <span class="DecNumber">1000'u32</span><span class="Other">;</span> <span class="Identifier">allowFlatty</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">;</span>
+              <span class="Identifier">walFlushEveryOps</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span class="Other">=</span> <span class="DecNumber">1000'u32</span><span class="Other">;</span>
               <span class="Identifier">enableConcurrency</span><span class="Other">:</span> <span class="Keyword">static</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a></pre></dt>
   <dd>
     
@@ -660,11 +643,10 @@
 </div>
 <div id="recoverFromWal-procs-all">
   <div id="recoverFromWal,Store">
-  <dt><pre><span class="Keyword">proc</span> <a href="#recoverFromWal%2CStore"><span class="Identifier">recoverFromWal</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">;</span> <span class="Identifier">allowFlatty</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span>
-    <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">JsonParsingError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span>
-    <span class="Identifier">CatchableError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">,</span>
-                            <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#recoverFromWal%2CStore"><span class="Identifier">recoverFromWal</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span>
+    <span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">JsonParsingError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
+    <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">,</span>
+    <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
@@ -758,7 +740,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-31 20:41:15 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-31 21:40:38 UTC</small>
       </div>
     </div>
   </div>

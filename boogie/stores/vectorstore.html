@@ -123,10 +123,6 @@
   <li><a class="reference" href="#len%2CVectorCollection" title="len(c: VectorCollection): int">len(c: VectorCollection): int</a></li>
 
 </ul>
-<ul class="simple nested-toc-section">migrateVectorSnapshotFromFlatty
-  <li><a class="reference" href="#migrateVectorSnapshotFromFlatty%2CVectorStore" title="migrateVectorSnapshotFromFlatty(s: VectorStore): bool">migrateVectorSnapshotFromFlatty(s: VectorStore): bool</a></li>
-
-</ul>
 <ul class="simple nested-toc-section">nearest
   <li><a class="reference" href="#nearest%2CVectorCollection%2Cseq%5Bfloat32%5D%2Cint%2CDistanceMetric%2Cstring" title="nearest(c: VectorCollection; query: seq[float32]; k: int;
         metric: DistanceMetric = dmCosine; partition = &quot;&quot;): seq[
@@ -410,19 +406,6 @@
 </div>
 
 </div>
-<div id="migrateVectorSnapshotFromFlatty-procs-all">
-  <div id="migrateVectorSnapshotFromFlatty,VectorStore">
-  <dt><pre><span class="Keyword">proc</span> <a href="#migrateVectorSnapshotFromFlatty%2CVectorStore"><span class="Identifier">migrateVectorSnapshotFromFlatty</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span>
-    <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-
-</div>
 <div id="nearest-procs-all">
   <div id="nearest,VectorCollection,seq[float32],int,DistanceMetric,string">
   <dt><pre><span class="Keyword">proc</span> <a href="#nearest%2CVectorCollection%2Cseq%5Bfloat32%5D%2Cint%2CDistanceMetric%2Cstring"><span class="Identifier">nearest</span></a><span class="Other">(</span><span class="Identifier">c</span><span class="Other">:</span> <a href="#VectorCollection"><span class="Identifier">VectorCollection</span></a><span class="Other">;</span> <span class="Identifier">query</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">float32</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">k</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span>
@@ -464,7 +447,7 @@
 <div id="newInMemoryVectorStore-procs-all">
   <div id="newInMemoryVectorStore">
   <dt><pre><span class="Keyword">proc</span> <a href="#newInMemoryVectorStore"><span class="Identifier">newInMemoryVectorStore</span></a><span class="Other">(</span><span class="Other">)</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">VectorStoreError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span>
-    <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">JsonParsingError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span>
+    <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">JsonParsingError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span>
     <span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">,</span>
                       <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
@@ -503,8 +486,8 @@
 </div>
 <div id="recoverFromWal-procs-all">
   <div id="recoverFromWal,VectorStore">
-  <dt><pre><span class="Keyword">proc</span> <a href="#recoverFromWal%2CVectorStore"><span class="Identifier">recoverFromWal</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span>
-    <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">VectorStoreError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">JsonParsingError</span><span class="Other">,</span>
+  <dt><pre><span class="Keyword">proc</span> <a href="#recoverFromWal%2CVectorStore"><span class="Identifier">recoverFromWal</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span>
+    <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">VectorStoreError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">JsonParsingError</span><span class="Other">,</span>
     <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">,</span>
                                   <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span>
                                       <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
@@ -544,7 +527,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-31 20:41:15 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-31 21:40:38 UTC</small>
       </div>
     </div>
   </div>

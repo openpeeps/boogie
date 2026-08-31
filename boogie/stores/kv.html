@@ -101,10 +101,6 @@
   <li><a class="reference" href="#len%2CKvStore" title="len(s: KvStore): int">len(s: KvStore): int</a></li>
 
 </ul>
-<ul class="simple nested-toc-section">migrateKvSnapshotFromFlatty
-  <li><a class="reference" href="#migrateKvSnapshotFromFlatty%2CKvStore" title="migrateKvSnapshotFromFlatty(s: KvStore): bool">migrateKvSnapshotFromFlatty(s: KvStore): bool</a></li>
-
-</ul>
 <ul class="simple nested-toc-section">newInMemoryKvStore
   <li><a class="reference" href="#newInMemoryKvStore" title="newInMemoryKvStore(): KvStore">newInMemoryKvStore(): KvStore</a></li>
 
@@ -284,19 +280,6 @@
 </div>
 
 </div>
-<div id="migrateKvSnapshotFromFlatty-procs-all">
-  <div id="migrateKvSnapshotFromFlatty,KvStore">
-  <dt><pre><span class="Keyword">proc</span> <a href="#migrateKvSnapshotFromFlatty%2CKvStore"><span class="Identifier">migrateKvSnapshotFromFlatty</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#KvStore"><span class="Identifier">KvStore</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span>
-    <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
-  <dd>
-    
-    Explicit migration helper: if the snapshot on disk is flatty-encoded, rewrite it as FBE.
-    
-  </dd>
-</div>
-
-</div>
 <div id="newInMemoryKvStore-procs-all">
   <div id="newInMemoryKvStore">
   <dt><pre><span class="Keyword">proc</span> <a href="#newInMemoryKvStore"><span class="Identifier">newInMemoryKvStore</span></a><span class="Other">(</span><span class="Other">)</span><span class="Other">:</span> <a href="#KvStore"><span class="Identifier">KvStore</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KvStoreError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span>
@@ -343,7 +326,7 @@
 <div id="recoverFromWal-procs-all">
   <div id="recoverFromWal,KvStore">
   <dt><pre><span class="Keyword">proc</span> <a href="#recoverFromWal%2CKvStore"><span class="Identifier">recoverFromWal</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#KvStore"><span class="Identifier">KvStore</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">KvStoreError</span><span class="Other">,</span>
-    <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span>
+    <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span>
     <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
@@ -392,7 +375,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-31 20:41:15 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-31 21:40:38 UTC</small>
       </div>
     </div>
   </div>

@@ -112,10 +112,6 @@
   <li><a class="reference" href="#len%2CDocumentStore" title="len(store: DocumentStore): int">len(store: DocumentStore): int</a></li>
 
 </ul>
-<ul class="simple nested-toc-section">migrateDocSnapshotFromFlatty
-  <li><a class="reference" href="#migrateDocSnapshotFromFlatty%2CDocumentStore" title="migrateDocSnapshotFromFlatty(s: var DocumentStore): bool">migrateDocSnapshotFromFlatty(s: var DocumentStore): bool</a></li>
-
-</ul>
 <ul class="simple nested-toc-section">openBSONDocument
   <li><a class="reference" href="#openBSONDocument%2CDocumentStore%2Cstring%2Cstring" title="openBSONDocument(store: var DocumentStore; key, path: string; sync = true): bool">openBSONDocument(store: var DocumentStore; key, path: string; sync = true): bool</a></li>
 
@@ -329,19 +325,6 @@
 </div>
 
 </div>
-<div id="migrateDocSnapshotFromFlatty-procs-all">
-  <div id="migrateDocSnapshotFromFlatty,DocumentStore">
-  <dt><pre><span class="Keyword">proc</span> <a href="#migrateDocSnapshotFromFlatty%2CDocumentStore"><span class="Identifier">migrateDocSnapshotFromFlatty</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#DocumentStore"><span class="Identifier">DocumentStore</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span>
-    <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
-  <dd>
-    
-    
-    
-  </dd>
-</div>
-
-</div>
 <div id="openBSONDocument-procs-all">
   <div id="openBSONDocument,DocumentStore,string,string">
   <dt><pre><span class="Keyword">proc</span> <a href="#openBSONDocument%2CDocumentStore%2Cstring%2Cstring"><span class="Identifier">openBSONDocument</span></a><span class="Other">(</span><span class="Identifier">store</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#DocumentStore"><span class="Identifier">DocumentStore</span></a><span class="Other">;</span> <span class="Identifier">key</span><span class="Other">,</span> <span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">sync</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.
@@ -365,7 +348,7 @@
                        <span class="Identifier">defaultEncoding</span> <span class="Other">=</span> <span class="Identifier">deJson</span><span class="Other">;</span> <span class="Identifier">enableSnapshots</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">;</span>
                        <span class="Identifier">checkpointEveryOps</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span class="Other">=</span> <span class="DecNumber">1000'u32</span><span class="Other">;</span>
                        <span class="Identifier">walFlushEveryOps</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span class="Other">=</span> <span class="DecNumber">1000'u32</span><span class="Other">)</span><span class="Other">:</span> <a href="#DocumentStore"><span class="Identifier">DocumentStore</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span>
-    <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">DocumentStoreError</span><span class="Other">,</span>
+    <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">DocumentStoreError</span><span class="Other">,</span>
     <span class="Identifier">OpenParserJsonError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span>
     <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
@@ -393,11 +376,10 @@
 </div>
 <div id="recoverFromWal-procs-all">
   <div id="recoverFromWal,DocumentStore">
-  <dt><pre><span class="Keyword">proc</span> <a href="#recoverFromWal%2CDocumentStore"><span class="Identifier">recoverFromWal</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#DocumentStore"><span class="Identifier">DocumentStore</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span>
-    <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">DocumentStoreError</span><span class="Other">,</span> <span class="Identifier">OpenParserJsonError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span>
-    <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">,</span>
-                               <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#recoverFromWal%2CDocumentStore"><span class="Identifier">recoverFromWal</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#DocumentStore"><span class="Identifier">DocumentStore</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span>
+    <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">DocumentStoreError</span><span class="Other">,</span> <span class="Identifier">OpenParserJsonError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span>
+    <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">,</span>
+                     <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Reconstructs the in-memory state of the document store by loading a snapshot (if enabled) and replaying any WAL entries that have occurred since the last checkpoint.
@@ -469,7 +451,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-31 20:41:15 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-31 21:40:39 UTC</small>
       </div>
     </div>
   </div>
