@@ -28,16 +28,16 @@
     <label for="nav-toggle" id="nav-overlay"></label>
     <div class="container">
       <h1 class="title">Index</h1>
-      Modules: <a href="index.html">boogie</a>, <a href="boogie/concurrency.html">boogie/concurrency</a>, <a href="boogie/crashsafe.html">boogie/crashsafe</a>, <a href="boogie/stores/columnar.html">boogie/stores/columnar</a>, <a href="boogie/stores/docstore.html">boogie/stores/docstore</a>, <a href="boogie/stores/graphstore.html">boogie/stores/graphstore</a>, <a href="boogie/stores/kv.html">boogie/stores/kv</a>, <a href="boogie/stores/rdbms.html">boogie/stores/rdbms</a>, <a href="boogie/stores/vectorstore.html">boogie/stores/vectorstore</a>, <a href="boogie/wal.html">boogie/wal</a>.<br/><p /><h2>API symbols</h2>
+      Modules: <a href="index.html">boogie</a>, <a href="boogie/concurrency.html">boogie/concurrency</a>, <a href="boogie/crashsafe.html">boogie/crashsafe</a>, <a href="boogie/fbe_codec.html">boogie/fbe_codec</a>, <a href="boogie/rdbms_types.html">boogie/rdbms_types</a>, <a href="boogie/stores/columnar.html">boogie/stores/columnar</a>, <a href="boogie/stores/docstore.html">boogie/stores/docstore</a>, <a href="boogie/stores/graphstore.html">boogie/stores/graphstore</a>, <a href="boogie/stores/kv.html">boogie/stores/kv</a>, <a href="boogie/stores/rdbms.html">boogie/stores/rdbms</a>, <a href="boogie/stores/vectorstore.html">boogie/stores/vectorstore</a>, <a href="boogie/wal.html">boogie/wal</a>.<br/><p /><h2>API symbols</h2>
 <dl><dt><a name="%60%24%60" href="#%60%24%60"><span>`$`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: proc `$`(v: Value): string" href="boogie/stores/rdbms.html#%24%2CValue">rdbms: proc `$`(v: Value): string</a></li>
+          data-doc-search-tag="rdbms_types: proc `$`(v: Value): string" href="boogie/rdbms_types.html#%24%2CValue">rdbms_types: proc `$`(v: Value): string</a></li>
           </ul></dd>
 <dt><a name="%60%3D%3D%60" href="#%60%3D%3D%60"><span>`==`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: proc `==`(a, b: RowRecord): bool" href="boogie/stores/rdbms.html#%3D%3D%2CRowRecord%2CRowRecord">rdbms: proc `==`(a, b: RowRecord): bool</a></li>
+          data-doc-search-tag="rdbms_types: proc `==`(a, b: Value): bool" href="boogie/rdbms_types.html#%3D%3D%2CValue%2CValue">rdbms_types: proc `==`(a, b: Value): bool</a></li>
           <li><a class="reference external"
-          data-doc-search-tag="rdbms: proc `==`(a, b: Value): bool" href="boogie/stores/rdbms.html#%3D%3D%2CValue%2CValue">rdbms: proc `==`(a, b: Value): bool</a></li>
+          data-doc-search-tag="rdbms: proc `==`(a, b: RowRecord): bool" href="boogie/stores/rdbms.html#%3D%3D%2CRowRecord%2CRowRecord">rdbms: proc `==`(a, b: RowRecord): bool</a></li>
           </ul></dd>
 <dt><a name="%60%3Dcopy%60" href="#%60%3Dcopy%60"><span>`=copy`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -119,6 +119,10 @@
 <li><a class="reference external"
           data-doc-search-tag="concurrency: proc beginWrite(rw: var RwLock)" href="boogie/concurrency.html#beginWrite%2CRwLock">concurrency: proc beginWrite(rw: var RwLock)</a></li>
           </ul></dd>
+<dt><a name="bufToString" href="#bufToString"><span>bufToString:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc bufToString(b: Buffer): string" href="boogie/fbe_codec.html#bufToString%2CBuffer">fbe_codec: proc bufToString(b: Buffer): string</a></li>
+          </ul></dd>
 <dt><a name="ccDictionary" href="#ccDictionary"><span>ccDictionary:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="columnar: CompressionCodec.ccDictionary" href="boogie/stores/columnar.html#ccDictionary">columnar: CompressionCodec.ccDictionary</a></li>
@@ -169,7 +173,7 @@
           </ul></dd>
 <dt><a name="ColumnDef" href="#ColumnDef"><span>ColumnDef:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: object ColumnDef" href="boogie/stores/rdbms.html#ColumnDef">rdbms: object ColumnDef</a></li>
+          data-doc-search-tag="rdbms_types: object ColumnDef" href="boogie/rdbms_types.html#ColumnDef">rdbms_types: object ColumnDef</a></li>
           </ul></dd>
 <dt><a name="ColumnSchema" href="#ColumnSchema"><span>ColumnSchema:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -251,7 +255,7 @@
           </ul></dd>
 <dt><a name="DataType" href="#DataType"><span>DataType:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: enum DataType" href="boogie/stores/rdbms.html#DataType">rdbms: enum DataType</a></li>
+          data-doc-search-tag="rdbms_types: enum DataType" href="boogie/rdbms_types.html#DataType">rdbms_types: enum DataType</a></li>
           </ul></dd>
 <dt><a name="DbTable" href="#DbTable"><span>DbTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -260,6 +264,82 @@
 <dt><a name="deBson" href="#deBson"><span>deBson:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="docstore: DocumentEncoding.deBson" href="boogie/stores/docstore.html#deBson">docstore: DocumentEncoding.deBson</a></li>
+          </ul></dd>
+<dt><a name="decodeDocSnapshot" href="#decodeDocSnapshot"><span>decodeDocSnapshot:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeDocSnapshot(b: var Buffer): DocSnapshotOnDisk" href="boogie/fbe_codec.html#decodeDocSnapshot%2CBuffer">fbe_codec: proc decodeDocSnapshot(b: var Buffer): DocSnapshotOnDisk</a></li>
+          </ul></dd>
+<dt><a name="decodeDocSnapshotFlatty" href="#decodeDocSnapshotFlatty"><span>decodeDocSnapshotFlatty:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeDocSnapshotFlatty(blob: string): DocSnapshotOnDisk" href="boogie/fbe_codec.html#decodeDocSnapshotFlatty%2Cstring">fbe_codec: proc decodeDocSnapshotFlatty(blob: string): DocSnapshotOnDisk</a></li>
+          </ul></dd>
+<dt><a name="decodeDocSnapshotFromString" href="#decodeDocSnapshotFromString"><span>decodeDocSnapshotFromString:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeDocSnapshotFromString(s: string): DocSnapshotOnDisk" href="boogie/fbe_codec.html#decodeDocSnapshotFromString%2Cstring">fbe_codec: proc decodeDocSnapshotFromString(s: string): DocSnapshotOnDisk</a></li>
+          </ul></dd>
+<dt><a name="decodeDocSnapshotFromStringWithFallback" href="#decodeDocSnapshotFromStringWithFallback"><span>decodeDocSnapshotFromStringWithFallback:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeDocSnapshotFromStringWithFallback(s: string): DocSnapshotOnDisk" href="boogie/fbe_codec.html#decodeDocSnapshotFromStringWithFallback%2Cstring">fbe_codec: proc decodeDocSnapshotFromStringWithFallback(s: string): DocSnapshotOnDisk</a></li>
+          </ul></dd>
+<dt><a name="decodeKvSnapshot" href="#decodeKvSnapshot"><span>decodeKvSnapshot:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeKvSnapshot(b: var Buffer): KvSnapshotOnDisk" href="boogie/fbe_codec.html#decodeKvSnapshot%2CBuffer">fbe_codec: proc decodeKvSnapshot(b: var Buffer): KvSnapshotOnDisk</a></li>
+          </ul></dd>
+<dt><a name="decodeKvSnapshotFlatty" href="#decodeKvSnapshotFlatty"><span>decodeKvSnapshotFlatty:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeKvSnapshotFlatty(blob: string): KvSnapshotOnDisk" href="boogie/fbe_codec.html#decodeKvSnapshotFlatty%2Cstring">fbe_codec: proc decodeKvSnapshotFlatty(blob: string): KvSnapshotOnDisk</a></li>
+          </ul></dd>
+<dt><a name="decodeKvSnapshotFromString" href="#decodeKvSnapshotFromString"><span>decodeKvSnapshotFromString:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeKvSnapshotFromString(s: string): KvSnapshotOnDisk" href="boogie/fbe_codec.html#decodeKvSnapshotFromString%2Cstring">fbe_codec: proc decodeKvSnapshotFromString(s: string): KvSnapshotOnDisk</a></li>
+          </ul></dd>
+<dt><a name="decodeKvSnapshotFromStringWithFallback" href="#decodeKvSnapshotFromStringWithFallback"><span>decodeKvSnapshotFromStringWithFallback:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeKvSnapshotFromStringWithFallback(s: string): KvSnapshotOnDisk" href="boogie/fbe_codec.html#decodeKvSnapshotFromStringWithFallback%2Cstring">fbe_codec: proc decodeKvSnapshotFromStringWithFallback(s: string): KvSnapshotOnDisk</a></li>
+          </ul></dd>
+<dt><a name="decodeRdbmsSnapshot" href="#decodeRdbmsSnapshot"><span>decodeRdbmsSnapshot:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeRdbmsSnapshot(b: var Buffer): RdbmsSnapshotOnDisk" href="boogie/fbe_codec.html#decodeRdbmsSnapshot%2CBuffer">fbe_codec: proc decodeRdbmsSnapshot(b: var Buffer): RdbmsSnapshotOnDisk</a></li>
+          </ul></dd>
+<dt><a name="decodeRdbmsSnapshotFlatty" href="#decodeRdbmsSnapshotFlatty"><span>decodeRdbmsSnapshotFlatty:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeRdbmsSnapshotFlatty(blob: string): RdbmsSnapshotOnDisk" href="boogie/fbe_codec.html#decodeRdbmsSnapshotFlatty%2Cstring">fbe_codec: proc decodeRdbmsSnapshotFlatty(blob: string): RdbmsSnapshotOnDisk</a></li>
+          </ul></dd>
+<dt><a name="decodeRdbmsSnapshotFromString" href="#decodeRdbmsSnapshotFromString"><span>decodeRdbmsSnapshotFromString:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeRdbmsSnapshotFromString(s: string): RdbmsSnapshotOnDisk" href="boogie/fbe_codec.html#decodeRdbmsSnapshotFromString%2Cstring">fbe_codec: proc decodeRdbmsSnapshotFromString(s: string): RdbmsSnapshotOnDisk</a></li>
+          </ul></dd>
+<dt><a name="decodeRdbmsSnapshotFromStringWithFallback" href="#decodeRdbmsSnapshotFromStringWithFallback"><span>decodeRdbmsSnapshotFromStringWithFallback:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeRdbmsSnapshotFromStringWithFallback(s: string; allowFlatty = true): RdbmsSnapshotOnDisk" href="boogie/fbe_codec.html#decodeRdbmsSnapshotFromStringWithFallback%2Cstring">fbe_codec: proc decodeRdbmsSnapshotFromStringWithFallback(s: string; allowFlatty = true): RdbmsSnapshotOnDisk</a></li>
+          </ul></dd>
+<dt><a name="decodeRowPayload" href="#decodeRowPayload"><span>decodeRowPayload:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeRowPayload(payload: string): RowData" href="boogie/fbe_codec.html#decodeRowPayload%2Cstring">fbe_codec: proc decodeRowPayload(payload: string): RowData</a></li>
+          </ul></dd>
+<dt><a name="decodeRowPayloadFlatty" href="#decodeRowPayloadFlatty"><span>decodeRowPayloadFlatty:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeRowPayloadFlatty(payload: string): RowData" href="boogie/fbe_codec.html#decodeRowPayloadFlatty%2Cstring">fbe_codec: proc decodeRowPayloadFlatty(payload: string): RowData</a></li>
+          </ul></dd>
+<dt><a name="decodeRowPayloadWithFallback" href="#decodeRowPayloadWithFallback"><span>decodeRowPayloadWithFallback:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeRowPayloadWithFallback(payload: string): RowData" href="boogie/fbe_codec.html#decodeRowPayloadWithFallback%2Cstring">fbe_codec: proc decodeRowPayloadWithFallback(payload: string): RowData</a></li>
+          </ul></dd>
+<dt><a name="decodeVectorSnapshot" href="#decodeVectorSnapshot"><span>decodeVectorSnapshot:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeVectorSnapshot(b: var Buffer): VectorSnapshotOnDisk" href="boogie/fbe_codec.html#decodeVectorSnapshot%2CBuffer">fbe_codec: proc decodeVectorSnapshot(b: var Buffer): VectorSnapshotOnDisk</a></li>
+          </ul></dd>
+<dt><a name="decodeVectorSnapshotFlatty" href="#decodeVectorSnapshotFlatty"><span>decodeVectorSnapshotFlatty:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeVectorSnapshotFlatty(blob: string): VectorSnapshotOnDisk" href="boogie/fbe_codec.html#decodeVectorSnapshotFlatty%2Cstring">fbe_codec: proc decodeVectorSnapshotFlatty(blob: string): VectorSnapshotOnDisk</a></li>
+          </ul></dd>
+<dt><a name="decodeVectorSnapshotFromString" href="#decodeVectorSnapshotFromString"><span>decodeVectorSnapshotFromString:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeVectorSnapshotFromString(s: string): VectorSnapshotOnDisk" href="boogie/fbe_codec.html#decodeVectorSnapshotFromString%2Cstring">fbe_codec: proc decodeVectorSnapshotFromString(s: string): VectorSnapshotOnDisk</a></li>
+          </ul></dd>
+<dt><a name="decodeVectorSnapshotFromStringWithFallback" href="#decodeVectorSnapshotFromStringWithFallback"><span>decodeVectorSnapshotFromStringWithFallback:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc decodeVectorSnapshotFromStringWithFallback(s: string): VectorSnapshotOnDisk" href="boogie/fbe_codec.html#decodeVectorSnapshotFromStringWithFallback%2Cstring">fbe_codec: proc decodeVectorSnapshotFromStringWithFallback(s: string): VectorSnapshotOnDisk</a></li>
           </ul></dd>
 <dt><a name="deJson" href="#deJson"><span>deJson:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -303,6 +383,10 @@
 <li><a class="reference external"
           data-doc-search-tag="vectorstore: DistanceMetric.dmL2" href="boogie/stores/vectorstore.html#dmL2">vectorstore: DistanceMetric.dmL2</a></li>
           </ul></dd>
+<dt><a name="DocSnapshotOnDisk" href="#DocSnapshotOnDisk"><span>DocSnapshotOnDisk:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: tuple DocSnapshotOnDisk" href="boogie/fbe_codec.html#DocSnapshotOnDisk">fbe_codec: tuple DocSnapshotOnDisk</a></li>
+          </ul></dd>
 <dt><a name="DocumentEncoding" href="#DocumentEncoding"><span>DocumentEncoding:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="docstore: enum DocumentEncoding" href="boogie/stores/docstore.html#DocumentEncoding">docstore: enum DocumentEncoding</a></li>
@@ -327,27 +411,63 @@
           </ul></dd>
 <dt><a name="dtBool" href="#dtBool"><span>dtBool:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: DataType.dtBool" href="boogie/stores/rdbms.html#dtBool">rdbms: DataType.dtBool</a></li>
+          data-doc-search-tag="rdbms_types: DataType.dtBool" href="boogie/rdbms_types.html#dtBool">rdbms_types: DataType.dtBool</a></li>
           </ul></dd>
 <dt><a name="dtFloat" href="#dtFloat"><span>dtFloat:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: DataType.dtFloat" href="boogie/stores/rdbms.html#dtFloat">rdbms: DataType.dtFloat</a></li>
+          data-doc-search-tag="rdbms_types: DataType.dtFloat" href="boogie/rdbms_types.html#dtFloat">rdbms_types: DataType.dtFloat</a></li>
           </ul></dd>
 <dt><a name="dtInt" href="#dtInt"><span>dtInt:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: DataType.dtInt" href="boogie/stores/rdbms.html#dtInt">rdbms: DataType.dtInt</a></li>
+          data-doc-search-tag="rdbms_types: DataType.dtInt" href="boogie/rdbms_types.html#dtInt">rdbms_types: DataType.dtInt</a></li>
           </ul></dd>
 <dt><a name="dtJson" href="#dtJson"><span>dtJson:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: DataType.dtJson" href="boogie/stores/rdbms.html#dtJson">rdbms: DataType.dtJson</a></li>
+          data-doc-search-tag="rdbms_types: DataType.dtJson" href="boogie/rdbms_types.html#dtJson">rdbms_types: DataType.dtJson</a></li>
           </ul></dd>
 <dt><a name="dtNull" href="#dtNull"><span>dtNull:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: DataType.dtNull" href="boogie/stores/rdbms.html#dtNull">rdbms: DataType.dtNull</a></li>
+          data-doc-search-tag="rdbms_types: DataType.dtNull" href="boogie/rdbms_types.html#dtNull">rdbms_types: DataType.dtNull</a></li>
           </ul></dd>
 <dt><a name="dtText" href="#dtText"><span>dtText:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: DataType.dtText" href="boogie/stores/rdbms.html#dtText">rdbms: DataType.dtText</a></li>
+          data-doc-search-tag="rdbms_types: DataType.dtText" href="boogie/rdbms_types.html#dtText">rdbms_types: DataType.dtText</a></li>
+          </ul></dd>
+<dt><a name="encodeDocSnapshot" href="#encodeDocSnapshot"><span>encodeDocSnapshot:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc encodeDocSnapshot(b: var Buffer; snap: DocSnapshotOnDisk)" href="boogie/fbe_codec.html#encodeDocSnapshot%2CBuffer%2CDocSnapshotOnDisk">fbe_codec: proc encodeDocSnapshot(b: var Buffer; snap: DocSnapshotOnDisk)</a></li>
+          </ul></dd>
+<dt><a name="encodeDocSnapshotToString" href="#encodeDocSnapshotToString"><span>encodeDocSnapshotToString:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc encodeDocSnapshotToString(snap: DocSnapshotOnDisk): string" href="boogie/fbe_codec.html#encodeDocSnapshotToString%2CDocSnapshotOnDisk">fbe_codec: proc encodeDocSnapshotToString(snap: DocSnapshotOnDisk): string</a></li>
+          </ul></dd>
+<dt><a name="encodeKvSnapshot" href="#encodeKvSnapshot"><span>encodeKvSnapshot:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc encodeKvSnapshot(b: var Buffer; snap: KvSnapshotOnDisk)" href="boogie/fbe_codec.html#encodeKvSnapshot%2CBuffer%2CKvSnapshotOnDisk">fbe_codec: proc encodeKvSnapshot(b: var Buffer; snap: KvSnapshotOnDisk)</a></li>
+          </ul></dd>
+<dt><a name="encodeKvSnapshotToString" href="#encodeKvSnapshotToString"><span>encodeKvSnapshotToString:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc encodeKvSnapshotToString(snap: KvSnapshotOnDisk): string" href="boogie/fbe_codec.html#encodeKvSnapshotToString%2CKvSnapshotOnDisk">fbe_codec: proc encodeKvSnapshotToString(snap: KvSnapshotOnDisk): string</a></li>
+          </ul></dd>
+<dt><a name="encodeRdbmsSnapshot" href="#encodeRdbmsSnapshot"><span>encodeRdbmsSnapshot:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc encodeRdbmsSnapshot(b: var Buffer; snap: RdbmsSnapshotOnDisk)" href="boogie/fbe_codec.html#encodeRdbmsSnapshot%2CBuffer%2CRdbmsSnapshotOnDisk">fbe_codec: proc encodeRdbmsSnapshot(b: var Buffer; snap: RdbmsSnapshotOnDisk)</a></li>
+          </ul></dd>
+<dt><a name="encodeRdbmsSnapshotToString" href="#encodeRdbmsSnapshotToString"><span>encodeRdbmsSnapshotToString:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc encodeRdbmsSnapshotToString(snap: RdbmsSnapshotOnDisk): string" href="boogie/fbe_codec.html#encodeRdbmsSnapshotToString%2CRdbmsSnapshotOnDisk">fbe_codec: proc encodeRdbmsSnapshotToString(snap: RdbmsSnapshotOnDisk): string</a></li>
+          </ul></dd>
+<dt><a name="encodeRowPayload" href="#encodeRowPayload"><span>encodeRowPayload:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc encodeRowPayload(data: RowData): string" href="boogie/fbe_codec.html#encodeRowPayload%2CRowData">fbe_codec: proc encodeRowPayload(data: RowData): string</a></li>
+          </ul></dd>
+<dt><a name="encodeVectorSnapshot" href="#encodeVectorSnapshot"><span>encodeVectorSnapshot:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc encodeVectorSnapshot(b: var Buffer; snap: VectorSnapshotOnDisk)" href="boogie/fbe_codec.html#encodeVectorSnapshot%2CBuffer%2CVectorSnapshotOnDisk">fbe_codec: proc encodeVectorSnapshot(b: var Buffer; snap: VectorSnapshotOnDisk)</a></li>
+          </ul></dd>
+<dt><a name="encodeVectorSnapshotToString" href="#encodeVectorSnapshotToString"><span>encodeVectorSnapshotToString:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc encodeVectorSnapshotToString(snap: VectorSnapshotOnDisk): string" href="boogie/fbe_codec.html#encodeVectorSnapshotToString%2CVectorSnapshotOnDisk">fbe_codec: proc encodeVectorSnapshotToString(snap: VectorSnapshotOnDisk): string</a></li>
           </ul></dd>
 <dt><a name="endRead" href="#endRead"><span>endRead:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -377,13 +497,17 @@
 <li><a class="reference external"
           data-doc-search-tag="columnar: enum FilterOp" href="boogie/stores/columnar.html#FilterOp">columnar: enum FilterOp</a></li>
           </ul></dd>
+<dt><a name="findColumn" href="#findColumn"><span>findColumn:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms: proc findColumn(t: DbTable; colName: string): Option[ColumnDef]" href="boogie/stores/rdbms.html#findColumn%2CDbTable%2Cstring">rdbms: proc findColumn(t: DbTable; colName: string): Option[ColumnDef]</a></li>
+          </ul></dd>
 <dt><a name="findNodesByLabel" href="#findNodesByLabel"><span>findNodesByLabel:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="graphstore: proc findNodesByLabel(s: GraphStore; label: string): seq[GraphNode]" href="boogie/stores/graphstore.html#findNodesByLabel%2CGraphStore%2Cstring">graphstore: proc findNodesByLabel(s: GraphStore; label: string): seq[GraphNode]</a></li>
           </ul></dd>
 <dt><a name="fkaRestrict" href="#fkaRestrict"><span>fkaRestrict:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: ForeignKeyAction.fkaRestrict" href="boogie/stores/rdbms.html#fkaRestrict">rdbms: ForeignKeyAction.fkaRestrict</a></li>
+          data-doc-search-tag="rdbms_types: ForeignKeyAction.fkaRestrict" href="boogie/rdbms_types.html#fkaRestrict">rdbms_types: ForeignKeyAction.fkaRestrict</a></li>
           </ul></dd>
 <dt><a name="flush" href="#flush"><span>flush:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -431,11 +555,11 @@
           </ul></dd>
 <dt><a name="ForeignKeyAction" href="#ForeignKeyAction"><span>ForeignKeyAction:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: enum ForeignKeyAction" href="boogie/stores/rdbms.html#ForeignKeyAction">rdbms: enum ForeignKeyAction</a></li>
+          data-doc-search-tag="rdbms_types: enum ForeignKeyAction" href="boogie/rdbms_types.html#ForeignKeyAction">rdbms_types: enum ForeignKeyAction</a></li>
           </ul></dd>
 <dt><a name="ForeignKeyDef" href="#ForeignKeyDef"><span>ForeignKeyDef:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: object ForeignKeyDef" href="boogie/stores/rdbms.html#ForeignKeyDef">rdbms: object ForeignKeyDef</a></li>
+          data-doc-search-tag="rdbms_types: object ForeignKeyDef" href="boogie/rdbms_types.html#ForeignKeyDef">rdbms_types: object ForeignKeyDef</a></li>
           </ul></dd>
 <dt><a name="get" href="#get"><span>get:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -541,11 +665,35 @@
 <li><a class="reference external"
           data-doc-search-tag="crashsafe: proc installCrashHandlers()" href="boogie/crashsafe.html#installCrashHandlers">crashsafe: proc installCrashHandlers()</a></li>
           </ul></dd>
+<dt><a name="isConcurrent" href="#isConcurrent"><span>isConcurrent:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms: proc isConcurrent(s: Store): bool" href="boogie/stores/rdbms.html#isConcurrent%2CStore">rdbms: proc isConcurrent(s: Store): bool</a></li>
+          </ul></dd>
 <dt><a name="isEmpty" href="#isEmpty"><span>isEmpty:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="kv: proc isEmpty(s: KvStore): bool" href="boogie/stores/kv.html#isEmpty%2CKvStore">kv: proc isEmpty(s: KvStore): bool</a></li>
           <li><a class="reference external"
           data-doc-search-tag="rdbms: proc isEmpty(t: DbTable): bool" href="boogie/stores/rdbms.html#isEmpty%2CDbTable">rdbms: proc isEmpty(t: DbTable): bool</a></li>
+          </ul></dd>
+<dt><a name="isFbeDocSnapshot" href="#isFbeDocSnapshot"><span>isFbeDocSnapshot:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc isFbeDocSnapshot(blob: string): bool" href="boogie/fbe_codec.html#isFbeDocSnapshot%2Cstring">fbe_codec: proc isFbeDocSnapshot(blob: string): bool</a></li>
+          </ul></dd>
+<dt><a name="isFbeKvSnapshot" href="#isFbeKvSnapshot"><span>isFbeKvSnapshot:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc isFbeKvSnapshot(blob: string): bool" href="boogie/fbe_codec.html#isFbeKvSnapshot%2Cstring">fbe_codec: proc isFbeKvSnapshot(blob: string): bool</a></li>
+          </ul></dd>
+<dt><a name="isFbeRdbmsSnapshot" href="#isFbeRdbmsSnapshot"><span>isFbeRdbmsSnapshot:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc isFbeRdbmsSnapshot(blob: string): bool" href="boogie/fbe_codec.html#isFbeRdbmsSnapshot%2Cstring">fbe_codec: proc isFbeRdbmsSnapshot(blob: string): bool</a></li>
+          </ul></dd>
+<dt><a name="isFbeRowPayload" href="#isFbeRowPayload"><span>isFbeRowPayload:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc isFbeRowPayload(payload: string): bool" href="boogie/fbe_codec.html#isFbeRowPayload%2Cstring">fbe_codec: proc isFbeRowPayload(payload: string): bool</a></li>
+          </ul></dd>
+<dt><a name="isFbeVectorSnapshot" href="#isFbeVectorSnapshot"><span>isFbeVectorSnapshot:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc isFbeVectorSnapshot(blob: string): bool" href="boogie/fbe_codec.html#isFbeVectorSnapshot%2Cstring">fbe_codec: proc isFbeVectorSnapshot(blob: string): bool</a></li>
           </ul></dd>
 <dt><a name="join" href="#join"><span>join:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -556,6 +704,10 @@
 <dt><a name="JoinType" href="#JoinType"><span>JoinType:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="columnar: enum JoinType" href="boogie/stores/columnar.html#JoinType">columnar: enum JoinType</a></li>
+          </ul></dd>
+<dt><a name="jsonToStoreValue" href="#jsonToStoreValue"><span>jsonToStoreValue:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms: proc jsonToStoreValue(j: JsonNode): Value" href="boogie/stores/rdbms.html#jsonToStoreValue%2CJsonNode">rdbms: proc jsonToStoreValue(j: JsonNode): Value</a></li>
           </ul></dd>
 <dt><a name="jtCross" href="#jtCross"><span>jtCross:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -585,6 +737,10 @@
 <li><a class="reference external"
           data-doc-search-tag="kv: KvStorageMode.ksmInMemory" href="boogie/stores/kv.html#ksmInMemory">kv: KvStorageMode.ksmInMemory</a></li>
           </ul></dd>
+<dt><a name="KvSnapshotOnDisk" href="#KvSnapshotOnDisk"><span>KvSnapshotOnDisk:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: tuple KvSnapshotOnDisk" href="boogie/fbe_codec.html#KvSnapshotOnDisk">fbe_codec: tuple KvSnapshotOnDisk</a></li>
+          </ul></dd>
 <dt><a name="KvStorageMode" href="#KvStorageMode"><span>KvStorageMode:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="kv: enum KvStorageMode" href="boogie/stores/kv.html#KvStorageMode">kv: enum KvStorageMode</a></li>
@@ -613,6 +769,64 @@
 <li><a class="reference external"
           data-doc-search-tag="wal: type LogReader" href="boogie/wal.html#LogReader">wal: type LogReader</a></li>
           </ul></dd>
+<dt><a name="migrateDocFlattyBlobToFbe" href="#migrateDocFlattyBlobToFbe"><span>migrateDocFlattyBlobToFbe:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc migrateDocFlattyBlobToFbe(blob: string): string" href="boogie/fbe_codec.html#migrateDocFlattyBlobToFbe%2Cstring">fbe_codec: proc migrateDocFlattyBlobToFbe(blob: string): string</a></li>
+          </ul></dd>
+<dt><a name="migrateDocSnapshotFileFlattyToFbe" href="#migrateDocSnapshotFileFlattyToFbe"><span>migrateDocSnapshotFileFlattyToFbe:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc migrateDocSnapshotFileFlattyToFbe(dbPath: string): bool" href="boogie/fbe_codec.html#migrateDocSnapshotFileFlattyToFbe%2Cstring">fbe_codec: proc migrateDocSnapshotFileFlattyToFbe(dbPath: string): bool</a></li>
+          </ul></dd>
+<dt><a name="migrateDocSnapshotFromFlatty" href="#migrateDocSnapshotFromFlatty"><span>migrateDocSnapshotFromFlatty:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="docstore: proc migrateDocSnapshotFromFlatty(s: var DocumentStore): bool" href="boogie/stores/docstore.html#migrateDocSnapshotFromFlatty%2CDocumentStore">docstore: proc migrateDocSnapshotFromFlatty(s: var DocumentStore): bool</a></li>
+          </ul></dd>
+<dt><a name="migrateKvFlattyBlobToFbe" href="#migrateKvFlattyBlobToFbe"><span>migrateKvFlattyBlobToFbe:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc migrateKvFlattyBlobToFbe(blob: string): string" href="boogie/fbe_codec.html#migrateKvFlattyBlobToFbe%2Cstring">fbe_codec: proc migrateKvFlattyBlobToFbe(blob: string): string</a></li>
+          </ul></dd>
+<dt><a name="migrateKvSnapshotFileFlattyToFbe" href="#migrateKvSnapshotFileFlattyToFbe"><span>migrateKvSnapshotFileFlattyToFbe:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc migrateKvSnapshotFileFlattyToFbe(dbPath: string): bool" href="boogie/fbe_codec.html#migrateKvSnapshotFileFlattyToFbe%2Cstring">fbe_codec: proc migrateKvSnapshotFileFlattyToFbe(dbPath: string): bool</a></li>
+          </ul></dd>
+<dt><a name="migrateKvSnapshotFromFlatty" href="#migrateKvSnapshotFromFlatty"><span>migrateKvSnapshotFromFlatty:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="kv: proc migrateKvSnapshotFromFlatty(s: KvStore): bool" href="boogie/stores/kv.html#migrateKvSnapshotFromFlatty%2CKvStore">kv: proc migrateKvSnapshotFromFlatty(s: KvStore): bool</a></li>
+          </ul></dd>
+<dt><a name="migrateRdbmsFlattyBlobToFbe" href="#migrateRdbmsFlattyBlobToFbe"><span>migrateRdbmsFlattyBlobToFbe:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc migrateRdbmsFlattyBlobToFbe(blob: string): string" href="boogie/fbe_codec.html#migrateRdbmsFlattyBlobToFbe%2Cstring">fbe_codec: proc migrateRdbmsFlattyBlobToFbe(blob: string): string</a></li>
+          </ul></dd>
+<dt><a name="migrateRdbmsSnapshotFileFlattyToFbe" href="#migrateRdbmsSnapshotFileFlattyToFbe"><span>migrateRdbmsSnapshotFileFlattyToFbe:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc migrateRdbmsSnapshotFileFlattyToFbe(dbPath: string): bool" href="boogie/fbe_codec.html#migrateRdbmsSnapshotFileFlattyToFbe%2Cstring">fbe_codec: proc migrateRdbmsSnapshotFileFlattyToFbe(dbPath: string): bool</a></li>
+          </ul></dd>
+<dt><a name="migrateRdbmsSnapshotFromFlatty" href="#migrateRdbmsSnapshotFromFlatty"><span>migrateRdbmsSnapshotFromFlatty:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms: proc migrateRdbmsSnapshotFromFlatty(s: Store): bool" href="boogie/stores/rdbms.html#migrateRdbmsSnapshotFromFlatty%2CStore">rdbms: proc migrateRdbmsSnapshotFromFlatty(s: Store): bool</a></li>
+          </ul></dd>
+<dt><a name="migrateRowPayloadFlattyToFbe" href="#migrateRowPayloadFlattyToFbe"><span>migrateRowPayloadFlattyToFbe:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc migrateRowPayloadFlattyToFbe(payload: string): string" href="boogie/fbe_codec.html#migrateRowPayloadFlattyToFbe%2Cstring">fbe_codec: proc migrateRowPayloadFlattyToFbe(payload: string): string</a></li>
+          </ul></dd>
+<dt><a name="migrateStoreSnapshotsFlattyToFbe" href="#migrateStoreSnapshotsFlattyToFbe"><span>migrateStoreSnapshotsFlattyToFbe:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc migrateStoreSnapshotsFlattyToFbe(basePath: string): tuple[
+    kv, doc, vector, rdbms: bool]" href="boogie/fbe_codec.html#migrateStoreSnapshotsFlattyToFbe%2Cstring">fbe_codec: proc migrateStoreSnapshotsFlattyToFbe(basePath: string): tuple[
+    kv, doc, vector, rdbms: bool]</a></li>
+          </ul></dd>
+<dt><a name="migrateVectorFlattyBlobToFbe" href="#migrateVectorFlattyBlobToFbe"><span>migrateVectorFlattyBlobToFbe:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc migrateVectorFlattyBlobToFbe(blob: string): string" href="boogie/fbe_codec.html#migrateVectorFlattyBlobToFbe%2Cstring">fbe_codec: proc migrateVectorFlattyBlobToFbe(blob: string): string</a></li>
+          </ul></dd>
+<dt><a name="migrateVectorSnapshotFileFlattyToFbe" href="#migrateVectorSnapshotFileFlattyToFbe"><span>migrateVectorSnapshotFileFlattyToFbe:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc migrateVectorSnapshotFileFlattyToFbe(dbPath: string): bool" href="boogie/fbe_codec.html#migrateVectorSnapshotFileFlattyToFbe%2Cstring">fbe_codec: proc migrateVectorSnapshotFileFlattyToFbe(dbPath: string): bool</a></li>
+          </ul></dd>
+<dt><a name="migrateVectorSnapshotFromFlatty" href="#migrateVectorSnapshotFromFlatty"><span>migrateVectorSnapshotFromFlatty:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="vectorstore: proc migrateVectorSnapshotFromFlatty(s: VectorStore): bool" href="boogie/stores/vectorstore.html#migrateVectorSnapshotFromFlatty%2CVectorStore">vectorstore: proc migrateVectorSnapshotFromFlatty(s: VectorStore): bool</a></li>
+          </ul></dd>
 <dt><a name="nearest" href="#nearest"><span>nearest:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc nearest(c: VectorCollection; query: seq[float32]; k: int;
@@ -633,7 +847,7 @@
           </ul></dd>
 <dt><a name="newBoolValue" href="#newBoolValue"><span>newBoolValue:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: proc newBoolValue(v: bool): Value" href="boogie/stores/rdbms.html#newBoolValue%2Cbool">rdbms: proc newBoolValue(v: bool): Value</a></li>
+          data-doc-search-tag="rdbms_types: proc newBoolValue(v: bool): Value" href="boogie/rdbms_types.html#newBoolValue%2Cbool">rdbms_types: proc newBoolValue(v: bool): Value</a></li>
           </ul></dd>
 <dt><a name="newCollection" href="#newCollection"><span>newCollection:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -651,7 +865,7 @@
           </ul></dd>
 <dt><a name="newFloatValue" href="#newFloatValue"><span>newFloatValue:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: proc newFloatValue(v: float64): Value" href="boogie/stores/rdbms.html#newFloatValue%2Cfloat64">rdbms: proc newFloatValue(v: float64): Value</a></li>
+          data-doc-search-tag="rdbms_types: proc newFloatValue(v: float64): Value" href="boogie/rdbms_types.html#newFloatValue%2Cfloat64">rdbms_types: proc newFloatValue(v: float64): Value</a></li>
           </ul></dd>
 <dt><a name="newForeignKey" href="#newForeignKey"><span>newForeignKey:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -673,11 +887,11 @@
           </ul></dd>
 <dt><a name="newIntValue" href="#newIntValue"><span>newIntValue:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: proc newIntValue(v: int64): Value" href="boogie/stores/rdbms.html#newIntValue%2Cint64">rdbms: proc newIntValue(v: int64): Value</a></li>
+          data-doc-search-tag="rdbms_types: proc newIntValue(v: int64): Value" href="boogie/rdbms_types.html#newIntValue%2Cint64">rdbms_types: proc newIntValue(v: int64): Value</a></li>
           </ul></dd>
 <dt><a name="newJSONValue" href="#newJSONValue"><span>newJSONValue:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: proc newJSONValue(v: JsonNode): Value" href="boogie/stores/rdbms.html#newJSONValue%2CJsonNode">rdbms: proc newJSONValue(v: JsonNode): Value</a></li>
+          data-doc-search-tag="rdbms_types: proc newJSONValue(v: JsonNode): Value" href="boogie/rdbms_types.html#newJSONValue%2CJsonNode">rdbms_types: proc newJSONValue(v: JsonNode): Value</a></li>
           </ul></dd>
 <dt><a name="newKvStore" href="#newKvStore"><span>newKvStore:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -691,16 +905,16 @@
           </ul></dd>
 <dt><a name="newNullValue" href="#newNullValue"><span>newNullValue:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: proc newNullValue(): Value" href="boogie/stores/rdbms.html#newNullValue">rdbms: proc newNullValue(): Value</a></li>
+          data-doc-search-tag="rdbms_types: proc newNullValue(): Value" href="boogie/rdbms_types.html#newNullValue">rdbms_types: proc newNullValue(): Value</a></li>
           </ul></dd>
 <dt><a name="newStore" href="#newStore"><span>newStore:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="rdbms: proc newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
          checkpointEveryOps: uint32 = 0'u32;
-         walFlushEveryOps: uint32 = 1000'u32;
-         enableConcurrency: static bool = false): Store" href="boogie/stores/rdbms.html#newStore%2Cstring%2CStorageMode%2Cbool%2Cuint32%2Cuint32%2Cstaticbool">rdbms: proc newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
+         walFlushEveryOps: uint32 = 1000'u32; allowFlatty: bool = false;
+         enableConcurrency: static bool = false): Store" href="boogie/stores/rdbms.html#newStore%2Cstring%2CStorageMode%2Cbool%2Cuint32%2Cuint32%2Cbool%2Cstaticbool">rdbms: proc newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
          checkpointEveryOps: uint32 = 0'u32;
-         walFlushEveryOps: uint32 = 1000'u32;
+         walFlushEveryOps: uint32 = 1000'u32; allowFlatty: bool = false;
          enableConcurrency: static bool = false): Store</a></li>
           </ul></dd>
 <dt><a name="newTable" href="#newTable"><span>newTable:</span></a></dt><dd><ul class="simple">
@@ -717,7 +931,7 @@
           </ul></dd>
 <dt><a name="newTextValue" href="#newTextValue"><span>newTextValue:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: proc newTextValue(v: string): Value" href="boogie/stores/rdbms.html#newTextValue%2Cstring">rdbms: proc newTextValue(v: string): Value</a></li>
+          data-doc-search-tag="rdbms_types: proc newTextValue(v: string): Value" href="boogie/rdbms_types.html#newTextValue%2Cstring">rdbms_types: proc newTextValue(v: string): Value</a></li>
           </ul></dd>
 <dt><a name="newVectorStore" href="#newVectorStore"><span>newVectorStore:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -785,15 +999,19 @@
           </ul></dd>
 <dt><a name="pkmManual" href="#pkmManual"><span>pkmManual:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: PrimaryKeyMode.pkmManual" href="boogie/stores/rdbms.html#pkmManual">rdbms: PrimaryKeyMode.pkmManual</a></li>
+          data-doc-search-tag="rdbms_types: PrimaryKeyMode.pkmManual" href="boogie/rdbms_types.html#pkmManual">rdbms_types: PrimaryKeyMode.pkmManual</a></li>
+          </ul></dd>
+<dt><a name="pkMode" href="#pkMode"><span>pkMode:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms: proc pkMode(t: DbTable): PrimaryKeyMode" href="boogie/stores/rdbms.html#pkMode%2CDbTable">rdbms: proc pkMode(t: DbTable): PrimaryKeyMode</a></li>
           </ul></dd>
 <dt><a name="pkmSerial" href="#pkmSerial"><span>pkmSerial:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: PrimaryKeyMode.pkmSerial" href="boogie/stores/rdbms.html#pkmSerial">rdbms: PrimaryKeyMode.pkmSerial</a></li>
+          data-doc-search-tag="rdbms_types: PrimaryKeyMode.pkmSerial" href="boogie/rdbms_types.html#pkmSerial">rdbms_types: PrimaryKeyMode.pkmSerial</a></li>
           </ul></dd>
 <dt><a name="PrimaryKeyMode" href="#PrimaryKeyMode"><span>PrimaryKeyMode:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: enum PrimaryKeyMode" href="boogie/stores/rdbms.html#PrimaryKeyMode">rdbms: enum PrimaryKeyMode</a></li>
+          data-doc-search-tag="rdbms_types: enum PrimaryKeyMode" href="boogie/rdbms_types.html#PrimaryKeyMode">rdbms_types: enum PrimaryKeyMode</a></li>
           </ul></dd>
 <dt><a name="put" href="#put"><span>put:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -808,6 +1026,10 @@
 <dt><a name="Queued" href="#Queued"><span>Queued:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="concurrency: object Queued" href="boogie/concurrency.html#Queued">concurrency: object Queued</a></li>
+          </ul></dd>
+<dt><a name="RdbmsSnapshotOnDisk" href="#RdbmsSnapshotOnDisk"><span>RdbmsSnapshotOnDisk:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: tuple RdbmsSnapshotOnDisk" href="boogie/fbe_codec.html#RdbmsSnapshotOnDisk">fbe_codec: tuple RdbmsSnapshotOnDisk</a></li>
           </ul></dd>
 <dt><a name="readAt" href="#readAt"><span>readAt:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -827,7 +1049,7 @@
           <li><a class="reference external"
           data-doc-search-tag="kv: proc recoverFromWal(s: KvStore)" href="boogie/stores/kv.html#recoverFromWal%2CKvStore">kv: proc recoverFromWal(s: KvStore)</a></li>
           <li><a class="reference external"
-          data-doc-search-tag="rdbms: proc recoverFromWal(s: Store)" href="boogie/stores/rdbms.html#recoverFromWal%2CStore">rdbms: proc recoverFromWal(s: Store)</a></li>
+          data-doc-search-tag="rdbms: proc recoverFromWal(s: Store; allowFlatty = true)" href="boogie/stores/rdbms.html#recoverFromWal%2CStore">rdbms: proc recoverFromWal(s: Store; allowFlatty = true)</a></li>
           <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc recoverFromWal(s: VectorStore)" href="boogie/stores/vectorstore.html#recoverFromWal%2CVectorStore">vectorstore: proc recoverFromWal(s: VectorStore)</a></li>
           </ul></dd>
@@ -861,7 +1083,7 @@
           </ul></dd>
 <dt><a name="RowData" href="#RowData"><span>RowData:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: type RowData" href="boogie/stores/rdbms.html#RowData">rdbms: type RowData</a></li>
+          data-doc-search-tag="rdbms_types: type RowData" href="boogie/rdbms_types.html#RowData">rdbms_types: type RowData</a></li>
           </ul></dd>
 <dt><a name="RowIndex" href="#RowIndex"><span>RowIndex:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -905,6 +1127,10 @@
 <li><a class="reference external"
           data-doc-search-tag="rdbms: object StoreError" href="boogie/stores/rdbms.html#StoreError">rdbms: object StoreError</a></li>
           </ul></dd>
+<dt><a name="stringToBuf" href="#stringToBuf"><span>stringToBuf:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc stringToBuf(s: string): Buffer" href="boogie/fbe_codec.html#stringToBuf%2Cstring">fbe_codec: proc stringToBuf(s: string): Buffer</a></li>
+          </ul></dd>
 <dt><a name="submit" href="#submit"><span>submit:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="concurrency: proc submit[T](cc: ConcurrentState[T]; slot: TableSlot[T]; op: sink T): uint64" href="boogie/concurrency.html#submit%2CConcurrentState%5BT%5D%2CTableSlot%5BT%5D%2CsinkT">concurrency: proc submit[T](cc: ConcurrentState[T]; slot: TableSlot[T]; op: sink T): uint64</a></li>
@@ -929,6 +1155,10 @@
 <li><a class="reference external"
           data-doc-search-tag="crashsafe: proc unregisterStoreFlush(storeId: pointer)" href="boogie/crashsafe.html#unregisterStoreFlush%2Cpointer">crashsafe: proc unregisterStoreFlush(storeId: pointer)</a></li>
           </ul></dd>
+<dt><a name="updateRow" href="#updateRow"><span>updateRow:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms: proc updateRow(s: Store; tableName: string; pk: string; data: RowData)" href="boogie/stores/rdbms.html#updateRow%2CStore%2Cstring%2Cstring%2CRowData">rdbms: proc updateRow(s: Store; tableName: string; pk: string; data: RowData)</a></li>
+          </ul></dd>
 <dt><a name="upsert" href="#upsert"><span>upsert:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="docstore: proc upsert(store: var DocumentStore; key: string; doc: JsonNode; sync = true;
@@ -945,11 +1175,15 @@
           </ul></dd>
 <dt><a name="Value" href="#Value"><span>Value:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="rdbms: object Value" href="boogie/stores/rdbms.html#Value">rdbms: object Value</a></li>
+          data-doc-search-tag="rdbms_types: object Value" href="boogie/rdbms_types.html#Value">rdbms_types: object Value</a></li>
           </ul></dd>
 <dt><a name="VectorCollection" href="#VectorCollection"><span>VectorCollection:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="vectorstore: type VectorCollection" href="boogie/stores/vectorstore.html#VectorCollection">vectorstore: type VectorCollection</a></li>
+          </ul></dd>
+<dt><a name="VectorSnapshotOnDisk" href="#VectorSnapshotOnDisk"><span>VectorSnapshotOnDisk:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: tuple VectorSnapshotOnDisk" href="boogie/fbe_codec.html#VectorSnapshotOnDisk">fbe_codec: tuple VectorSnapshotOnDisk</a></li>
           </ul></dd>
 <dt><a name="VectorStorageMode" href="#VectorStorageMode"><span>VectorStorageMode:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -1045,7 +1279,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-25 09:50:04 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-31 20:31:34 UTC</small>
       </div>
     </div>
   </div>

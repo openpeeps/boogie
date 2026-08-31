@@ -1,64 +1,45 @@
 nimTitle	rdbms	boogie/stores/rdbms.html	module boogie/stores/rdbms		0
-nim	smInMemory	boogie/stores/rdbms.html#smInMemory	StorageMode.smInMemory		28
-nim	smDisk	boogie/stores/rdbms.html#smDisk	StorageMode.smDisk		28
-nim	StorageMode	boogie/stores/rdbms.html#StorageMode	enum StorageMode		28
-nim	dtNull	boogie/stores/rdbms.html#dtNull	DataType.dtNull		35
-nim	dtInt	boogie/stores/rdbms.html#dtInt	DataType.dtInt		35
-nim	dtFloat	boogie/stores/rdbms.html#dtFloat	DataType.dtFloat		35
-nim	dtBool	boogie/stores/rdbms.html#dtBool	DataType.dtBool		35
-nim	dtText	boogie/stores/rdbms.html#dtText	DataType.dtText		35
-nim	dtJson	boogie/stores/rdbms.html#dtJson	DataType.dtJson		35
-nim	DataType	boogie/stores/rdbms.html#DataType	enum DataType		35
-nim	ColumnDef	boogie/stores/rdbms.html#ColumnDef	object ColumnDef		38
-nim	Value	boogie/stores/rdbms.html#Value	object Value		46
-nim	RowData	boogie/stores/rdbms.html#RowData	type RowData		64
-nim	RowIndex	boogie/stores/rdbms.html#RowIndex	type RowIndex		72
-nim	pkmManual	boogie/stores/rdbms.html#pkmManual	PrimaryKeyMode.pkmManual		76
-nim	pkmSerial	boogie/stores/rdbms.html#pkmSerial	PrimaryKeyMode.pkmSerial		76
-nim	PrimaryKeyMode	boogie/stores/rdbms.html#PrimaryKeyMode	enum PrimaryKeyMode		76
-nim	fkaRestrict	boogie/stores/rdbms.html#fkaRestrict	ForeignKeyAction.fkaRestrict		79
-nim	ForeignKeyAction	boogie/stores/rdbms.html#ForeignKeyAction	enum ForeignKeyAction		79
-nim	ForeignKeyDef	boogie/stores/rdbms.html#ForeignKeyDef	object ForeignKeyDef		82
-nim	DbTable	boogie/stores/rdbms.html#DbTable	type DbTable		89
-nim	Store	boogie/stores/rdbms.html#Store	type Store		120
-nim	StoreError	boogie/stores/rdbms.html#StoreError	object StoreError		155
-nim	recoverFromWal	boogie/stores/rdbms.html#recoverFromWal,Store	proc recoverFromWal(s: Store)		167
-nim	where	boogie/stores/rdbms.html#where,DbTable,string,Value	proc where(t: DbTable; column: string; value: Value): seq[(string, RowData)]		168
-nim	`==`	boogie/stores/rdbms.html#==,RowRecord,RowRecord	proc `==`(a, b: RowRecord): bool		176
-nim	`==`	boogie/stores/rdbms.html#==,Value,Value	proc `==`(a, b: Value): bool		186
-nim	newStore	boogie/stores/rdbms.html#newStore,string,StorageMode,bool,uint32,uint32,staticbool	proc newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;\n         checkpointEveryOps: uint32 = 0'u32;\n         walFlushEveryOps: uint32 = 1000'u32;\n         enableConcurrency: static bool = false): Store		212
-nim	newInMemoryStore	boogie/stores/rdbms.html#newInMemoryStore	proc newInMemoryStore(): Store		294
-nim	newTable	boogie/stores/rdbms.html#newTable,string,string,openArray[ColumnDef],PrimaryKeyMode,openArray[ForeignKeyDef]	proc newTable(name: string; primaryKey: string; columns: openArray[ColumnDef];\n         primaryKeyMode: PrimaryKeyMode = pkmSerial;\n         foreignKeys: openArray[ForeignKeyDef] = []): DbTable		298
-nim	newForeignKey	boogie/stores/rdbms.html#newForeignKey,string,string,string,string,ForeignKeyAction	proc newForeignKey(name, column, refTable, refColumn: string;\n              onDelete: ForeignKeyAction = fkaRestrict): ForeignKeyDef		365
-nim	newColumn	boogie/stores/rdbms.html#newColumn,string,DataType,bool	proc newColumn(name: string; kind: DataType; nullable: bool): ColumnDef		384
-nim	newNullValue	boogie/stores/rdbms.html#newNullValue	proc newNullValue(): Value		391
-nim	newIntValue	boogie/stores/rdbms.html#newIntValue,int64	proc newIntValue(v: int64): Value		392
-nim	newFloatValue	boogie/stores/rdbms.html#newFloatValue,float64	proc newFloatValue(v: float64): Value		393
-nim	newBoolValue	boogie/stores/rdbms.html#newBoolValue,bool	proc newBoolValue(v: bool): Value		394
-nim	newTextValue	boogie/stores/rdbms.html#newTextValue,string	proc newTextValue(v: string): Value		395
-nim	newJSONValue	boogie/stores/rdbms.html#newJSONValue,JsonNode	proc newJSONValue(v: JsonNode): Value		396
-nim	`$`	boogie/stores/rdbms.html#$,Value	proc `$`(v: Value): string		398
-nim	row	boogie/stores/rdbms.html#row,openArray[]	proc row(pairs: openArray[(string, Value)]): RowData		408
-nim	hasTable	boogie/stores/rdbms.html#hasTable,Store,string	proc hasTable(s: Store; name: string): bool		413
-nim	createIndex	boogie/stores/rdbms.html#createIndex,DbTable,string	proc createIndex(t: DbTable; column: string)		469
-nim	checkpoint	boogie/stores/rdbms.html#checkpoint,Store	proc checkpoint(s: Store)		911
-nim	close	boogie/stores/rdbms.html#close,Store	proc close(s: Store)		921
-nim	getTable	boogie/stores/rdbms.html#getTable,Store,string	proc getTable(s: Store; name: string): Option[DbTable]		932
-nim	createTable	boogie/stores/rdbms.html#createTable,Store,DbTable	proc createTable(s: Store; t: DbTable)		943
-nim	createTableIfNotExist	boogie/stores/rdbms.html#createTableIfNotExist,Store,DbTable	proc createTableIfNotExist(s: Store; t: DbTable)		960
-nim	dropTable	boogie/stores/rdbms.html#dropTable,Store,string	proc dropTable(s: Store; name: string)		965
-nim	isEmpty	boogie/stores/rdbms.html#isEmpty,DbTable	proc isEmpty(t: DbTable): bool		997
-nim	insertRow	boogie/stores/rdbms.html#insertRow,DbTable,string,RowData	proc insertRow(t: DbTable; pk: string; data: RowData)		1001
-nim	deleteRow	boogie/stores/rdbms.html#deleteRow,DbTable,string	proc deleteRow(t: DbTable; pk: string): bool		1006
-nim	getRow	boogie/stores/rdbms.html#getRow,DbTable,string	proc getRow(t: DbTable; pk: string): Option[RowData]		1010
-nim	allRows	boogie/stores/rdbms.html#allRows.i,DbTable	iterator allRows(t: DbTable): (string, RowData)		1018
-nim	allRowsByPk	boogie/stores/rdbms.html#allRowsByPk.i,DbTable	iterator allRowsByPk(t: DbTable): (string, RowData)		1034
-nim	insertRow	boogie/stores/rdbms.html#insertRow,Store,string,string,RowData	proc insertRow(s: Store; tableName: string; pk: string; data: RowData)		1047
-nim	insertRow	boogie/stores/rdbms.html#insertRow,DbTable,RowData	proc insertRow(t: DbTable; data: RowData): string		1086
-nim	insertRow	boogie/stores/rdbms.html#insertRow,Store,string,RowData	proc insertRow(s: Store; tableName: string; data: RowData): string		1093
-nim	deleteRow	boogie/stores/rdbms.html#deleteRow,Store,string,string	proc deleteRow(s: Store; tableName: string; pk: string): bool		1137
-nim	getRow	boogie/stores/rdbms.html#getRow,Store,string,string	proc getRow(s: Store; tableName: string; pk: string): Option[RowData]		1162
-nimgrp	==	boogie/stores/rdbms.html#==-procs-all	proc		176
-nimgrp	insertrow	boogie/stores/rdbms.html#insertRow-procs-all	proc		1001
-nimgrp	deleterow	boogie/stores/rdbms.html#deleteRow-procs-all	proc		1006
-nimgrp	getrow	boogie/stores/rdbms.html#getRow-procs-all	proc		1010
+nim	smInMemory	boogie/stores/rdbms.html#smInMemory	StorageMode.smInMemory		31
+nim	smDisk	boogie/stores/rdbms.html#smDisk	StorageMode.smDisk		31
+nim	StorageMode	boogie/stores/rdbms.html#StorageMode	enum StorageMode		31
+nim	RowIndex	boogie/stores/rdbms.html#RowIndex	type RowIndex		43
+nim	DbTable	boogie/stores/rdbms.html#DbTable	type DbTable		47
+nim	Store	boogie/stores/rdbms.html#Store	type Store		78
+nim	StoreError	boogie/stores/rdbms.html#StoreError	object StoreError		113
+nim	where	boogie/stores/rdbms.html#where,DbTable,string,Value	proc where(t: DbTable; column: string; value: Value): seq[(string, RowData)]		125
+nim	`==`	boogie/stores/rdbms.html#==,RowRecord,RowRecord	proc `==`(a, b: RowRecord): bool		133
+nim	recoverFromWal	boogie/stores/rdbms.html#recoverFromWal,Store	proc recoverFromWal(s: Store; allowFlatty = true)		152
+nim	newStore	boogie/stores/rdbms.html#newStore,string,StorageMode,bool,uint32,uint32,bool,staticbool	proc newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;\n         checkpointEveryOps: uint32 = 0'u32;\n         walFlushEveryOps: uint32 = 1000'u32; allowFlatty: bool = false;\n         enableConcurrency: static bool = false): Store		154
+nim	newInMemoryStore	boogie/stores/rdbms.html#newInMemoryStore	proc newInMemoryStore(): Store		237
+nim	newTable	boogie/stores/rdbms.html#newTable,string,string,openArray[ColumnDef],PrimaryKeyMode,openArray[ForeignKeyDef]	proc newTable(name: string; primaryKey: string; columns: openArray[ColumnDef];\n         primaryKeyMode: PrimaryKeyMode = pkmSerial;\n         foreignKeys: openArray[ForeignKeyDef] = []): DbTable		241
+nim	newForeignKey	boogie/stores/rdbms.html#newForeignKey,string,string,string,string,ForeignKeyAction	proc newForeignKey(name, column, refTable, refColumn: string;\n              onDelete: ForeignKeyAction = fkaRestrict): ForeignKeyDef		308
+nim	newColumn	boogie/stores/rdbms.html#newColumn,string,DataType,bool	proc newColumn(name: string; kind: DataType; nullable: bool): ColumnDef		327
+nim	row	boogie/stores/rdbms.html#row,openArray[]	proc row(pairs: openArray[(string, Value)]): RowData		331
+nim	hasTable	boogie/stores/rdbms.html#hasTable,Store,string	proc hasTable(s: Store; name: string): bool		336
+nim	findColumn	boogie/stores/rdbms.html#findColumn,DbTable,string	proc findColumn(t: DbTable; colName: string): Option[ColumnDef]		345
+nim	createIndex	boogie/stores/rdbms.html#createIndex,DbTable,string	proc createIndex(t: DbTable; column: string)		392
+nim	jsonToStoreValue	boogie/stores/rdbms.html#jsonToStoreValue,JsonNode	proc jsonToStoreValue(j: JsonNode): Value		408
+nim	migrateRdbmsSnapshotFromFlatty	boogie/stores/rdbms.html#migrateRdbmsSnapshotFromFlatty,Store	proc migrateRdbmsSnapshotFromFlatty(s: Store): bool		811
+nim	checkpoint	boogie/stores/rdbms.html#checkpoint,Store	proc checkpoint(s: Store)		859
+nim	close	boogie/stores/rdbms.html#close,Store	proc close(s: Store)		869
+nim	getTable	boogie/stores/rdbms.html#getTable,Store,string	proc getTable(s: Store; name: string): Option[DbTable]		880
+nim	createTable	boogie/stores/rdbms.html#createTable,Store,DbTable	proc createTable(s: Store; t: DbTable)		891
+nim	createTableIfNotExist	boogie/stores/rdbms.html#createTableIfNotExist,Store,DbTable	proc createTableIfNotExist(s: Store; t: DbTable)		908
+nim	dropTable	boogie/stores/rdbms.html#dropTable,Store,string	proc dropTable(s: Store; name: string)		913
+nim	isEmpty	boogie/stores/rdbms.html#isEmpty,DbTable	proc isEmpty(t: DbTable): bool		945
+nim	pkMode	boogie/stores/rdbms.html#pkMode,DbTable	proc pkMode(t: DbTable): PrimaryKeyMode		949
+nim	isConcurrent	boogie/stores/rdbms.html#isConcurrent,Store	proc isConcurrent(s: Store): bool		953
+nim	insertRow	boogie/stores/rdbms.html#insertRow,DbTable,string,RowData	proc insertRow(t: DbTable; pk: string; data: RowData)		957
+nim	deleteRow	boogie/stores/rdbms.html#deleteRow,DbTable,string	proc deleteRow(t: DbTable; pk: string): bool		962
+nim	getRow	boogie/stores/rdbms.html#getRow,DbTable,string	proc getRow(t: DbTable; pk: string): Option[RowData]		966
+nim	allRows	boogie/stores/rdbms.html#allRows.i,DbTable	iterator allRows(t: DbTable): (string, RowData)		974
+nim	allRowsByPk	boogie/stores/rdbms.html#allRowsByPk.i,DbTable	iterator allRowsByPk(t: DbTable): (string, RowData)		990
+nim	insertRow	boogie/stores/rdbms.html#insertRow,Store,string,string,RowData	proc insertRow(s: Store; tableName: string; pk: string; data: RowData)		1003
+nim	insertRow	boogie/stores/rdbms.html#insertRow,DbTable,RowData	proc insertRow(t: DbTable; data: RowData): string		1042
+nim	insertRow	boogie/stores/rdbms.html#insertRow,Store,string,RowData	proc insertRow(s: Store; tableName: string; data: RowData): string		1049
+nim	deleteRow	boogie/stores/rdbms.html#deleteRow,Store,string,string	proc deleteRow(s: Store; tableName: string; pk: string): bool		1093
+nim	updateRow	boogie/stores/rdbms.html#updateRow,Store,string,string,RowData	proc updateRow(s: Store; tableName: string; pk: string; data: RowData)		1118
+nim	getRow	boogie/stores/rdbms.html#getRow,Store,string,string	proc getRow(s: Store; tableName: string; pk: string): Option[RowData]		1140
+nimgrp	insertrow	boogie/stores/rdbms.html#insertRow-procs-all	proc		957
+nimgrp	deleterow	boogie/stores/rdbms.html#deleteRow-procs-all	proc		962
+nimgrp	getrow	boogie/stores/rdbms.html#getRow-procs-all	proc		966

@@ -4,16 +4,17 @@ nim	ksmDisk	boogie/stores/kv.html#ksmDisk	KvStorageMode.ksmDisk		25
 nim	KvStorageMode	boogie/stores/kv.html#KvStorageMode	enum KvStorageMode		25
 nim	KvStoreError	boogie/stores/kv.html#KvStoreError	object KvStoreError		31
 nim	KvStore	boogie/stores/kv.html#KvStore	type KvStore		42
-nim	recoverFromWal	boogie/stores/kv.html#recoverFromWal,KvStore	proc recoverFromWal(s: KvStore)		81
-nim	newKvStore	boogie/stores/kv.html#newKvStore,string,KvStorageMode,bool,uint32,uint32,staticbool	proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;\n           checkpointEveryOps: uint32 = 0'u32;\n           walFlushEveryOps: uint32 = 1000'u32; lazyReads = false;\n           enableConcurrency: static bool = false): KvStore		193
-nim	newInMemoryKvStore	boogie/stores/kv.html#newInMemoryKvStore	proc newInMemoryKvStore(): KvStore		279
-nim	checkpoint	boogie/stores/kv.html#checkpoint,KvStore	proc checkpoint(s: KvStore)		284
-nim	close	boogie/stores/kv.html#close,KvStore	proc close(s: KvStore)		298
-nim	put	boogie/stores/kv.html#put,KvStore,string,string	proc put(s: KvStore; key, value: string)		306
-nim	get	boogie/stores/kv.html#get,KvStore,string	proc get(s: KvStore; key: string): Option[string]		318
-nim	hasKey	boogie/stores/kv.html#hasKey,KvStore,string	proc hasKey(s: KvStore; key: string): bool		346
-nim	delete	boogie/stores/kv.html#delete,KvStore,string	proc delete(s: KvStore; key: string): bool		355
-nim	len	boogie/stores/kv.html#len,KvStore	proc len(s: KvStore): int		371
-nim	isEmpty	boogie/stores/kv.html#isEmpty,KvStore	proc isEmpty(s: KvStore): bool		380
-nim	retainedValueBytes	boogie/stores/kv.html#retainedValueBytes,KvStore	proc retainedValueBytes(s: KvStore): int64		389
-nim	pairsUnordered	boogie/stores/kv.html#pairsUnordered.i,KvStore	iterator pairsUnordered(s: KvStore): (string, string)		397
+nim	recoverFromWal	boogie/stores/kv.html#recoverFromWal,KvStore	proc recoverFromWal(s: KvStore)		75
+nim	migrateKvSnapshotFromFlatty	boogie/stores/kv.html#migrateKvSnapshotFromFlatty,KvStore	proc migrateKvSnapshotFromFlatty(s: KvStore): bool		124
+nim	newKvStore	boogie/stores/kv.html#newKvStore,string,KvStorageMode,bool,uint32,uint32,staticbool	proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;\n           checkpointEveryOps: uint32 = 0'u32;\n           walFlushEveryOps: uint32 = 1000'u32; lazyReads = false;\n           enableConcurrency: static bool = false): KvStore		192
+nim	newInMemoryKvStore	boogie/stores/kv.html#newInMemoryKvStore	proc newInMemoryKvStore(): KvStore		278
+nim	checkpoint	boogie/stores/kv.html#checkpoint,KvStore	proc checkpoint(s: KvStore)		283
+nim	close	boogie/stores/kv.html#close,KvStore	proc close(s: KvStore)		297
+nim	put	boogie/stores/kv.html#put,KvStore,string,string	proc put(s: KvStore; key, value: string)		305
+nim	get	boogie/stores/kv.html#get,KvStore,string	proc get(s: KvStore; key: string): Option[string]		317
+nim	hasKey	boogie/stores/kv.html#hasKey,KvStore,string	proc hasKey(s: KvStore; key: string): bool		345
+nim	delete	boogie/stores/kv.html#delete,KvStore,string	proc delete(s: KvStore; key: string): bool		354
+nim	len	boogie/stores/kv.html#len,KvStore	proc len(s: KvStore): int		370
+nim	isEmpty	boogie/stores/kv.html#isEmpty,KvStore	proc isEmpty(s: KvStore): bool		379
+nim	retainedValueBytes	boogie/stores/kv.html#retainedValueBytes,KvStore	proc retainedValueBytes(s: KvStore): int64		388
+nim	pairsUnordered	boogie/stores/kv.html#pairsUnordered.i,KvStore	iterator pairsUnordered(s: KvStore): (string, string)		396

@@ -1,0 +1,25 @@
+nimTitle	rdbms_types	boogie/rdbms_types.html	module boogie/rdbms_types		0
+nim	dtNull	boogie/rdbms_types.html#dtNull	DataType.dtNull		4
+nim	dtInt	boogie/rdbms_types.html#dtInt	DataType.dtInt		4
+nim	dtFloat	boogie/rdbms_types.html#dtFloat	DataType.dtFloat		4
+nim	dtBool	boogie/rdbms_types.html#dtBool	DataType.dtBool		4
+nim	dtText	boogie/rdbms_types.html#dtText	DataType.dtText		4
+nim	dtJson	boogie/rdbms_types.html#dtJson	DataType.dtJson		4
+nim	DataType	boogie/rdbms_types.html#DataType	enum DataType		4
+nim	ColumnDef	boogie/rdbms_types.html#ColumnDef	object ColumnDef		7
+nim	Value	boogie/rdbms_types.html#Value	object Value		13
+nim	RowData	boogie/rdbms_types.html#RowData	type RowData		28
+nim	pkmManual	boogie/rdbms_types.html#pkmManual	PrimaryKeyMode.pkmManual		30
+nim	pkmSerial	boogie/rdbms_types.html#pkmSerial	PrimaryKeyMode.pkmSerial		30
+nim	PrimaryKeyMode	boogie/rdbms_types.html#PrimaryKeyMode	enum PrimaryKeyMode		30
+nim	fkaRestrict	boogie/rdbms_types.html#fkaRestrict	ForeignKeyAction.fkaRestrict		33
+nim	ForeignKeyAction	boogie/rdbms_types.html#ForeignKeyAction	enum ForeignKeyAction		33
+nim	ForeignKeyDef	boogie/rdbms_types.html#ForeignKeyDef	object ForeignKeyDef		36
+nim	newNullValue	boogie/rdbms_types.html#newNullValue	proc newNullValue(): Value		43
+nim	newIntValue	boogie/rdbms_types.html#newIntValue,int64	proc newIntValue(v: int64): Value		44
+nim	newFloatValue	boogie/rdbms_types.html#newFloatValue,float64	proc newFloatValue(v: float64): Value		45
+nim	newBoolValue	boogie/rdbms_types.html#newBoolValue,bool	proc newBoolValue(v: bool): Value		46
+nim	newTextValue	boogie/rdbms_types.html#newTextValue,string	proc newTextValue(v: string): Value		47
+nim	newJSONValue	boogie/rdbms_types.html#newJSONValue,JsonNode	proc newJSONValue(v: JsonNode): Value		48
+nim	`$`	boogie/rdbms_types.html#$,Value	proc `$`(v: Value): string		50
+nim	`==`	boogie/rdbms_types.html#==,Value,Value	proc `==`(a, b: Value): bool		59
