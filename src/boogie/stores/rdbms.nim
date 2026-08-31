@@ -8,10 +8,13 @@
 import std/[tables, options, strformat,
             json, strutils, os, sets]
 
-import pkg/[flatty, sorta]
+import pkg/sorta
 import ../wal
 import ../concurrency
 import ../crashsafe
+import ../fbe_codec
+import ../rdbms_types
+export rdbms_types
 
 ## This module implements a simple WAL-based embedded database for Nim.
 ## It provides a Store type that manages multiple tables, each with a defined schema and supports 
@@ -32,38 +35,6 @@ type
     ## - `smDisk` mode writes data to disk (persistent but slower)
     smInMemory, smDisk
 
-  DataType* = enum
-    dtNull, dtInt, dtFloat, dtBool, dtText, dtJson
-
-  ColumnDef* = object
-    name*: string
-      ## Name of the column
-    kind*: DataType
-      ## Data type of the column (int, float, bool, text, json)
-    nullable*: bool
-      ## Whether the column can contain null values. If false, a value must be provided for this column on insert.
-
-  Value* = object
-    ## Value representing a cell in a table row
-    case kind*: DataType
-    of dtInt:
-      intVal*: int64
-    of dtFloat:
-      floatVal*: float64
-    of dtBool:
-      boolVal*: bool
-    of dtText:
-      strVal*: string
-    of dtJson:
-      jsonVal*: string
-        ## For JSON, we store the raw JSON string. This allows us to
-        ## preserve formatting and avoid double-encoding issues.
-    of dtNull:
-      discard
-
-  RowData* = OrderedTable[string, Value]
-    ## A mapping of column names to cell values representing a single row in a table
-
   RowRecord = object
     # Internal repr of a row, stored in the order index
     pk: string
@@ -72,19 +43,6 @@ type
   RowIndex* = SortedTable[RowRecord, string]
     ## An ordered index of rows in a table, keyed by primary key value. This allows for efficient
     ## ordered iteration and range queries.
-
-  PrimaryKeyMode* = enum
-    pkmManual, pkmSerial
-
-  ForeignKeyAction* = enum
-    fkaRestrict
-
-  ForeignKeyDef* = object
-    name*: string
-    column*: string
-    refTable*: string
-    refColumn*: string
-    onDelete*: ForeignKeyAction
 
   DbTable* = ref object
     ## Represents a table in the store, including its schema and data.
@@ -164,7 +122,6 @@ type
     data: RowData
 
 # fwd declarations
-proc recoverFromWal*(s: Store)
 proc where*(t: DbTable, column: string, value: Value): seq[(string, RowData)]
 proc insertRowNoWal(t: DbTable, pk: string, data: var RowData): string
 proc deleteRowNoWal(t: DbTable, pk: string): bool
@@ -183,24 +140,6 @@ proc `==`*(a, b: RowRecord): bool =
   ## inserting a new one with the same primary key.
   a.pk == b.pk
 
-proc `==`*(a, b: Value): bool =
-  ## Equality comparison for Value. This is used for
-  ## validating updates and for equality indexes.
-  if a.kind != b.kind: return
-  case a.kind
-  of dtNull:
-    true
-  of dtInt:
-    a.intVal == b.intVal
-  of dtFloat:
-    a.floatVal == b.floatVal
-  of dtBool:
-    a.boolVal == b.boolVal
-  of dtText:
-    a.strVal == b.strVal
-  of dtJson:
-    a.jsonVal == b.jsonVal
-
 proc writeTextAtomic(path, content: string) =
   # Atomically write text content to a file by writing to a temp file and renaming it
   let tmp = path & ".tmp"
@@ -209,9 +148,13 @@ proc writeTextAtomic(path, content: string) =
     removeFile(path)
   moveFile(tmp, path)
 
+proc loadSnapshotIfPresent(s: Store, allowFlatty = true)
+proc recoverFromWal*(s: Store, allowFlatty = true)
+
 proc newStore*(path: string, mode: StorageMode = smDisk,
     enableWal: bool = true, checkpointEveryOps: uint32 = 0'u32,
     walFlushEveryOps: uint32 = 1000'u32,
+    allowFlatty: bool = false,
     enableConcurrency: static bool = false
   ): Store =
   ## Create a new Store instance. Use `smInMemory` for an in-memory
@@ -280,7 +223,7 @@ proc newStore*(path: string, mode: StorageMode = smDisk,
     )
 
   # If WAL is enabled, we need to recover the store state by replaying the WAL entries.
-  recoverFromWal(result)
+  recoverFromWal(result, allowFlatty)
 
   let s = result
   registerStoreFlush(cast[pointer](s), proc() {.gcsafe.} =
@@ -385,26 +328,6 @@ proc newColumn*(name: string, kind: DataType, nullable: bool): ColumnDef =
   ## Create a new ColumnDef with the specified name, data type, and nullability.
   ColumnDef(name: name, kind: kind, nullable: nullable)
 
-#
-# Value constructors and helpers
-#
-proc newNullValue*(): Value = Value(kind: dtNull)
-proc newIntValue*(v: int64): Value = Value(kind: dtInt, intVal: v)
-proc newFloatValue*(v: float64): Value = Value(kind: dtFloat, floatVal: v)
-proc newBoolValue*(v: bool): Value = Value(kind: dtBool, boolVal: v)
-proc newTextValue*(v: string): Value = Value(kind: dtText, strVal: v)
-proc newJSONValue*(v: JsonNode): Value = Value(kind: dtJson, jsonVal: $(v))
-
-proc `$`*(v: Value): string =
-  ## Stringified representation of a Value
-  case v.kind
-  of dtNull: "null"
-  of dtInt: $v.intVal
-  of dtFloat: $v.floatVal
-  of dtBool: $v.boolVal
-  of dtText: v.strVal
-  of dtJson: v.jsonVal
-
 proc row*(pairs: openArray[(string, Value)]): RowData =
   ## Helper to create RowData from an open array of (column, value) pairs.
   for (k, v) in pairs:
@@ -419,7 +342,7 @@ proc hasTable*(s: Store, name: string): bool =
     return res
   s.tables.hasKey(name)
 
-proc findColumn(t: DbTable, colName: string): Option[ColumnDef] =
+proc findColumn*(t: DbTable, colName: string): Option[ColumnDef] =
   # Returns the ColumnDef for the given column name, or none if not found
   if t.columnsByName.hasKey(colName):
     some(t.columnsByName[colName])
@@ -482,6 +405,9 @@ proc createIndex*(t: DbTable, column: string) =
   t.eqIndex[column] = colMap
   t.indexedCols.incl(column)
 
+proc jsonToStoreValue*(j: JsonNode): Value {.gcsafe.}
+  ## Converts a JSON literal into a store value. Used for column defaults.
+
 proc effectivePkForInsert(t: DbTable, pk: string): string =
   case t.pkType
   of pkmManual:
@@ -495,7 +421,8 @@ proc effectivePkForInsert(t: DbTable, pk: string): string =
       result = $t.pkSequence
 
 proc normalizedRowWithPk(t: DbTable, data: var RowData, pk: string) =
-  ## Sets the primary key column on `data` to `pk` in place.
+  ## Sets the primary key column on `data` to `pk` in place and applies any
+  ## declared column defaults for values that were not provided.
   let pkCol = t.primaryKey
   let pkDef = t.findColumn(pkCol)
   if pkDef.isNone:
@@ -512,6 +439,19 @@ proc normalizedRowWithPk(t: DbTable, data: var RowData, pk: string) =
     # Add more types as needed
     if not data.hasKey(pkCol):
       data[pkCol] = newTextValue(pk)
+  for c in t.columns:
+    if c.defaultValue.len > 0 and not data.hasKey(c.name) and c.name != pkCol:
+      data[c.name] = jsonToStoreValue(parseJson(c.defaultValue))
+
+proc jsonToStoreValue*(j: JsonNode): Value {.gcsafe.} =
+  ## Converts a JSON literal into a store value. Used for column defaults.
+  case j.kind
+  of JNull: newNullValue()
+  of JInt: newIntValue(j.getInt.int64)
+  of JFloat: newFloatValue(j.getFloat)
+  of JBool: newBoolValue(j.getBool)
+  of JString: newTextValue(j.getStr())
+  of JArray, JObject: Value(kind: dtJson, jsonVal: $j)
 
 proc matchesType(v: Value, c: ColumnDef): bool =
   case v.kind
@@ -548,7 +488,8 @@ proc validateRow(t: DbTable, data: var RowData) =
 proc schemaToPayload(t: DbTable): string =
   var cols = newJArray()
   for c in t.columns:
-    cols.add(%*{"name": c.name, "kind": $c.kind, "nullable": c.nullable})
+    cols.add(%*{"name": c.name, "kind": $c.kind, "nullable": c.nullable,
+                "default": c.defaultValue})
   var fks = newJArray()
   for fk in t.foreignKeys:
     fks.add(%*{
@@ -575,7 +516,8 @@ proc tableFromPayload(tableName, payload: string): DbTable =
     cols.add(ColumnDef(
       name: c["name"].getStr(),
       kind: parseEnum[DataType](c["kind"].getStr()),
-      nullable: c["nullable"].getBool()
+      nullable: c["nullable"].getBool(),
+      defaultValue: if c.hasKey("default"): c["default"].getStr() else: ""
     ))
   var foreignKeys: seq[ForeignKeyDef] = @[]
   if n.hasKey("foreignKeys"):
@@ -597,13 +539,10 @@ proc tableFromPayload(tableName, payload: string): DbTable =
   t
 
 proc rowToPayload(data: RowData): string =
-  # Binary WAL payload via flatty (same encoding the snapshot path already uses
-  # for RowData). This is parsed back by `rowFromPayload`.
-  toFlatty(data)
+  encodeRowPayload(data)
 
 proc rowFromPayload(payload: string): RowData =
-  # Parse a flatty binary payload back into RowData. This should be the inverse of `rowToPayload`.
-  fromFlatty(payload, RowData)
+  decodeRowPayloadWithFallback(payload)
 
 proc pkStringFromValue(v: Value): string =
   case v.kind
@@ -787,22 +726,22 @@ proc deleteRowNoWal(t: DbTable, pk: string): bool =
   t.orderIndexDirty = true
   true
 
+proc updateRowNoWal(t: DbTable, pk: string, data: var RowData): bool =
+  # Replace an existing row in place without writing to WAL. This is used
+  # by the store-level `updateRow` proc which handles WAL logging and commit.
+  # The row is deleted and re-inserted under the same primary key, which keeps
+  # the equality indexes and the order index consistent.
+  if not t.rowsByPk.hasKey(pk):
+    return false
+  discard t.deleteRowNoWal(pk)
+  discard t.insertRowNoWal(pk, data)
+  true
+
 #
 # Snapshot API
 #
 type
-  SnapshotOnDisk = tuple
-    version: uint32
-    checkpointLsn: uint64
-    tables: seq[tuple[
-      name: string,
-      primaryKey: string,
-      pkType: PrimaryKeyMode,
-      pkSequence: uint64,
-      columns: seq[ColumnDef],
-      foreignKeys: seq[ForeignKeyDef],
-      rows: seq[(string, RowData)]
-    ]]
+  SnapshotOnDisk = RdbmsSnapshotOnDisk
 
 proc buildSnapshot(s: Store): SnapshotOnDisk =
   # Build a snapshot of the current store state for persistence.
@@ -850,19 +789,28 @@ proc saveSnapshotIfEnabled(s: Store) =
   # When enabled, saves a snapshot of the current store state to disk.
   if not s.hasDbFile:
     return
-  let blob = toFlatty(buildSnapshot(s))
+  let blob = encodeRdbmsSnapshotToString(buildSnapshot(s))
   writeTextAtomic(s.dbPath, blob)
 
-proc loadSnapshotIfPresent(s: Store) =
+proc loadSnapshotIfPresent(s: Store, allowFlatty = true) =
   # Load a snapshot from disk if it exists. This should be called during store
-  # initialization before applying WAL entries.
+  # initialization before applying WAL entries. Flatty fallback is opt-in to avoid OOM.
   if (not s.hasDbFile) or (not fileExists(s.dbPath)):
     return
   let blob = readFile(s.dbPath)
   if blob.len == 0:
     return
-  let snap = fromFlatty(blob, SnapshotOnDisk)
-  s.loadSnapshotIntoStore(snap)
+  try:
+    let snap = decodeRdbmsSnapshotFromStringWithFallback(blob, allowFlatty)
+    s.loadSnapshotIntoStore(snap)
+  except CatchableError as e:
+    stderr.writeLine("Warning: failed to load snapshot " & s.dbPath & ": " & e.msg & " (run migrateRdbmsSnapshotFromFlatty to convert flatty DB)")
+
+
+
+proc migrateRdbmsSnapshotFromFlatty*(s: Store): bool =
+  if not s.hasDbFile: return false
+  migrateRdbmsSnapshotFileFlattyToFbe(s.dbPath)
 
 proc flushWalIfNeeded(s: Store, force = false) =
   # Flush WAL to disk based on group-commit policy.
@@ -997,6 +945,14 @@ proc dropTable*(s: Store, name: string) =
 proc isEmpty*(t: DbTable): bool =
   ## Check if the table is empty (has no rows).
   t.rowsByPk.len == 0
+
+proc pkMode*(t: DbTable): PrimaryKeyMode =
+  ## Returns the primary key mode of the table (manual or serial/auto-increment)
+  t.pkType
+
+proc isConcurrent*(s: Store): bool =
+  ## True when the store was opened with `enableConcurrency = true`
+  s.cc != nil
 
 proc insertRow*(t: DbTable, pk: string, data: RowData) =
   # direct table mutation: no WAL here (store-level proc logs)
@@ -1159,6 +1115,28 @@ proc deleteRow*(s: Store, tableName: string, pk: string): bool {.discardable.} =
   s.markCommitted(lsn)
   removed
 
+proc updateRow*(s: Store, tableName: string, pk: string, data: RowData) =
+  ## Replace an existing row identified by `pk` with `data`. The payload is the
+  ## complete new row; callers doing partial updates are expected to fetch,
+  ## merge and pass back the full row. Concurrency slots are not supported yet.
+  if s.cc != nil:
+    raise newException(StoreError, "updateRow is not supported in concurrent mode yet")
+  if unlikely(not s.tables.hasKey(tableName)):
+    raise newException(StoreError, fmt"table not found: {tableName}")
+  var t = s.tables[tableName]
+  if not t.rowsByPk.hasKey(pk):
+    raise newException(StoreError, fmt"row not found: '{pk}' in table '{tableName}'")
+
+  var d = data
+  t.normalizedRowWithPk(d, pk)
+  validateRow(t, d)
+  s.validateForeignKeysOnInsert(t, d)
+
+  let lsn = s.appendWalIfEnabled(woUpdateRow, tableName, pk, rowToPayload(d))
+  discard t.updateRowNoWal(pk, d)
+  s.tables[tableName] = t
+  s.markCommitted(lsn)
+
 proc getRow*(s: Store, tableName: string, pk: string): Option[RowData] =
   ## Fetch a single row by primary key. This will be fast if the table has
   ## an order index, but will fall back to a hash lookup if not.
@@ -1228,9 +1206,14 @@ proc applyWalEntry(s: Store, e: WalEntry) =
       discard t.deleteRowNoWal(e.pk)
       s.tables[e.table] = t
   of woUpdateRow:
-    raise newException(StoreError, "WAL replay: woUpdateRow not implemented")
+    if unlikely(not s.tables.hasKey(e.table)):
+      raise newException(StoreError, "WAL replay: table not found: " & e.table)
+    var t = s.tables[e.table]
+    var row = rowFromPayload(e.payload)
+    discard t.updateRowNoWal(e.pk, row)
+    s.tables[e.table] = t
 
-proc recoverFromWal*(s: Store) =
+proc recoverFromWal*(s: Store, allowFlatty = true) =
   ## Load snapshot if present, then apply WAL entries to bring state up to date.
   s.tables = initTable[string, DbTable]()
   s.checkpointLsn = 0'u64
@@ -1238,7 +1221,7 @@ proc recoverFromWal*(s: Store) =
   s.pendingWalOps = 0'u32
   # First load the snapshot (if it exists) to get the base state.
   # Then apply WAL entries that are newer than the checkpointLsn.
-  s.loadSnapshotIfPresent()
+  s.loadSnapshotIfPresent(allowFlatty)
 
   if s.hasWal:
     for e in s.wal.entries:

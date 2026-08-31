@@ -29,6 +29,7 @@
 4. **Columnar Store** - Columnar storage engine for analytics workloads with WAL support and in-memory column caching
 5. **Graph Store** - A simple graph database with support for nodes, relationships, and basic graph queries (e.g., neighbors, BFS) with WAL support
 6. **Document Store** - A flexible document store on top of the WAL, storing JSON (or BSON) documents
+7. **SQL Driver** - A `db_connector`-compatible driver (`boogie/db_boogie`) that compiles SQL statements to [vancode](https://github.com/openpeeps/vancode) bytecode and evaluates them against the RDBMS store
 
 >[!NOTE]
 > Boogie is an experimental project mostly made with the chatbot for fun and learning. It is still in early stages, so expect data loss and breaking changes. Use at your own risk.
@@ -252,6 +253,59 @@ store.checkpoint()
 | get | ~1.99 M |
 | lookup | ~4.88 M |
 | delete | ~0.21 M |
+
+### SQL Driver (db_connector compatible)
+
+`boogie/db_boogie` mirrors the `db_connector/db_sqlite` API, so applications can
+switch to Boogie by changing a single import. Statements are parsed with
+[openparser/sql](https://github.com/openpeeps/openparser), lowered to vancode
+bytecode (WHERE predicates run as real VM loops using NULL-aware comparison
+opcodes), and evaluated against the RDBMS store, with WAL durability and
+crash recovery for free.
+
+```nim
+import boogie/db_boogie
+
+let db = open("mydb", "", "", "app")  # or open(":memory:", "", "", "")
+db.exec(sql"CREATE TABLE users (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  age INT DEFAULT 0)")
+
+db.exec(sql"INSERT INTO users (name, age) VALUES (?, ?)", "alice", "30")
+echo db.insertID(sql"INSERT INTO users (name) VALUES (?)", "bob")
+
+for row in db.fastRows(sql"SELECT id, name FROM users WHERE age > ? ORDER BY name", "18"):
+  echo row
+
+# prepared statements with typed bindings
+let ps = db.prepare("UPDATE users SET age = age + 1 WHERE id = ?")
+ps.bindParam(1, 1'i64)
+db.exec(ps)
+
+echo db.getValue(sql"SELECT COUNT(*) FROM users")
+db.close()
+```
+
+Supported subset: `CREATE TABLE [IF NOT EXISTS]` (typed columns, PRIMARY KEY,
+NOT NULL, DEFAULT), `DROP TABLE [IF EXISTS]`, `CREATE INDEX`, multi-row
+`INSERT` with serial primary keys, `SELECT` with `WHERE`/`ORDER BY`/`LIMIT`/
+`OFFSET`/`DISTINCT`, `UPDATE ... SET ... WHERE`, `DELETE FROM ... WHERE`,
+aggregates without GROUP BY (`COUNT`/`SUM`/`AVG`/`MIN`/`MAX`), and expressions
+with comparisons, `AND`/`OR`/`NOT`, arithmetic, `IS [NOT] NULL` and `?`/`$n`
+placeholders. JOINs, GROUP BY/HAVING and subqueries are not supported yet.
+
+> Unlike the SQLite backend, statements here are precompiled bytecode cached
+> per connection; interpolated `exec()` calls recompile when their text
+> changes. Numeric comparisons follow SQLite column-affinity rules (text
+> operands coerce when they parse) and NULL propagates per SQL semantics.
+
+| Operation | ops/s |
+|---|---|
+| insert | ~43 K |
+| point query (unindexed scan) | ~281 q/s |
+| ordered scan | ~333 K rows/s |
+| update | ~89 |
 
 > [!TIP]
 > Run the full test + benchmark suites with `nimble test -d:release` (the `-d:release`

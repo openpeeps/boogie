@@ -16,11 +16,12 @@
 
 import std/[tables, options, base64, os]
 
-import pkg/[flatty, sorta]
+import pkg/sorta
 import pkg/openparser/[json, bson]
 
 import ../wal
-export wal, bson
+import ../fbe_codec
+export wal, bson, json
 
 type
   DocumentEncoding* = enum
@@ -30,10 +31,7 @@ type
 
   DocumentStoreError* = object of CatchableError
 
-  SnapshotOnDisk = tuple
-    version: uint32
-    checkpointLsn: uint64
-    docs: seq[(string, string)] # (key, jsonText)
+  SnapshotOnDisk = DocSnapshotOnDisk
 
   DocumentStore* = object
     ## A simple document store that supports storing
@@ -112,7 +110,7 @@ proc loadSnapshotIntoStore(s: var DocumentStore, snap: SnapshotOnDisk) =
 proc saveSnapshotIfEnabled(s: var DocumentStore) =
   if not s.hasDbFile:
     return
-  let blob = toFlatty(buildSnapshot(s))
+  let blob = encodeDocSnapshotToString(buildSnapshot(s))
   writeTextAtomic(s.dbPath, blob)
 
 proc loadSnapshotIfPresent(s: var DocumentStore) =
@@ -121,8 +119,12 @@ proc loadSnapshotIfPresent(s: var DocumentStore) =
   let blob = readFile(s.dbPath)
   if blob.len == 0:
     return
-  let snap = fromFlatty(blob, SnapshotOnDisk)
+  let snap = decodeDocSnapshotFromStringWithFallback(blob)
   s.loadSnapshotIntoStore(snap)
+
+proc migrateDocSnapshotFromFlatty*(s: var DocumentStore): bool =
+  if not s.hasDbFile: return false
+  migrateDocSnapshotFileFlattyToFbe(s.dbPath)
 
 proc flushWalIfNeeded(s: var DocumentStore, force = false) =
   if force:

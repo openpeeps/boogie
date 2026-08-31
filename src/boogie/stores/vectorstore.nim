@@ -6,7 +6,7 @@
 #          https://github.com/openpeeps/boogie
 
 import std/[tables, options, strformat, strutils, json, os, math, algorithm]
-import pkg/flatty
+import ../fbe_codec
 import ../wal
 import ../concurrency
 import ../crashsafe
@@ -94,14 +94,7 @@ type
     ## such as invalid input, collection not found, or WAL issues.
 
 type
-  SnapshotOnDisk = tuple
-    version: uint32
-    checkpointLsn: uint64
-    collections: seq[tuple[
-      name: string,
-      dimension: int,
-      rows: seq[(string, seq[float32], string)]
-    ]]
+  SnapshotOnDisk = VectorSnapshotOnDisk
 
 # fwd
 proc recoverFromWal*(s: VectorStore)
@@ -325,7 +318,7 @@ proc loadSnapshotIntoStore(s: VectorStore, snap: SnapshotOnDisk) =
 proc saveSnapshotIfEnabled(s: VectorStore) =
   if not s.hasDbFile:
     return
-  let blob = toFlatty(buildSnapshot(s))
+  let blob = encodeVectorSnapshotToString(buildSnapshot(s))
   writeTextAtomic(s.dbPath, blob)
 
 proc loadSnapshotIfPresent(s: VectorStore) =
@@ -334,8 +327,12 @@ proc loadSnapshotIfPresent(s: VectorStore) =
   let blob = readFile(s.dbPath)
   if blob.len == 0:
     return
-  let snap = fromFlatty(blob, SnapshotOnDisk)
+  let snap = decodeVectorSnapshotFromStringWithFallback(blob)
   s.loadSnapshotIntoStore(snap)
+
+proc migrateVectorSnapshotFromFlatty*(s: VectorStore): bool =
+  if not s.hasDbFile: return false
+  migrateVectorSnapshotFileFlattyToFbe(s.dbPath)
 
 proc markCommitted(s: VectorStore, lsn: uint64) =
   if lsn > s.checkpointLsn:

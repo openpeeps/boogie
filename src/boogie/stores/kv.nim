@@ -6,7 +6,7 @@
 #          https://github.com/openpeeps/boogie
 
 import std/[tables, options, os]
-import pkg/flatty
+import ../fbe_codec
 import ../wal
 import ../concurrency
 import ../crashsafe
@@ -69,12 +69,6 @@ type
     slot: TableSlot[KvWriteTask]
       ## The store's single table slot; nil unless `enableConcurrency = true`.
 
-type
-  KvSnapshotOnDisk = tuple
-    version: uint32
-    checkpointLsn: uint64
-    entries: seq[(string, string)]
-
 const
   KvTableName = "__kv__"
 
@@ -115,7 +109,7 @@ proc loadSnapshotIntoStore(s: KvStore, snap: KvSnapshotOnDisk) =
 proc saveSnapshotIfEnabled(s: KvStore) =
   if not s.hasDbFile:
     return
-  let blob = toFlatty(buildSnapshot(s))
+  let blob = encodeKvSnapshotToString(buildSnapshot(s))
   writeTextAtomic(s.dbPath, blob)
 
 proc loadSnapshotIfPresent(s: KvStore) =
@@ -124,8 +118,13 @@ proc loadSnapshotIfPresent(s: KvStore) =
   let blob = readFile(s.dbPath)
   if blob.len == 0:
     return
-  let snap = fromFlatty(blob, KvSnapshotOnDisk)
+  let snap = decodeKvSnapshotFromStringWithFallback(blob)
   s.loadSnapshotIntoStore(snap)
+
+proc migrateKvSnapshotFromFlatty*(s: KvStore): bool =
+  ## Explicit migration helper: if the snapshot on disk is flatty-encoded, rewrite it as FBE.
+  if not s.hasDbFile: return false
+  migrateKvSnapshotFileFlattyToFbe(s.dbPath)
 
 proc flushWalIfNeeded(s: KvStore, force = false) =
   if not s.hasWal:
