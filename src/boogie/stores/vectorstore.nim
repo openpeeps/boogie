@@ -327,12 +327,8 @@ proc loadSnapshotIfPresent(s: VectorStore) =
   let blob = readFile(s.dbPath)
   if blob.len == 0:
     return
-  let snap = decodeVectorSnapshotFromStringWithFallback(blob)
+  let snap = decodeVectorSnapshotFromString(blob)
   s.loadSnapshotIntoStore(snap)
-
-proc migrateVectorSnapshotFromFlatty*(s: VectorStore): bool =
-  if not s.hasDbFile: return false
-  migrateVectorSnapshotFileFlattyToFbe(s.dbPath)
 
 proc markCommitted(s: VectorStore, lsn: uint64) =
   if lsn > s.checkpointLsn:

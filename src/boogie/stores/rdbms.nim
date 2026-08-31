@@ -148,13 +148,12 @@ proc writeTextAtomic(path, content: string) =
     removeFile(path)
   moveFile(tmp, path)
 
-proc loadSnapshotIfPresent(s: Store, allowFlatty = true)
-proc recoverFromWal*(s: Store, allowFlatty = true)
+proc loadSnapshotIfPresent(s: Store)
+proc recoverFromWal*(s: Store)
 
 proc newStore*(path: string, mode: StorageMode = smDisk,
     enableWal: bool = true, checkpointEveryOps: uint32 = 0'u32,
     walFlushEveryOps: uint32 = 1000'u32,
-    allowFlatty: bool = false,
     enableConcurrency: static bool = false
   ): Store =
   ## Create a new Store instance. Use `smInMemory` for an in-memory
@@ -223,7 +222,7 @@ proc newStore*(path: string, mode: StorageMode = smDisk,
     )
 
   # If WAL is enabled, we need to recover the store state by replaying the WAL entries.
-  recoverFromWal(result, allowFlatty)
+  recoverFromWal(result)
 
   let s = result
   registerStoreFlush(cast[pointer](s), proc() {.gcsafe.} =
@@ -542,7 +541,7 @@ proc rowToPayload(data: RowData): string =
   encodeRowPayload(data)
 
 proc rowFromPayload(payload: string): RowData =
-  decodeRowPayloadWithFallback(payload)
+  decodeRowPayload(payload)
 
 proc pkStringFromValue(v: Value): string =
   case v.kind
@@ -792,25 +791,14 @@ proc saveSnapshotIfEnabled(s: Store) =
   let blob = encodeRdbmsSnapshotToString(buildSnapshot(s))
   writeTextAtomic(s.dbPath, blob)
 
-proc loadSnapshotIfPresent(s: Store, allowFlatty = true) =
-  # Load a snapshot from disk if it exists. This should be called during store
-  # initialization before applying WAL entries. Flatty fallback is opt-in to avoid OOM.
+proc loadSnapshotIfPresent(s: Store) =
   if (not s.hasDbFile) or (not fileExists(s.dbPath)):
     return
   let blob = readFile(s.dbPath)
   if blob.len == 0:
     return
-  try:
-    let snap = decodeRdbmsSnapshotFromStringWithFallback(blob, allowFlatty)
-    s.loadSnapshotIntoStore(snap)
-  except CatchableError as e:
-    stderr.writeLine("Warning: failed to load snapshot " & s.dbPath & ": " & e.msg & " (run migrateRdbmsSnapshotFromFlatty to convert flatty DB)")
-
-
-
-proc migrateRdbmsSnapshotFromFlatty*(s: Store): bool =
-  if not s.hasDbFile: return false
-  migrateRdbmsSnapshotFileFlattyToFbe(s.dbPath)
+  let snap = decodeRdbmsSnapshotFromString(blob)
+  s.loadSnapshotIntoStore(snap)
 
 proc flushWalIfNeeded(s: Store, force = false) =
   # Flush WAL to disk based on group-commit policy.
@@ -1213,7 +1201,7 @@ proc applyWalEntry(s: Store, e: WalEntry) =
     discard t.updateRowNoWal(e.pk, row)
     s.tables[e.table] = t
 
-proc recoverFromWal*(s: Store, allowFlatty = true) =
+proc recoverFromWal*(s: Store) =
   ## Load snapshot if present, then apply WAL entries to bring state up to date.
   s.tables = initTable[string, DbTable]()
   s.checkpointLsn = 0'u64
@@ -1221,7 +1209,7 @@ proc recoverFromWal*(s: Store, allowFlatty = true) =
   s.pendingWalOps = 0'u32
   # First load the snapshot (if it exists) to get the base state.
   # Then apply WAL entries that are newer than the checkpointLsn.
-  s.loadSnapshotIfPresent(allowFlatty)
+  s.loadSnapshotIfPresent()
 
   if s.hasWal:
     for e in s.wal.entries:

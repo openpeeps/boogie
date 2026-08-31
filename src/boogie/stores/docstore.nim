@@ -119,12 +119,8 @@ proc loadSnapshotIfPresent(s: var DocumentStore) =
   let blob = readFile(s.dbPath)
   if blob.len == 0:
     return
-  let snap = decodeDocSnapshotFromStringWithFallback(blob)
+  let snap = decodeDocSnapshotFromString(blob)
   s.loadSnapshotIntoStore(snap)
-
-proc migrateDocSnapshotFromFlatty*(s: var DocumentStore): bool =
-  if not s.hasDbFile: return false
-  migrateDocSnapshotFileFlattyToFbe(s.dbPath)
 
 proc flushWalIfNeeded(s: var DocumentStore, force = false) =
   if force:

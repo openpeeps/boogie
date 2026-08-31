@@ -118,13 +118,8 @@ proc loadSnapshotIfPresent(s: KvStore) =
   let blob = readFile(s.dbPath)
   if blob.len == 0:
     return
-  let snap = decodeKvSnapshotFromStringWithFallback(blob)
+  let snap = decodeKvSnapshotFromString(blob)
   s.loadSnapshotIntoStore(snap)
-
-proc migrateKvSnapshotFromFlatty*(s: KvStore): bool =
-  ## Explicit migration helper: if the snapshot on disk is flatty-encoded, rewrite it as FBE.
-  if not s.hasDbFile: return false
-  migrateKvSnapshotFileFlattyToFbe(s.dbPath)
 
 proc flushWalIfNeeded(s: KvStore, force = false) =
   if not s.hasWal:
