@@ -1,0 +1,53 @@
+nimTitle	signals	boogie/signals.html	module boogie/signals		0
+nim	SignalError	boogie/signals.html#SignalError	object SignalError		35
+nim	SignalHup	boogie/signals.html#SignalHup	OsSignal.SignalHup		37
+nim	SignalInt	boogie/signals.html#SignalInt	OsSignal.SignalInt		37
+nim	SignalQuit	boogie/signals.html#SignalQuit	OsSignal.SignalQuit		37
+nim	SignalIll	boogie/signals.html#SignalIll	OsSignal.SignalIll		37
+nim	SignalTrap	boogie/signals.html#SignalTrap	OsSignal.SignalTrap		37
+nim	SignalAbrt	boogie/signals.html#SignalAbrt	OsSignal.SignalAbrt		37
+nim	SignalBus	boogie/signals.html#SignalBus	OsSignal.SignalBus		37
+nim	SignalFpe	boogie/signals.html#SignalFpe	OsSignal.SignalFpe		37
+nim	SignalKill	boogie/signals.html#SignalKill	OsSignal.SignalKill		37
+nim	SignalUsr1	boogie/signals.html#SignalUsr1	OsSignal.SignalUsr1		37
+nim	SignalSegv	boogie/signals.html#SignalSegv	OsSignal.SignalSegv		37
+nim	SignalUsr2	boogie/signals.html#SignalUsr2	OsSignal.SignalUsr2		37
+nim	SignalPipe	boogie/signals.html#SignalPipe	OsSignal.SignalPipe		37
+nim	SignalAlarm	boogie/signals.html#SignalAlarm	OsSignal.SignalAlarm		37
+nim	SignalTerm	boogie/signals.html#SignalTerm	OsSignal.SignalTerm		37
+nim	SignalStkflt	boogie/signals.html#SignalStkflt	OsSignal.SignalStkflt		37
+nim	SignalChild	boogie/signals.html#SignalChild	OsSignal.SignalChild		37
+nim	SignalCont	boogie/signals.html#SignalCont	OsSignal.SignalCont		37
+nim	SignalStop	boogie/signals.html#SignalStop	OsSignal.SignalStop		37
+nim	SignalTstp	boogie/signals.html#SignalTstp	OsSignal.SignalTstp		37
+nim	SignalTtin	boogie/signals.html#SignalTtin	OsSignal.SignalTtin		37
+nim	SignalTtou	boogie/signals.html#SignalTtou	OsSignal.SignalTtou		37
+nim	SignalUrgent	boogie/signals.html#SignalUrgent	OsSignal.SignalUrgent		37
+nim	SignalXcpu	boogie/signals.html#SignalXcpu	OsSignal.SignalXcpu		37
+nim	SignalXfsz	boogie/signals.html#SignalXfsz	OsSignal.SignalXfsz		37
+nim	SignalVtalrm	boogie/signals.html#SignalVtalrm	OsSignal.SignalVtalrm		37
+nim	SignalProf	boogie/signals.html#SignalProf	OsSignal.SignalProf		37
+nim	SignalWinch	boogie/signals.html#SignalWinch	OsSignal.SignalWinch		37
+nim	SignalIo	boogie/signals.html#SignalIo	OsSignal.SignalIo		37
+nim	SignalPwr	boogie/signals.html#SignalPwr	OsSignal.SignalPwr		37
+nim	SignalSys	boogie/signals.html#SignalSys	OsSignal.SignalSys		37
+nim	SignalEmt	boogie/signals.html#SignalEmt	OsSignal.SignalEmt		37
+nim	SignalInfo	boogie/signals.html#SignalInfo	OsSignal.SignalInfo		37
+nim	OsSignal	boogie/signals.html#OsSignal	enum OsSignal		37
+nim	SignalCallback	boogie/signals.html#SignalCallback	type SignalCallback		74
+nim	signalNumber	boogie/signals.html#signalNumber,OsSignal	proc signalNumber(s: OsSignal): cint		80
+nim	SigRtMin	boogie/signals.html#SigRtMin	const SigRtMin		115
+nim	SigRtMax	boogie/signals.html#SigRtMax	const SigRtMax		117
+nim	rtSignal	boogie/signals.html#rtSignal,int	proc rtSignal(n: int): cint		120
+nim	ListenerHandle	boogie/signals.html#ListenerHandle	type ListenerHandle		134
+nim	listenRawSignal	boogie/signals.html#listenRawSignal,int,SignalCallback	proc listenRawSignal(signo: int; cb: SignalCallback): ListenerHandle		299
+nim	listenRawSignalOnce	boogie/signals.html#listenRawSignalOnce,int,SignalCallback	proc listenRawSignalOnce(signo: int; cb: SignalCallback): ListenerHandle		319
+nim	listenSignal	boogie/signals.html#listenSignal,OsSignal,SignalCallback	proc listenSignal(s: OsSignal; cb: SignalCallback): ListenerHandle		336
+nim	listenSignalOnce	boogie/signals.html#listenSignalOnce,OsSignal,SignalCallback	proc listenSignalOnce(s: OsSignal; cb: SignalCallback): ListenerHandle		340
+nim	listenCustom	boogie/signals.html#listenCustom,int,SignalCallback	proc listenCustom(id: int; cb: SignalCallback): ListenerHandle		344
+nim	listenCustomOnce	boogie/signals.html#listenCustomOnce,int,SignalCallback	proc listenCustomOnce(id: int; cb: SignalCallback): ListenerHandle		350
+nim	unlisten	boogie/signals.html#unlisten,ListenerHandle	proc unlisten(h: ListenerHandle)		354
+nim	emitSignal	boogie/signals.html#emitSignal,int	proc emitSignal(signo: int)		374
+nim	watchOsSignals	boogie/signals.html#watchOsSignals,openArray[OsSignal]	proc watchOsSignals(signals: openArray[OsSignal])		399
+nim	watchedSignals	boogie/signals.html#watchedSignals	proc watchedSignals(): seq[int]		412
+nim	installFatalHandler	boogie/signals.html#installFatalHandler,openArray[OsSignal],SignalCallback	proc installFatalHandler(signals: openArray[OsSignal]; cb: SignalCallback)		446

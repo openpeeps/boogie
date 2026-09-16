@@ -16,10 +16,10 @@
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH4QQQEwksSS9ZWwAAAk1JREFUWMPtll2ITVEUx39nn/O7Y5qR8f05wtCUUr6ZIS++8pEnkZInPImneaCQ5METNdOkeFBKUhMPRIkHKfEuUZSUlGlKPN2TrgfncpvmnntnmlEyq1Z7t89/rf9a6+y99oZxGZf/XeIq61EdtgKXgdXA0xrYAvBjOIF1AI9zvjcC74BSpndrJPkBWDScTF8Aa4E3wDlgHbASaANmVqlcCnwHvgDvgVfAJ+AikAAvgfVZwLnSVZHZaOuKoQi3ZOMi4NkYkpe1p4J7A8BpYAD49hfIy/oqG0+hLomiKP2L5L+1ubn5115S+3OAn4EnwBlgMzCjyt6ZAnQCJ4A7wOs88iRJHvw50HoujuPBoCKwHWiosy8MdfZnAdcHk8dxXFJ3VQbQlCTJvRBCGdRbD4M6uc5glpY3eAihpN5S5w12diSEcCCEcKUO4ljdr15T76ur1FDDLIQQ3qv71EdDOe3Kxj3leRXyk+pxdWnFWod6Wt2bY3de3aSuUHcPBVimHs7mK9WrmeOF6lR1o9qnzskh2ar2qm1qizpfXaPeVGdlmGN5pb09qMxz1Xb1kLqgzn1RyH7JUXW52lr5e/Kqi9qpto7V1atuUzfnARrV7jEib1T76gG2qxdGmXyiekkt1GswPTtek0aBfJp6YySGBfWg2tPQ0FAYgf1stUfdmdcjarbYJEniKIq6gY/Aw+zWHAC+p2labGpqiorFYgGYCEzN7oQdQClN07O1/EfDyGgC0ALMBdYAi4FyK+4H3gLPsxfR1zRNi+NP7nH5J+QntnXe5B5mpfQAAAAASUVORK5CYII=">
 
 <!-- CSS -->
-<link rel="stylesheet" type="text/css" href="../../nimdoc.out.css?v=2.2.10">
+<link rel="stylesheet" type="text/css" href="../../nimdoc.out.css?v=2.2.12">
 
 <!-- JS -->
-<script type="text/javascript" src="../../dochack.js?v=2.2.10"></script>
+<script type="text/javascript" src="../../dochack.js?v=2.2.12"></script>
 </head>
 <body>
   <div class="document" id="documentId">
@@ -115,6 +115,10 @@
   <li><a class="reference" href="#checkpoint%2CColumnarStore" title="checkpoint(s: var ColumnarStore)">checkpoint(s: var ColumnarStore)</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">close
+  <li><a class="reference" href="#close%2CColumnarStore" title="close(s: var ColumnarStore)">close(s: var ColumnarStore)</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">createTable
   <li><a class="reference" href="#createTable%2CColumnarStore%2CTableSchema%2Cbool" title="createTable(s: var ColumnarStore; schema: TableSchema; sync: bool = true)">createTable(s: var ColumnarStore; schema: TableSchema; sync: bool = true)</a></li>
 
@@ -171,7 +175,7 @@
     <div class="section" id="6">
   <h1><a class="toc-backref" href="#6">Imports</a></h1>
   <dl class="item">
-    <a class="reference external" href="../wal.html">../wal</a>
+    <a class="reference external" href="../wal.html">../wal</a>, <a class="reference external" href="../filelock.html">../filelock</a>
   </dl>
 </div>
 <div class="section" id="7">
@@ -325,6 +329,19 @@
 </div>
 
 </div>
+<div id="close-procs-all">
+  <div id="close,ColumnarStore">
+  <dt><pre><span class="Keyword">proc</span> <a href="#close%2CColumnarStore"><span class="Identifier">close</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#ColumnarStore"><span class="Identifier">ColumnarStore</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span>
+                                   <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span>
+                                   <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Flushes pending WAL writes and releases the cross-process lock.
+    
+  </dd>
+</div>
+
+</div>
 <div id="createTable-procs-all">
   <div id="createTable,ColumnarStore,TableSchema,bool">
   <dt><pre><span class="Keyword">proc</span> <a href="#createTable%2CColumnarStore%2CTableSchema%2Cbool"><span class="Identifier">createTable</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#ColumnarStore"><span class="Identifier">ColumnarStore</span></a><span class="Other">;</span> <span class="Identifier">schema</span><span class="Other">:</span> <a href="#TableSchema"><span class="Identifier">TableSchema</span></a><span class="Other">;</span> <span class="Identifier">sync</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span> {.
@@ -383,9 +400,9 @@
   <div id="openColumnarStore,string,string,int">
   <dt><pre><span class="Keyword">proc</span> <a href="#openColumnarStore%2Cstring%2Cstring%2Cint"><span class="Identifier">openColumnarStore</span></a><span class="Other">(</span><span class="Identifier">rootDir</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">walPath</span><span class="Other">:</span> <span class="Identifier">string</span> <span class="Other">=</span> <span class="StringLit">&quot;&quot;</span><span class="Other">;</span>
                        <span class="Identifier">walFlushEveryOps</span><span class="Other">:</span> <span class="Identifier">int</span> <span class="Other">=</span> <span class="DecNumber">100</span><span class="Other">)</span><span class="Other">:</span> <a href="#ColumnarStore"><span class="Identifier">ColumnarStore</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span>
-    <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">ColumnarError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">JsonParsingError</span><span class="Other">,</span>
-    <span class="Identifier">ValueError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span>
-                        <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">FileLockError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span>
+    <span class="Identifier">ColumnarError</span><span class="Other">,</span> <span class="Identifier">JsonParsingError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span>
+    <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Open or create a columnar store at the given root directory. If walPath is provided, use that for the WAL file; otherwise, use a default path under rootDir. The walFlushEveryOps parameter controls how many operations can be buffered in memory before an automatic flush to disk is triggered.
@@ -418,7 +435,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-31 21:43:41 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-16 12:13:07 UTC</small>
       </div>
     </div>
   </div>

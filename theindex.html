@@ -16,10 +16,10 @@
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH4QQQEwksSS9ZWwAAAk1JREFUWMPtll2ITVEUx39nn/O7Y5qR8f05wtCUUr6ZIS++8pEnkZInPImneaCQ5METNdOkeFBKUhMPRIkHKfEuUZSUlGlKPN2TrgfncpvmnntnmlEyq1Z7t89/rf9a6+y99oZxGZf/XeIq61EdtgKXgdXA0xrYAvBjOIF1AI9zvjcC74BSpndrJPkBWDScTF8Aa4E3wDlgHbASaANmVqlcCnwHvgDvgVfAJ+AikAAvgfVZwLnSVZHZaOuKoQi3ZOMi4NkYkpe1p4J7A8BpYAD49hfIy/oqG0+hLomiKP2L5L+1ubn5115S+3OAn4EnwBlgMzCjyt6ZAnQCJ4A7wOs88iRJHvw50HoujuPBoCKwHWiosy8MdfZnAdcHk8dxXFJ3VQbQlCTJvRBCGdRbD4M6uc5glpY3eAihpN5S5w12diSEcCCEcKUO4ljdr15T76ur1FDDLIQQ3qv71EdDOe3Kxj3leRXyk+pxdWnFWod6Wt2bY3de3aSuUHcPBVimHs7mK9WrmeOF6lR1o9qnzskh2ar2qm1qizpfXaPeVGdlmGN5pb09qMxz1Xb1kLqgzn1RyH7JUXW52lr5e/Kqi9qpto7V1atuUzfnARrV7jEib1T76gG2qxdGmXyiekkt1GswPTtek0aBfJp6YySGBfWg2tPQ0FAYgf1stUfdmdcjarbYJEniKIq6gY/Aw+zWHAC+p2labGpqiorFYgGYCEzN7oQdQClN07O1/EfDyGgC0ALMBdYAi4FyK+4H3gLPsxfR1zRNi+NP7nH5J+QntnXe5B5mpfQAAAAASUVORK5CYII=">
 
 <!-- CSS -->
-<link rel="stylesheet" type="text/css" href="nimdoc.out.css?v=2.2.10">
+<link rel="stylesheet" type="text/css" href="nimdoc.out.css?v=2.2.12">
 
 <!-- JS -->
-<script type="text/javascript" src="dochack.js?v=2.2.10"></script>
+<script type="text/javascript" src="dochack.js?v=2.2.12"></script>
 </head>
 <body>
   <div class="document" id="documentId">
@@ -28,7 +28,7 @@
     <label for="nav-toggle" id="nav-overlay"></label>
     <div class="container">
       <h1 class="title">Index</h1>
-      Modules: <a href="index.html">boogie</a>, <a href="boogie/concurrency.html">boogie/concurrency</a>, <a href="boogie/crashsafe.html">boogie/crashsafe</a>, <a href="boogie/fbe_codec.html">boogie/fbe_codec</a>, <a href="boogie/rdbms_types.html">boogie/rdbms_types</a>, <a href="boogie/stores/columnar.html">boogie/stores/columnar</a>, <a href="boogie/stores/docstore.html">boogie/stores/docstore</a>, <a href="boogie/stores/graphstore.html">boogie/stores/graphstore</a>, <a href="boogie/stores/kv.html">boogie/stores/kv</a>, <a href="boogie/stores/rdbms.html">boogie/stores/rdbms</a>, <a href="boogie/stores/vectorstore.html">boogie/stores/vectorstore</a>, <a href="boogie/wal.html">boogie/wal</a>.<br/><p /><h2>API symbols</h2>
+      Modules: <a href="index.html">boogie</a>, <a href="boogie/concurrency.html">boogie/concurrency</a>, <a href="boogie/crashsafe.html">boogie/crashsafe</a>, <a href="boogie/fbe_codec.html">boogie/fbe_codec</a>, <a href="boogie/filelock.html">boogie/filelock</a>, <a href="boogie/rdbms_types.html">boogie/rdbms_types</a>, <a href="boogie/signals.html">boogie/signals</a>, <a href="boogie/stores/columnar.html">boogie/stores/columnar</a>, <a href="boogie/stores/docstore.html">boogie/stores/docstore</a>, <a href="boogie/stores/graphstore.html">boogie/stores/graphstore</a>, <a href="boogie/stores/kv.html">boogie/stores/kv</a>, <a href="boogie/stores/rdbms.html">boogie/stores/rdbms</a>, <a href="boogie/stores/vectorstore.html">boogie/stores/vectorstore</a>, <a href="boogie/wal.html">boogie/wal</a>.<br/><p /><h2>API symbols</h2>
 <dl><dt><a name="%60%24%60" href="#%60%24%60"><span>`$`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="rdbms_types: proc `$`(v: Value): string" href="boogie/rdbms_types.html#%24%2CValue">rdbms_types: proc `$`(v: Value): string</a></li>
@@ -46,10 +46,16 @@
 <dt><a name="%60%3Ddestroy%60" href="#%60%3Ddestroy%60"><span>`=destroy`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="concurrency: proc `=destroy`(rw: RwLock)" href="boogie/concurrency.html#%3Ddestroy%2CRwLock">concurrency: proc `=destroy`(rw: RwLock)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="filelock: proc `=destroy`(l: var FileLock)" href="boogie/filelock.html#%3Ddestroy%2CFileLock">filelock: proc `=destroy`(l: var FileLock)</a></li>
           </ul></dd>
 <dt><a name="%60%3Dsink%60" href="#%60%3Dsink%60"><span>`=sink`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="concurrency: proc `=sink`(dest: var RwLock; source: RwLock)" href="boogie/concurrency.html#%3Dsink%2CRwLock%2CRwLock">concurrency: proc `=sink`(dest: var RwLock; source: RwLock)</a></li>
+          </ul></dd>
+<dt><a name="acquireFileLock" href="#acquireFileLock"><span>acquireFileLock:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="filelock: proc acquireFileLock(lockPath: string): FileLock" href="boogie/filelock.html#acquireFileLock%2Cstring">filelock: proc acquireFileLock(lockPath: string): FileLock</a></li>
           </ul></dd>
 <dt><a name="AggKind" href="#AggKind"><span>AggKind:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -150,6 +156,10 @@
 <dt><a name="close" href="#close"><span>close:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="concurrency: proc close[T](cc: ConcurrentState[T]; wal: var Wal)" href="boogie/concurrency.html#close%2CConcurrentState%5BT%5D%2CWal">concurrency: proc close[T](cc: ConcurrentState[T]; wal: var Wal)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="columnar: proc close(s: var ColumnarStore)" href="boogie/stores/columnar.html#close%2CColumnarStore">columnar: proc close(s: var ColumnarStore)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="docstore: proc close(store: var DocumentStore)" href="boogie/stores/docstore.html#close%2CDocumentStore">docstore: proc close(store: var DocumentStore)</a></li>
           <li><a class="reference external"
           data-doc-search-tag="kv: proc close(s: KvStore)" href="boogie/stores/kv.html#close%2CKvStore">kv: proc close(s: KvStore)</a></li>
           <li><a class="reference external"
@@ -393,6 +403,10 @@
 <li><a class="reference external"
           data-doc-search-tag="rdbms_types: DataType.dtText" href="boogie/rdbms_types.html#dtText">rdbms_types: DataType.dtText</a></li>
           </ul></dd>
+<dt><a name="emitSignal" href="#emitSignal"><span>emitSignal:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: proc emitSignal(signo: int)" href="boogie/signals.html#emitSignal%2Cint">signals: proc emitSignal(signo: int)</a></li>
+          </ul></dd>
 <dt><a name="encodeDocSnapshot" href="#encodeDocSnapshot"><span>encodeDocSnapshot:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="fbe_codec: proc encodeDocSnapshot(b: var Buffer; snap: DocSnapshotOnDisk)" href="boogie/fbe_codec.html#encodeDocSnapshot%2CBuffer%2CDocSnapshotOnDisk">fbe_codec: proc encodeDocSnapshot(b: var Buffer; snap: DocSnapshotOnDisk)</a></li>
@@ -448,6 +462,14 @@
 <dt><a name="exportCollection" href="#exportCollection"><span>exportCollection:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc exportCollection(s: VectorStore; collection: string; path: string)" href="boogie/stores/vectorstore.html#exportCollection%2CVectorStore%2Cstring%2Cstring">vectorstore: proc exportCollection(s: VectorStore; collection: string; path: string)</a></li>
+          </ul></dd>
+<dt><a name="FileLock" href="#FileLock"><span>FileLock:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="filelock: object FileLock" href="boogie/filelock.html#FileLock">filelock: object FileLock</a></li>
+          </ul></dd>
+<dt><a name="FileLockError" href="#FileLockError"><span>FileLockError:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="filelock: object FileLockError" href="boogie/filelock.html#FileLockError">filelock: object FileLockError</a></li>
           </ul></dd>
 <dt><a name="Filter" href="#Filter"><span>Filter:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -625,6 +647,10 @@
 <li><a class="reference external"
           data-doc-search-tag="crashsafe: proc installCrashHandlers()" href="boogie/crashsafe.html#installCrashHandlers">crashsafe: proc installCrashHandlers()</a></li>
           </ul></dd>
+<dt><a name="installFatalHandler" href="#installFatalHandler"><span>installFatalHandler:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: proc installFatalHandler(signals: openArray[OsSignal]; cb: SignalCallback)" href="boogie/signals.html#installFatalHandler%2CopenArray%5BOsSignal%5D%2CSignalCallback">signals: proc installFatalHandler(signals: openArray[OsSignal]; cb: SignalCallback)</a></li>
+          </ul></dd>
 <dt><a name="isConcurrent" href="#isConcurrent"><span>isConcurrent:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="rdbms: proc isConcurrent(s: Store): bool" href="boogie/stores/rdbms.html#isConcurrent%2CStore">rdbms: proc isConcurrent(s: Store): bool</a></li>
@@ -700,6 +726,34 @@
           data-doc-search-tag="kv: proc len(s: KvStore): int" href="boogie/stores/kv.html#len%2CKvStore">kv: proc len(s: KvStore): int</a></li>
           <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc len(c: VectorCollection): int" href="boogie/stores/vectorstore.html#len%2CVectorCollection">vectorstore: proc len(c: VectorCollection): int</a></li>
+          </ul></dd>
+<dt><a name="listenCustom" href="#listenCustom"><span>listenCustom:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: proc listenCustom(id: int; cb: SignalCallback): ListenerHandle" href="boogie/signals.html#listenCustom%2Cint%2CSignalCallback">signals: proc listenCustom(id: int; cb: SignalCallback): ListenerHandle</a></li>
+          </ul></dd>
+<dt><a name="listenCustomOnce" href="#listenCustomOnce"><span>listenCustomOnce:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: proc listenCustomOnce(id: int; cb: SignalCallback): ListenerHandle" href="boogie/signals.html#listenCustomOnce%2Cint%2CSignalCallback">signals: proc listenCustomOnce(id: int; cb: SignalCallback): ListenerHandle</a></li>
+          </ul></dd>
+<dt><a name="ListenerHandle" href="#ListenerHandle"><span>ListenerHandle:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: type ListenerHandle" href="boogie/signals.html#ListenerHandle">signals: type ListenerHandle</a></li>
+          </ul></dd>
+<dt><a name="listenRawSignal" href="#listenRawSignal"><span>listenRawSignal:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: proc listenRawSignal(signo: int; cb: SignalCallback): ListenerHandle" href="boogie/signals.html#listenRawSignal%2Cint%2CSignalCallback">signals: proc listenRawSignal(signo: int; cb: SignalCallback): ListenerHandle</a></li>
+          </ul></dd>
+<dt><a name="listenRawSignalOnce" href="#listenRawSignalOnce"><span>listenRawSignalOnce:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: proc listenRawSignalOnce(signo: int; cb: SignalCallback): ListenerHandle" href="boogie/signals.html#listenRawSignalOnce%2Cint%2CSignalCallback">signals: proc listenRawSignalOnce(signo: int; cb: SignalCallback): ListenerHandle</a></li>
+          </ul></dd>
+<dt><a name="listenSignal" href="#listenSignal"><span>listenSignal:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: proc listenSignal(s: OsSignal; cb: SignalCallback): ListenerHandle" href="boogie/signals.html#listenSignal%2COsSignal%2CSignalCallback">signals: proc listenSignal(s: OsSignal; cb: SignalCallback): ListenerHandle</a></li>
+          </ul></dd>
+<dt><a name="listenSignalOnce" href="#listenSignalOnce"><span>listenSignalOnce:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: proc listenSignalOnce(s: OsSignal; cb: SignalCallback): ListenerHandle" href="boogie/signals.html#listenSignalOnce%2COsSignal%2CSignalCallback">signals: proc listenSignalOnce(s: OsSignal; cb: SignalCallback): ListenerHandle</a></li>
           </ul></dd>
 <dt><a name="logPos" href="#logPos"><span>logPos:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -863,6 +917,10 @@
 <li><a class="reference external"
           data-doc-search-tag="wal: proc openWal(path: string): Wal" href="boogie/wal.html#openWal%2Cstring">wal: proc openWal(path: string): Wal</a></li>
           </ul></dd>
+<dt><a name="OsSignal" href="#OsSignal"><span>OsSignal:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: enum OsSignal" href="boogie/signals.html#OsSignal">signals: enum OsSignal</a></li>
+          </ul></dd>
 <dt><a name="outgoing" href="#outgoing"><span>outgoing:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="graphstore: proc outgoing(s: GraphStore; nodeId: uint64; relType = &quot;&quot;): seq[Relationship]" href="boogie/stores/graphstore.html#outgoing%2CGraphStore%2Cuint64%2Cstring">graphstore: proc outgoing(s: GraphStore; nodeId: uint64; relType = &quot;&quot;): seq[Relationship]</a></li>
@@ -971,6 +1029,10 @@
 <li><a class="reference external"
           data-doc-search-tag="rdbms: type RowIndex" href="boogie/stores/rdbms.html#RowIndex">rdbms: type RowIndex</a></li>
           </ul></dd>
+<dt><a name="rtSignal" href="#rtSignal"><span>rtSignal:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: proc rtSignal(n: int): cint" href="boogie/signals.html#rtSignal%2Cint">signals: proc rtSignal(n: int): cint</a></li>
+          </ul></dd>
 <dt><a name="RwLock" href="#RwLock"><span>RwLock:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="concurrency: object RwLock" href="boogie/concurrency.html#RwLock">concurrency: object RwLock</a></li>
@@ -980,6 +1042,158 @@
           data-doc-search-tag="columnar: proc scan(s: ColumnarStore; table: string; projectedColumns: seq[string];
      filters: seq[Filter] = @[]; limit: int = 0): seq[JsonNode]" href="boogie/stores/columnar.html#scan%2CColumnarStore%2Cstring%2Cseq%5Bstring%5D%2Cseq%5BFilter%5D%2Cint">columnar: proc scan(s: ColumnarStore; table: string; projectedColumns: seq[string];
      filters: seq[Filter] = @[]; limit: int = 0): seq[JsonNode]</a></li>
+          </ul></dd>
+<dt><a name="SignalAbrt" href="#SignalAbrt"><span>SignalAbrt:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalAbrt" href="boogie/signals.html#SignalAbrt">signals: OsSignal.SignalAbrt</a></li>
+          </ul></dd>
+<dt><a name="SignalAlarm" href="#SignalAlarm"><span>SignalAlarm:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalAlarm" href="boogie/signals.html#SignalAlarm">signals: OsSignal.SignalAlarm</a></li>
+          </ul></dd>
+<dt><a name="SignalBus" href="#SignalBus"><span>SignalBus:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalBus" href="boogie/signals.html#SignalBus">signals: OsSignal.SignalBus</a></li>
+          </ul></dd>
+<dt><a name="SignalCallback" href="#SignalCallback"><span>SignalCallback:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: type SignalCallback" href="boogie/signals.html#SignalCallback">signals: type SignalCallback</a></li>
+          </ul></dd>
+<dt><a name="SignalChild" href="#SignalChild"><span>SignalChild:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalChild" href="boogie/signals.html#SignalChild">signals: OsSignal.SignalChild</a></li>
+          </ul></dd>
+<dt><a name="SignalCont" href="#SignalCont"><span>SignalCont:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalCont" href="boogie/signals.html#SignalCont">signals: OsSignal.SignalCont</a></li>
+          </ul></dd>
+<dt><a name="SignalEmt" href="#SignalEmt"><span>SignalEmt:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalEmt" href="boogie/signals.html#SignalEmt">signals: OsSignal.SignalEmt</a></li>
+          </ul></dd>
+<dt><a name="SignalError" href="#SignalError"><span>SignalError:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: object SignalError" href="boogie/signals.html#SignalError">signals: object SignalError</a></li>
+          </ul></dd>
+<dt><a name="SignalFpe" href="#SignalFpe"><span>SignalFpe:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalFpe" href="boogie/signals.html#SignalFpe">signals: OsSignal.SignalFpe</a></li>
+          </ul></dd>
+<dt><a name="SignalHup" href="#SignalHup"><span>SignalHup:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalHup" href="boogie/signals.html#SignalHup">signals: OsSignal.SignalHup</a></li>
+          </ul></dd>
+<dt><a name="SignalIll" href="#SignalIll"><span>SignalIll:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalIll" href="boogie/signals.html#SignalIll">signals: OsSignal.SignalIll</a></li>
+          </ul></dd>
+<dt><a name="SignalInfo" href="#SignalInfo"><span>SignalInfo:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalInfo" href="boogie/signals.html#SignalInfo">signals: OsSignal.SignalInfo</a></li>
+          </ul></dd>
+<dt><a name="SignalInt" href="#SignalInt"><span>SignalInt:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalInt" href="boogie/signals.html#SignalInt">signals: OsSignal.SignalInt</a></li>
+          </ul></dd>
+<dt><a name="SignalIo" href="#SignalIo"><span>SignalIo:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalIo" href="boogie/signals.html#SignalIo">signals: OsSignal.SignalIo</a></li>
+          </ul></dd>
+<dt><a name="SignalKill" href="#SignalKill"><span>SignalKill:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalKill" href="boogie/signals.html#SignalKill">signals: OsSignal.SignalKill</a></li>
+          </ul></dd>
+<dt><a name="signalNumber" href="#signalNumber"><span>signalNumber:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: proc signalNumber(s: OsSignal): cint" href="boogie/signals.html#signalNumber%2COsSignal">signals: proc signalNumber(s: OsSignal): cint</a></li>
+          </ul></dd>
+<dt><a name="SignalPipe" href="#SignalPipe"><span>SignalPipe:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalPipe" href="boogie/signals.html#SignalPipe">signals: OsSignal.SignalPipe</a></li>
+          </ul></dd>
+<dt><a name="SignalProf" href="#SignalProf"><span>SignalProf:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalProf" href="boogie/signals.html#SignalProf">signals: OsSignal.SignalProf</a></li>
+          </ul></dd>
+<dt><a name="SignalPwr" href="#SignalPwr"><span>SignalPwr:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalPwr" href="boogie/signals.html#SignalPwr">signals: OsSignal.SignalPwr</a></li>
+          </ul></dd>
+<dt><a name="SignalQuit" href="#SignalQuit"><span>SignalQuit:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalQuit" href="boogie/signals.html#SignalQuit">signals: OsSignal.SignalQuit</a></li>
+          </ul></dd>
+<dt><a name="SignalSegv" href="#SignalSegv"><span>SignalSegv:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalSegv" href="boogie/signals.html#SignalSegv">signals: OsSignal.SignalSegv</a></li>
+          </ul></dd>
+<dt><a name="SignalStkflt" href="#SignalStkflt"><span>SignalStkflt:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalStkflt" href="boogie/signals.html#SignalStkflt">signals: OsSignal.SignalStkflt</a></li>
+          </ul></dd>
+<dt><a name="SignalStop" href="#SignalStop"><span>SignalStop:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalStop" href="boogie/signals.html#SignalStop">signals: OsSignal.SignalStop</a></li>
+          </ul></dd>
+<dt><a name="SignalSys" href="#SignalSys"><span>SignalSys:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalSys" href="boogie/signals.html#SignalSys">signals: OsSignal.SignalSys</a></li>
+          </ul></dd>
+<dt><a name="SignalTerm" href="#SignalTerm"><span>SignalTerm:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalTerm" href="boogie/signals.html#SignalTerm">signals: OsSignal.SignalTerm</a></li>
+          </ul></dd>
+<dt><a name="SignalTrap" href="#SignalTrap"><span>SignalTrap:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalTrap" href="boogie/signals.html#SignalTrap">signals: OsSignal.SignalTrap</a></li>
+          </ul></dd>
+<dt><a name="SignalTstp" href="#SignalTstp"><span>SignalTstp:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalTstp" href="boogie/signals.html#SignalTstp">signals: OsSignal.SignalTstp</a></li>
+          </ul></dd>
+<dt><a name="SignalTtin" href="#SignalTtin"><span>SignalTtin:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalTtin" href="boogie/signals.html#SignalTtin">signals: OsSignal.SignalTtin</a></li>
+          </ul></dd>
+<dt><a name="SignalTtou" href="#SignalTtou"><span>SignalTtou:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalTtou" href="boogie/signals.html#SignalTtou">signals: OsSignal.SignalTtou</a></li>
+          </ul></dd>
+<dt><a name="SignalUrgent" href="#SignalUrgent"><span>SignalUrgent:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalUrgent" href="boogie/signals.html#SignalUrgent">signals: OsSignal.SignalUrgent</a></li>
+          </ul></dd>
+<dt><a name="SignalUsr1" href="#SignalUsr1"><span>SignalUsr1:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalUsr1" href="boogie/signals.html#SignalUsr1">signals: OsSignal.SignalUsr1</a></li>
+          </ul></dd>
+<dt><a name="SignalUsr2" href="#SignalUsr2"><span>SignalUsr2:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalUsr2" href="boogie/signals.html#SignalUsr2">signals: OsSignal.SignalUsr2</a></li>
+          </ul></dd>
+<dt><a name="SignalVtalrm" href="#SignalVtalrm"><span>SignalVtalrm:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalVtalrm" href="boogie/signals.html#SignalVtalrm">signals: OsSignal.SignalVtalrm</a></li>
+          </ul></dd>
+<dt><a name="SignalWinch" href="#SignalWinch"><span>SignalWinch:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalWinch" href="boogie/signals.html#SignalWinch">signals: OsSignal.SignalWinch</a></li>
+          </ul></dd>
+<dt><a name="SignalXcpu" href="#SignalXcpu"><span>SignalXcpu:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalXcpu" href="boogie/signals.html#SignalXcpu">signals: OsSignal.SignalXcpu</a></li>
+          </ul></dd>
+<dt><a name="SignalXfsz" href="#SignalXfsz"><span>SignalXfsz:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: OsSignal.SignalXfsz" href="boogie/signals.html#SignalXfsz">signals: OsSignal.SignalXfsz</a></li>
+          </ul></dd>
+<dt><a name="SigRtMax" href="#SigRtMax"><span>SigRtMax:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: const SigRtMax" href="boogie/signals.html#SigRtMax">signals: const SigRtMax</a></li>
+          </ul></dd>
+<dt><a name="SigRtMin" href="#SigRtMin"><span>SigRtMin:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: const SigRtMin" href="boogie/signals.html#SigRtMin">signals: const SigRtMin</a></li>
           </ul></dd>
 <dt><a name="smDisk" href="#smDisk"><span>smDisk:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -1032,6 +1246,10 @@
           data-doc-search-tag="graphstore: proc traverseBfs(s: GraphStore; startNode: uint64; maxDepth: int; relType = &quot;&quot;): seq[
     uint64]" href="boogie/stores/graphstore.html#traverseBfs%2CGraphStore%2Cuint64%2Cint%2Cstring">graphstore: proc traverseBfs(s: GraphStore; startNode: uint64; maxDepth: int; relType = &quot;&quot;): seq[
     uint64]</a></li>
+          </ul></dd>
+<dt><a name="unlisten" href="#unlisten"><span>unlisten:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: proc unlisten(h: ListenerHandle)" href="boogie/signals.html#unlisten%2CListenerHandle">signals: proc unlisten(h: ListenerHandle)</a></li>
           </ul></dd>
 <dt><a name="unregisterStoreFlush" href="#unregisterStoreFlush"><span>unregisterStoreFlush:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -1103,6 +1321,14 @@
 <li><a class="reference external"
           data-doc-search-tag="wal: enum WalOp" href="boogie/wal.html#WalOp">wal: enum WalOp</a></li>
           </ul></dd>
+<dt><a name="watchedSignals" href="#watchedSignals"><span>watchedSignals:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: proc watchedSignals(): seq[int]" href="boogie/signals.html#watchedSignals">signals: proc watchedSignals(): seq[int]</a></li>
+          </ul></dd>
+<dt><a name="watchOsSignals" href="#watchOsSignals"><span>watchOsSignals:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: proc watchOsSignals(signals: openArray[OsSignal])" href="boogie/signals.html#watchOsSignals%2CopenArray%5BOsSignal%5D">signals: proc watchOsSignals(signals: openArray[OsSignal])</a></li>
+          </ul></dd>
 <dt><a name="where" href="#where"><span>where:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="rdbms: proc where(t: DbTable; column: string; value: Value): seq[(string, RowData)]" href="boogie/stores/rdbms.html#where%2CDbTable%2Cstring%2CValue">rdbms: proc where(t: DbTable; column: string; value: Value): seq[(string, RowData)]</a></li>
@@ -1161,7 +1387,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-31 21:43:42 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-16 12:13:07 UTC</small>
       </div>
     </div>
   </div>

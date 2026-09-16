@@ -1,45 +1,46 @@
 nimTitle	columnar	boogie/stores/columnar.html	module boogie/stores/columnar		0
-nim	ctInt64	boogie/stores/columnar.html#ctInt64	ColumnType.ctInt64		23
-nim	ctFloat64	boogie/stores/columnar.html#ctFloat64	ColumnType.ctFloat64		23
-nim	ctBool	boogie/stores/columnar.html#ctBool	ColumnType.ctBool		23
-nim	ctString	boogie/stores/columnar.html#ctString	ColumnType.ctString		23
-nim	ctJson	boogie/stores/columnar.html#ctJson	ColumnType.ctJson		23
-nim	ColumnType	boogie/stores/columnar.html#ColumnType	enum ColumnType		23
-nim	ccNone	boogie/stores/columnar.html#ccNone	CompressionCodec.ccNone		31
-nim	ccRle	boogie/stores/columnar.html#ccRle	CompressionCodec.ccRle		31
-nim	ccDictionary	boogie/stores/columnar.html#ccDictionary	CompressionCodec.ccDictionary		31
-nim	CompressionCodec	boogie/stores/columnar.html#CompressionCodec	enum CompressionCodec		31
-nim	ColumnSchema	boogie/stores/columnar.html#ColumnSchema	object ColumnSchema		34
-nim	TableSchema	boogie/stores/columnar.html#TableSchema	object TableSchema		44
-nim	foEq	boogie/stores/columnar.html#foEq	FilterOp.foEq		50
-nim	foNe	boogie/stores/columnar.html#foNe	FilterOp.foNe		50
-nim	foGt	boogie/stores/columnar.html#foGt	FilterOp.foGt		50
-nim	foGte	boogie/stores/columnar.html#foGte	FilterOp.foGte		50
-nim	foLt	boogie/stores/columnar.html#foLt	FilterOp.foLt		50
-nim	foLte	boogie/stores/columnar.html#foLte	FilterOp.foLte		50
-nim	foIn	boogie/stores/columnar.html#foIn	FilterOp.foIn		50
-nim	FilterOp	boogie/stores/columnar.html#FilterOp	enum FilterOp		50
-nim	Filter	boogie/stores/columnar.html#Filter	object Filter		53
-nim	akCount	boogie/stores/columnar.html#akCount	AggKind.akCount		59
-nim	akSum	boogie/stores/columnar.html#akSum	AggKind.akSum		59
-nim	akMin	boogie/stores/columnar.html#akMin	AggKind.akMin		59
-nim	akMax	boogie/stores/columnar.html#akMax	AggKind.akMax		59
-nim	akAvg	boogie/stores/columnar.html#akAvg	AggKind.akAvg		59
-nim	AggKind	boogie/stores/columnar.html#AggKind	enum AggKind		59
-nim	AggregateSpec	boogie/stores/columnar.html#AggregateSpec	object AggregateSpec		62
-nim	jtInner	boogie/stores/columnar.html#jtInner	JoinType.jtInner		67
-nim	jtLeft	boogie/stores/columnar.html#jtLeft	JoinType.jtLeft		67
-nim	jtRight	boogie/stores/columnar.html#jtRight	JoinType.jtRight		67
-nim	jtFull	boogie/stores/columnar.html#jtFull	JoinType.jtFull		67
-nim	jtCross	boogie/stores/columnar.html#jtCross	JoinType.jtCross		67
-nim	JoinType	boogie/stores/columnar.html#JoinType	enum JoinType		67
-nim	ColumnarError	boogie/stores/columnar.html#ColumnarError	object ColumnarError		70
-nim	ColumnarStore	boogie/stores/columnar.html#ColumnarStore	object ColumnarStore		80
-nim	checkpoint	boogie/stores/columnar.html#checkpoint,ColumnarStore	proc checkpoint(s: var ColumnarStore)		269
-nim	openColumnarStore	boogie/stores/columnar.html#openColumnarStore,string,string,int	proc openColumnarStore(rootDir: string; walPath: string = "";\n                  walFlushEveryOps: int = 100): ColumnarStore		407
-nim	createTable	boogie/stores/columnar.html#createTable,ColumnarStore,TableSchema,bool	proc createTable(s: var ColumnarStore; schema: TableSchema; sync: bool = true)		437
-nim	dropTable	boogie/stores/columnar.html#dropTable,ColumnarStore,string,bool	proc dropTable(s: var ColumnarStore; table: string; sync: bool = true)		440
-nim	insertBatch	boogie/stores/columnar.html#insertBatch,ColumnarStore,string,seq[JsonNode],bool	proc insertBatch(s: var ColumnarStore; table: string; rows: seq[JsonNode];\n            sync: bool = true)		443
-nim	scan	boogie/stores/columnar.html#scan,ColumnarStore,string,seq[string],seq[Filter],int	proc scan(s: ColumnarStore; table: string; projectedColumns: seq[string];\n     filters: seq[Filter] = @[]; limit: int = 0): seq[JsonNode]		446
-nim	aggregate	boogie/stores/columnar.html#aggregate,ColumnarStore,string,seq[AggregateSpec],seq[Filter]	proc aggregate(s: ColumnarStore; table: string; specs: seq[AggregateSpec];\n          filters: seq[Filter] = @[]): JsonNode		492
-nim	join	boogie/stores/columnar.html#join,ColumnarStore,JoinType,string,string	proc join(s: ColumnarStore; joinType: JoinType; leftTable, rightTable: string): seq[\n    JsonNode]		558
+nim	ctInt64	boogie/stores/columnar.html#ctInt64	ColumnType.ctInt64		24
+nim	ctFloat64	boogie/stores/columnar.html#ctFloat64	ColumnType.ctFloat64		24
+nim	ctBool	boogie/stores/columnar.html#ctBool	ColumnType.ctBool		24
+nim	ctString	boogie/stores/columnar.html#ctString	ColumnType.ctString		24
+nim	ctJson	boogie/stores/columnar.html#ctJson	ColumnType.ctJson		24
+nim	ColumnType	boogie/stores/columnar.html#ColumnType	enum ColumnType		24
+nim	ccNone	boogie/stores/columnar.html#ccNone	CompressionCodec.ccNone		32
+nim	ccRle	boogie/stores/columnar.html#ccRle	CompressionCodec.ccRle		32
+nim	ccDictionary	boogie/stores/columnar.html#ccDictionary	CompressionCodec.ccDictionary		32
+nim	CompressionCodec	boogie/stores/columnar.html#CompressionCodec	enum CompressionCodec		32
+nim	ColumnSchema	boogie/stores/columnar.html#ColumnSchema	object ColumnSchema		35
+nim	TableSchema	boogie/stores/columnar.html#TableSchema	object TableSchema		45
+nim	foEq	boogie/stores/columnar.html#foEq	FilterOp.foEq		51
+nim	foNe	boogie/stores/columnar.html#foNe	FilterOp.foNe		51
+nim	foGt	boogie/stores/columnar.html#foGt	FilterOp.foGt		51
+nim	foGte	boogie/stores/columnar.html#foGte	FilterOp.foGte		51
+nim	foLt	boogie/stores/columnar.html#foLt	FilterOp.foLt		51
+nim	foLte	boogie/stores/columnar.html#foLte	FilterOp.foLte		51
+nim	foIn	boogie/stores/columnar.html#foIn	FilterOp.foIn		51
+nim	FilterOp	boogie/stores/columnar.html#FilterOp	enum FilterOp		51
+nim	Filter	boogie/stores/columnar.html#Filter	object Filter		54
+nim	akCount	boogie/stores/columnar.html#akCount	AggKind.akCount		60
+nim	akSum	boogie/stores/columnar.html#akSum	AggKind.akSum		60
+nim	akMin	boogie/stores/columnar.html#akMin	AggKind.akMin		60
+nim	akMax	boogie/stores/columnar.html#akMax	AggKind.akMax		60
+nim	akAvg	boogie/stores/columnar.html#akAvg	AggKind.akAvg		60
+nim	AggKind	boogie/stores/columnar.html#AggKind	enum AggKind		60
+nim	AggregateSpec	boogie/stores/columnar.html#AggregateSpec	object AggregateSpec		63
+nim	jtInner	boogie/stores/columnar.html#jtInner	JoinType.jtInner		68
+nim	jtLeft	boogie/stores/columnar.html#jtLeft	JoinType.jtLeft		68
+nim	jtRight	boogie/stores/columnar.html#jtRight	JoinType.jtRight		68
+nim	jtFull	boogie/stores/columnar.html#jtFull	JoinType.jtFull		68
+nim	jtCross	boogie/stores/columnar.html#jtCross	JoinType.jtCross		68
+nim	JoinType	boogie/stores/columnar.html#JoinType	enum JoinType		68
+nim	ColumnarError	boogie/stores/columnar.html#ColumnarError	object ColumnarError		71
+nim	ColumnarStore	boogie/stores/columnar.html#ColumnarStore	object ColumnarStore		81
+nim	checkpoint	boogie/stores/columnar.html#checkpoint,ColumnarStore	proc checkpoint(s: var ColumnarStore)		273
+nim	close	boogie/stores/columnar.html#close,ColumnarStore	proc close(s: var ColumnarStore)		278
+nim	openColumnarStore	boogie/stores/columnar.html#openColumnarStore,string,string,int	proc openColumnarStore(rootDir: string; walPath: string = "";\n                  walFlushEveryOps: int = 100): ColumnarStore		417
+nim	createTable	boogie/stores/columnar.html#createTable,ColumnarStore,TableSchema,bool	proc createTable(s: var ColumnarStore; schema: TableSchema; sync: bool = true)		451
+nim	dropTable	boogie/stores/columnar.html#dropTable,ColumnarStore,string,bool	proc dropTable(s: var ColumnarStore; table: string; sync: bool = true)		454
+nim	insertBatch	boogie/stores/columnar.html#insertBatch,ColumnarStore,string,seq[JsonNode],bool	proc insertBatch(s: var ColumnarStore; table: string; rows: seq[JsonNode];\n            sync: bool = true)		457
+nim	scan	boogie/stores/columnar.html#scan,ColumnarStore,string,seq[string],seq[Filter],int	proc scan(s: ColumnarStore; table: string; projectedColumns: seq[string];\n     filters: seq[Filter] = @[]; limit: int = 0): seq[JsonNode]		460
+nim	aggregate	boogie/stores/columnar.html#aggregate,ColumnarStore,string,seq[AggregateSpec],seq[Filter]	proc aggregate(s: ColumnarStore; table: string; specs: seq[AggregateSpec];\n          filters: seq[Filter] = @[]): JsonNode		506
+nim	join	boogie/stores/columnar.html#join,ColumnarStore,JoinType,string,string	proc join(s: ColumnarStore; joinType: JoinType; leftTable, rightTable: string): seq[\n    JsonNode]		572
