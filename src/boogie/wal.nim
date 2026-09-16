@@ -467,6 +467,66 @@ proc reset*(w: var Wal) =
   writeHeader(w.path)
   w.nextLsn = 1'u64
 
+proc walFileSize*(w: Wal): int64 =
+  ## On-disk size of the WAL file in bytes (0 when absent). Used to decide
+  ## when a checkpoint should also compact or truncate the log.
+  if fileExists(w.path):
+    getFileSize(w.path)
+  else:
+    0'i64
+
+proc truncate*(w: var Wal) =
+  ## Drops all log records, keeping `nextLsn` monotonic. Only safe right
+  ## after the logged state was made durable elsewhere (e.g. an RDBMS
+  ## snapshot): recovery skips entries at or below the snapshot's
+  ## checkpoint LSN, so the truncated prefix is redundant. A crash between
+  ## the snapshot and this call just replays the old log over the snapshot.
+  w.pendingEntries.setLen(0)
+  if w.log != nil:
+    w.log.handle.close()
+    w.log = nil
+  writeHeader(w.path)
+
+proc rewriteEntries*(w: var Wal, entries: openArray[WalEntry]) =
+  ## Atomically replaces the log file with exactly `entries` (crash-safe via
+  ## tmp file + rename, so a crash leaves the previous log intact).
+  ## `nextLsn` is left untouched: callers assign LSNs continuing from it, so
+  ## LSNs stay monotonic across the rewrite. Pending entries are dropped by
+  ## the caller beforehand (they must already be reflected in `entries`).
+  ## Callers must hold whatever lock serializes concurrent appends.
+  if w.log != nil:
+    w.log.handle.close()
+    w.log = nil
+  let tmp = w.path & ".compact"
+  var f = open(tmp, fmWrite)
+  try:
+    writeExact(f, cast[pointer](cstring(WalMagic)), WalMagic.len)
+    var buf = newStringOfCap(16 * 1024)
+    var maxLsn = 0'u64
+    let ts = getTime().toUnix()
+    for e in entries:
+      var ee = e
+      ee.tsUnix = ts
+      if ee.lsn > maxLsn:
+        maxLsn = ee.lsn
+      let body = encodeEntry(ee)
+      buf.putRecordHeader(body)
+      buf.add(body)
+    if entries.len > 0:
+      buf.putFooter(maxLsn)
+    if buf.len > 0:
+      f.write(buf)
+    f.flushFile()
+  finally:
+    f.close()
+  try:
+    moveFile(tmp, w.path)
+  except OSError:
+    # Windows rename refuses to overwrite: remove-then-move. A crash in
+    # this window can lose the log; POSIX rename above is atomic.
+    removeFile(w.path)
+    moveFile(tmp, w.path)
+
 iterator entries*(w: Wal): WalEntry =
   ## An iterator over all entries in the WAL file. This can
   ## be used for replaying the WAL during recovery.

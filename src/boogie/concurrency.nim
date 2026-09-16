@@ -373,3 +373,15 @@ template withMetaWrite*[T](cc: ConcurrentState[T], body: untyped) =
     body
   finally:
     endWrite(cc.metaMu)
+
+template withWalLock*[T](cc: ConcurrentState[T], body: untyped) =
+  ## Serializes against concurrent WAL appends (`appendWal`/`flushWal` take
+  ## the same lock). Used for log maintenance such as compaction, which must
+  ## not interleave with an append. Never hold a slot write lock while
+  ## acquiring this (consumer takes slot-write then wal-lock); the safe order
+  ## is slot-reads first, wal-lock second.
+  acquire(cc.walLock)
+  try:
+    body
+  finally:
+    release(cc.walLock)

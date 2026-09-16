@@ -6,7 +6,7 @@
 #          https://github.com/openpeeps/boogie
 
 import std/[tables, options, strformat,
-            json, strutils, os, sets]
+            json, strutils, os, sets, algorithm]
 
 import pkg/sorta
 import ../wal
@@ -108,6 +108,11 @@ type
       # number of mutation operations since the last WAL flush. This is used to trigger
       # automatic WAL flushes after a certain number of operations, as configured by
       # `walFlushEveryOps`
+    walMaxBytes: uint32
+      # when the WAL file reaches this size, the next checkpoint also
+      # compacts it (`0` disables). Non-concurrent stores truncate the log
+      # after every snapshot checkpoint; concurrent (WAL-only) stores rewrite
+      # the log from live in-memory state.
     cc: ConcurrentState[RdbWriteTask]
       ## Store-level concurrency state; nil unless `enableConcurrency = true`.
     lock: FileLock
@@ -158,15 +163,22 @@ proc recoverFromWal*(s: Store)
 proc newStore*(path: string, mode: StorageMode = smDisk,
     enableWal: bool = true, checkpointEveryOps: uint32 = 0'u32,
     walFlushEveryOps: uint32 = 1000'u32,
+    walMaxBytes: uint32 = 64'u32 * 1024 * 1024,
     enableConcurrency: static bool = false
   ): Store =
   ## Create a new Store instance. Use `smInMemory` for an in-memory
   ## store (no persistence) or `smDisk` for a disk-backed store.
-  ## 
+  ##
   ## walFlushEveryOps:
   ##   - 1    => flush every op (old behavior / strongest durability)
   ##   - 1000 => group commit (faster inserts)
   ##   - 0    => flush only on checkpoint/close/recovery-end
+  ##
+  ## walMaxBytes (default 64MB):
+  ##   - non-concurrent stores truncate the WAL after every snapshot
+  ##     checkpoint regardless of size;
+  ##   - concurrent stores rewrite the WAL from live state on checkpoint
+  ##     once the file reaches this size (`0` disables compaction).
   ##
   ## With `enableConcurrency = true` reads are concurrent per table and writes
   ## are serialized per table through a bounded worker pool (WAL-only durability).
@@ -204,6 +216,7 @@ proc newStore*(path: string, mode: StorageMode = smDisk,
     dbPath: dbPath,
     checkpointEveryOps: checkpointEveryOps,
     walFlushEveryOps: walFlushEveryOps,
+    walMaxBytes: walMaxBytes,
     lock: fLock,
   )
 
@@ -851,16 +864,77 @@ proc markCommitted(s: Store, lsn: uint64) =
     inc s.pendingOps
     if s.pendingOps >= s.checkpointEveryOps:
       s.saveSnapshotIfEnabled()
+      if s.hasWal:
+        s.wal.truncate()
       s.pendingOps = 0'u32
 
+proc needsWalCompact(s: Store): bool =
+  ## True when the WAL file reached the configured size budget.
+  s.hasWal and s.walMaxBytes > 0'u32 and
+    s.wal.walFileSize() >= int64(s.walMaxBytes)
+
+proc compactWalFromMemory(s: Store) =
+  ## Rewrites the WAL file from live in-memory state: one create-table entry
+  ## per live table plus one insert per live row (drops, deletes and
+  ## superseded updates are omitted). LSNs continue monotonically from
+  ## `wal.nextLsn`, so recovery replays the compacted log identically.
+  ## The consumer worker is stalled for the whole operation by holding every
+  ## table read lock (lock order: meta-read, slot-reads sorted by table name,
+  ## then the WAL lock — the inverse of no existing path, so no deadlock),
+  ## which rules out partial applies and duplicate log entries.
+  if s.cc == nil or not s.hasWal:
+    return
+  withMetaRead(s.cc):
+    var names = newSeq[string]()
+    for k in s.tables.keys:
+      names.add(k)
+    names.sort()
+    var slots = newSeq[TableSlot[RdbWriteTask]](names.len)
+    for i, n in names:
+      slots[i] = s.tables[n].slot
+    for sl in slots:
+      if sl != nil:
+        beginRead(sl.mu)
+    try:
+      var compacted = newSeq[WalEntry]()
+      for i, n in names:
+        let t = s.tables[n]
+        compacted.add(WalEntry(op: woCreateTable, table: t.name, pk: "",
+                               payload: schemaToPayload(t)))
+        for pk, rec in t.rowsByPk.pairs:
+          compacted.add(WalEntry(op: woInsertRow, table: t.name, pk: pk,
+                                 payload: rowToPayload(rec.cols)))
+      withWalLock(s.cc):
+        # Flush pending entries directly: the WAL lock is already held and
+        # `flushWal` would re-acquire it (self-deadlock). This is the same
+        # serialization `appendWal`/`flushWal` provide.
+        s.wal.flush()
+        for e in compacted.mitems:
+          e.lsn = s.wal.nextLsn
+          inc s.wal.nextLsn
+        s.wal.rewriteEntries(compacted)
+    finally:
+      for sl in slots:
+        if sl != nil:
+          endRead(sl.mu)
+
 proc checkpoint*(s: Store) =
-  ## Force a snapshot checkpoint now.
+  ## Force a checkpoint now.
+  ##
+  ## Non-concurrent stores flush the WAL, write a snapshot, then truncate the
+  ## WAL (entries at or below the snapshot LSN are redundant). Concurrent
+  ## (WAL-only) stores flush the WAL and rewrite it from live state once it
+  ## reaches `walMaxBytes`.
   if s.cc != nil:
     s.cc.flushWal(s.wal)
+    if s.needsWalCompact():
+      s.compactWalFromMemory()
     return
   if not s.hasDbFile: return
   s.flushWalIfNeeded(force = true)
   s.saveSnapshotIfEnabled()
+  if s.hasWal:
+    s.wal.truncate()
   s.pendingOps = 0'u32
 
 proc close*(s: Store) =
@@ -1237,3 +1311,9 @@ proc recoverFromWal*(s: Store) =
   s.saveSnapshotIfEnabled()
   s.pendingOps = 0'u32
   s.pendingWalOps = 0'u32
+
+  # A truncated WAL restarts its on-disk LSNs from scratch while the snapshot
+  # still sits at its checkpoint LSN. Without this, fresh appends would reuse
+  # LSNs at or below it and be skipped by recovery (silent data loss).
+  if s.hasWal and s.wal.nextLsn <= s.checkpointLsn:
+    s.wal.nextLsn = s.checkpointLsn + 1'u64
