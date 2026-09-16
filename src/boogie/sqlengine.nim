@@ -1018,7 +1018,7 @@ proc compileSelect(l: var Lowerer, root: SqlNode): CompiledStmt =
     l.ch.emit(opcEqI)
     let holeStop = l.jmpFwd(opcJumpFwdT)
     l.ch.emit(opcDiscard); l.ch.emit(1'u8)
-    l.patchFwd(holeStop, l.here())
+    extraEndHoles.add(holeStop)
 
   l.jmpBack(loopTop)
 
