@@ -11,7 +11,7 @@ srcDir        = "src"
 
 requires "nim >= 2.0.0"
 requires "sorta >= 0.2.0"
-requires "openparser >= 0.3.4"
+requires "openparser >= 0.3.3"
 requires "vancode >= 0.2.9"
 requires "voodoo >= 0.2.0"
 requires "db_connector >= 0.1.0"
