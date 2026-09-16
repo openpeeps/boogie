@@ -13,6 +13,7 @@ import ../wal
 import ../concurrency
 import ../crashsafe
 import ../fbe_codec
+import ../filelock
 import ../rdbms_types
 export rdbms_types
 
@@ -109,6 +110,9 @@ type
       # `walFlushEveryOps`
     cc: ConcurrentState[RdbWriteTask]
       ## Store-level concurrency state; nil unless `enableConcurrency = true`.
+    lock: FileLock
+      ## Cross-process exclusive lock held for the store lifetime (disk mode).
+      ## A second process opening the same path blocks here instead of racing.
 
   StoreError* = object of CatchableError
 
@@ -171,13 +175,17 @@ proc newStore*(path: string, mode: StorageMode = smDisk,
     hasDb: bool
     hasWal: bool
     walObj: Wal
-  
+    fLock: FileLock
+
   case mode
   of smInMemory:
     discard
   of smDisk:
     if path.len == 0:
       raise newException(StoreError, "path cannot be empty in disk mode")
+    # Serialize whole-lifetime against other processes on this path BEFORE
+    # touching the snapshot or WAL (blocks until the holder closes).
+    fLock = acquireFileLock(path.changeFileExt(".lock"))
     hasDb = true
     dbPath = path.changeFileExt(".db")
     if enableWal:
@@ -196,6 +204,7 @@ proc newStore*(path: string, mode: StorageMode = smDisk,
     dbPath: dbPath,
     checkpointEveryOps: checkpointEveryOps,
     walFlushEveryOps: walFlushEveryOps,
+    lock: fLock,
   )
 
   when enableConcurrency:
@@ -861,6 +870,7 @@ proc close*(s: Store) =
     s.cc.close(s.wal)
   else:
     s.flushWalIfNeeded(force = true)
+  s.lock = FileLock()
 
 #
 # Public API (WAL + apply)

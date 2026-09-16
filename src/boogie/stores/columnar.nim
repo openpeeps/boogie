@@ -18,6 +18,7 @@
 
 import std/[tables, options, json, strformat, sets, strutils, os, sequtils]
 import ../wal
+import ../filelock
 
 type
   ColumnType* = enum
@@ -83,6 +84,9 @@ type
     tables*: Table[string, ColumnarTable]
     walFlushEveryOps*: int
     pendingOps*: int
+    lock: FileLock
+      ## Cross-process exclusive lock held while the store is alive. A second
+      ## process opening the same root blocks here instead of racing.
 
 proc tablesRoot(s: ColumnarStore): string = s.rootDir / "tables"
 proc tableDir(s: ColumnarStore, table: string): string = s.tablesRoot / table
@@ -271,6 +275,12 @@ proc checkpoint*(s: var ColumnarStore) =
   s.wal.reset()
   s.pendingOps = 0
 
+proc close*(s: var ColumnarStore) =
+  ## Flushes pending WAL writes and releases the cross-process lock.
+  s.wal.flush()
+  s.pendingOps = 0
+  s.lock = FileLock()
+
 proc createTableInternal(s: var ColumnarStore, schema: TableSchema, emitWal: bool, sync: bool) =
   if s.tables.hasKey(schema.name):
     raise newException(ColumnarError, fmt"Table already exists: {schema.name}")
@@ -416,6 +426,10 @@ proc openColumnarStore*(rootDir: string, walPath: string = "", walFlushEveryOps:
 
   ensureDir(rootDir)
   ensureDir(result.tablesRoot)
+
+  # Serialize against other processes on this root BEFORE touching the WAL
+  # (blocks until the holder closes).
+  result.lock = acquireFileLock(rootDir / "boogie.lock")
 
   let wpath = if walPath.len > 0: walPath else: rootDir / "boogie"
   result.wal = openWal(wpath)

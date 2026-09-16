@@ -21,6 +21,7 @@ import pkg/openparser/[json, bson]
 
 import ../wal
 import ../fbe_codec
+import ../filelock
 export wal, bson, json
 
 type
@@ -50,6 +51,9 @@ type
     checkpointEveryOps: uint32
     walFlushEveryOps: uint32
     pendingWalOps: uint32
+    lock: FileLock
+      ## Cross-process exclusive lock held while the store is alive. A second
+      ## process opening the same path blocks here instead of racing.
 
 proc fail(msg: string) {.noreturn.} =
   raise newException(DocumentStoreError, msg)
@@ -202,6 +206,9 @@ proc openDocumentStore*(path: string, name = "documents",
     createDir(path)
 
   let base = path / name
+  # Serialize whole-lifetime against other processes on this path BEFORE
+  # touching the WAL (blocks until the holder closes).
+  let fLock = acquireFileLock(base.changeFileExt(".lock"))
   result = DocumentStore(
     name: name,
     wal: openWal(base),
@@ -213,7 +220,8 @@ proc openDocumentStore*(path: string, name = "documents",
     pendingOps: 0'u32,
     checkpointEveryOps: checkpointEveryOps,
     walFlushEveryOps: walFlushEveryOps,
-    pendingWalOps: 0'u32
+    pendingWalOps: 0'u32,
+    lock: fLock,
   )
   result.recoverFromWal()
 
@@ -222,6 +230,12 @@ proc checkpoint*(store: var DocumentStore) =
   store.flushWalIfNeeded(force = true)
   store.saveSnapshotIfEnabled()
   store.pendingOps = 0'u32
+
+proc close*(store: var DocumentStore) =
+  ## Flushes pending WAL writes, checkpoints the snapshot and releases the
+  ## cross-process lock.
+  store.checkpoint()
+  store.lock = FileLock()
 
 proc len*(store: DocumentStore): int =
   ## Returns the number of documents currently stored in the document store.

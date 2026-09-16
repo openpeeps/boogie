@@ -6,6 +6,8 @@ testresults/
 /tests/*
 !/tests/*.nim
 !/tests/*.nims
+!/tests/mp_workers/
+!/tests/mp_workers/*.nim
 nimble.develop
 nimble.paths
 nimbledeps

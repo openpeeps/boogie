@@ -9,6 +9,7 @@ import std/[tables, options, os, times, strutils]
 
 import ../wal
 import ../crashsafe
+import ../filelock
 export wal
 
 ## This module implements an append-only log store optimized for sequential access.
@@ -101,6 +102,9 @@ type
       ## this point exist only in the group-commit buffer and are served from
       ## there until the next flush lands them on disk.
     cache: LruCache
+    lock: FileLock
+      ## Cross-process exclusive lock held for the store lifetime (disk mode).
+      ## A second process opening the same path blocks here instead of racing.
 
 const FooterSize = 9'i64
   ## Size of the `<tag> <u64 lastLsn>` footer every WAL flush appends
@@ -309,13 +313,17 @@ proc openLogStore*(path: string, name = "logs",
     createDir(path)
 
   let base = path / name
+  # Serialize whole-lifetime against other processes on this path BEFORE
+  # touching the WAL (blocks until the holder closes).
+  let fLock = acquireFileLock(base.changeFileExt(".lock"))
   result = LogStore(
     name: name,
     wal: openWal(base),
     hasDisk: true,
     walFlushEveryOps: walFlushEveryOps,
     pendingWalOps: 0'u32,
-    cache: newLruCache(cacheCapacity)
+    cache: newLruCache(cacheCapacity),
+    lock: fLock,
   )
   openLog(result.wal)
   result.reader = openLogReader(result.wal)
@@ -351,6 +359,7 @@ proc close*(s: LogStore) =
       s.flushWalIfNeeded(force = true)
     finally:
       s.reader.close()
+  s.lock = FileLock()
 
 #
 # stream management

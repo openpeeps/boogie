@@ -23,6 +23,7 @@
 import std/[os, tables, sets, strutils, json]
 import ../concurrency
 import ../wal
+import ../filelock
 
 type
   GraphError* = object of CatchableError
@@ -57,6 +58,9 @@ type
     rootDir: string
     wal*: Wal
     mu: RwLock
+    lock: FileLock
+      ## Cross-process exclusive lock held for the store lifetime. A second
+      ## process opening the same root blocks here instead of racing.
 
     nextNodeId: uint64
     nextRelId: uint64
@@ -511,6 +515,9 @@ proc openGraphStore*(rootDir: string): GraphStore =
   createDir(rootDir)
   new(result)
   result.rootDir = rootDir
+  # Serialize whole-lifetime against other processes on this root BEFORE
+  # touching the snapshot or WAL (blocks until the holder closes).
+  result.lock = acquireFileLock(rootDir / "boogie.lock")
   result.nodes = initTable[uint64, GraphNode]()
   result.rels = initTable[uint64, Relationship]()
   result.outAdj = initTable[uint64, seq[uint64]]()
@@ -534,6 +541,7 @@ proc openGraphStore*(rootDir: string): GraphStore =
 proc closeGraphStore*(s: GraphStore) =
   writeWith graphStoreRwLock:
     checkpointNoLock(s)
+  s.lock = FileLock()
 
 proc beginTx*(s: GraphStore): GraphTx =
   GraphTx(store: s, ops: @[], finished: false)

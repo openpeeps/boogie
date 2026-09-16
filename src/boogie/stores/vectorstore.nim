@@ -10,6 +10,7 @@ import ../fbe_codec
 import ../wal
 import ../concurrency
 import ../crashsafe
+import ../filelock
 
 ## A simple vector store implementation with optional disk persistence and write-ahead logging (WAL) for 
 ## durability. The vector store supports multiple named collections, each with a specified dimension
@@ -88,6 +89,9 @@ type
     pendingWalOps: uint32
     cc: ConcurrentState[VecWriteTask]
       ## Store-level concurrency state; nil unless `enableConcurrency = true`.
+    lock: FileLock
+      ## Cross-process exclusive lock held for the store lifetime (disk mode).
+      ## A second process opening the same path blocks here instead of racing.
 
   VectorStoreError* = object of CatchableError
     ## Custom exception type for errors related to the vector store operations,
@@ -359,6 +363,7 @@ proc close*(s: VectorStore) =
     s.cc.close(s.wal)
   else:
     s.flushWalIfNeeded(force = true)
+  s.lock = FileLock()
 
 proc applyWalEntry(s: VectorStore, e: WalEntry) =
   case e.op
@@ -416,6 +421,7 @@ proc newVectorStore*(path: string, mode: VectorStorageMode = smDisk, enableWal: 
     hasDb: bool
     hasWal: bool
     walObj: Wal
+    fLock: FileLock
 
   case mode
   of smInMemory:
@@ -423,6 +429,9 @@ proc newVectorStore*(path: string, mode: VectorStorageMode = smDisk, enableWal: 
   of smDisk:
     if path.len == 0:
       raise newException(VectorStoreError, "path cannot be empty in disk mode")
+    # Serialize whole-lifetime against other processes on this path BEFORE
+    # touching the snapshot or WAL (blocks until the holder closes).
+    fLock = acquireFileLock(path.changeFileExt(".lock"))
     hasDb = true
 
   when enableConcurrency:
@@ -442,7 +451,8 @@ proc newVectorStore*(path: string, mode: VectorStorageMode = smDisk, enableWal: 
     hasDbFile: hasDb,
     dbPath: dbPath,
     checkpointEveryOps: checkpointEveryOps,
-    walFlushEveryOps: walFlushEveryOps
+    walFlushEveryOps: walFlushEveryOps,
+    lock: fLock,
   )
 
   when enableConcurrency:

@@ -10,6 +10,7 @@ import ../fbe_codec
 import ../wal
 import ../concurrency
 import ../crashsafe
+import ../filelock
 
 ## This module implements a simple key-value store with optional
 ## write-ahead logging (WAL) and disk persistence. It uses an in-memory hash map
@@ -68,6 +69,9 @@ type
       ## Store-level concurrency state; nil unless `enableConcurrency = true`.
     slot: TableSlot[KvWriteTask]
       ## The store's single table slot; nil unless `enableConcurrency = true`.
+    lock: FileLock
+      ## Cross-process exclusive lock held for the store lifetime (disk mode).
+      ## A second process opening the same path blocks here instead of racing.
 
 const
   KvTableName = "__kv__"
@@ -207,6 +211,7 @@ proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = 
     hasDb: bool
     hasWal: bool
     walObj: Wal
+    fLock: FileLock
 
   case mode
   of ksmInMemory:
@@ -214,6 +219,9 @@ proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = 
   of ksmDisk:
     if path.len == 0:
       raise newException(KvStoreError, "path cannot be empty in disk mode")
+    # Serialize whole-lifetime against other processes on this path BEFORE
+    # touching the snapshot or WAL (blocks until the holder closes).
+    fLock = acquireFileLock(path.changeFileExt(".lock"))
     hasDb = not lazyReads
     dbPath = path.changeFileExt(".db")
     if enableWal:
@@ -234,7 +242,8 @@ proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = 
     checkpointEveryOps: checkpointEveryOps,
     walFlushEveryOps: walFlushEveryOps,
     lazyReads: lazyReads,
-    valueOffsets: initTable[string, int64]()
+    valueOffsets: initTable[string, int64](),
+    lock: fLock,
   )
 
   when enableConcurrency:
@@ -296,6 +305,7 @@ proc close*(s: KvStore) =
     s.cc.close(s.wal)
   else:
     s.flushWalIfNeeded(force = true)
+  s.lock = FileLock()
 
 proc put*(s: KvStore, key, value: string) =
   ## Inserts or updates the value for the given key. If WAL is enabled,
