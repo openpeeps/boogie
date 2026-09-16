@@ -1,29 +1,8 @@
 name: test
-on:
-  push:
-    paths-ignore:
-      - LICENSE
-      - README.*
-      - examples
-      - .github/workflows
-  pull_request:
-    paths-ignore:
-      - LICENSE
-      - README.*
-      - examples
-      - .github/workflows
+on: [push, pull_request]
 jobs:
   test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        nim-version:
-          - 'stable'
-    steps:
-      - uses: actions/checkout@v3
-      - uses: jiro4989/setup-nim-action@v1
-        with:
-          nim-version: ${{ matrix.nim-version }}
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - run: nimble install -Y
-      - run: nimble test -d:release
+    uses: nimbase/setup-nim-action/.github/workflows/test.yml@main
+    with:
+      nim-version: stable
+      test-flags: "-d:release"
