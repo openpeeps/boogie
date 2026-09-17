@@ -40,14 +40,14 @@ nim	SigRtMin	boogie/signals.html#SigRtMin	const SigRtMin		115
 nim	SigRtMax	boogie/signals.html#SigRtMax	const SigRtMax		117
 nim	rtSignal	boogie/signals.html#rtSignal,int	proc rtSignal(n: int): cint		120
 nim	ListenerHandle	boogie/signals.html#ListenerHandle	type ListenerHandle		134
-nim	listenRawSignal	boogie/signals.html#listenRawSignal,int,SignalCallback	proc listenRawSignal(signo: int; cb: SignalCallback): ListenerHandle		299
-nim	listenRawSignalOnce	boogie/signals.html#listenRawSignalOnce,int,SignalCallback	proc listenRawSignalOnce(signo: int; cb: SignalCallback): ListenerHandle		319
-nim	listenSignal	boogie/signals.html#listenSignal,OsSignal,SignalCallback	proc listenSignal(s: OsSignal; cb: SignalCallback): ListenerHandle		336
-nim	listenSignalOnce	boogie/signals.html#listenSignalOnce,OsSignal,SignalCallback	proc listenSignalOnce(s: OsSignal; cb: SignalCallback): ListenerHandle		340
-nim	listenCustom	boogie/signals.html#listenCustom,int,SignalCallback	proc listenCustom(id: int; cb: SignalCallback): ListenerHandle		344
-nim	listenCustomOnce	boogie/signals.html#listenCustomOnce,int,SignalCallback	proc listenCustomOnce(id: int; cb: SignalCallback): ListenerHandle		350
-nim	unlisten	boogie/signals.html#unlisten,ListenerHandle	proc unlisten(h: ListenerHandle)		354
-nim	emitSignal	boogie/signals.html#emitSignal,int	proc emitSignal(signo: int)		374
-nim	watchOsSignals	boogie/signals.html#watchOsSignals,openArray[OsSignal]	proc watchOsSignals(signals: openArray[OsSignal])		399
-nim	watchedSignals	boogie/signals.html#watchedSignals	proc watchedSignals(): seq[int]		412
-nim	installFatalHandler	boogie/signals.html#installFatalHandler,openArray[OsSignal],SignalCallback	proc installFatalHandler(signals: openArray[OsSignal]; cb: SignalCallback)		446
+nim	listenRawSignal	boogie/signals.html#listenRawSignal,int,SignalCallback	proc listenRawSignal(signo: int; cb: SignalCallback): ListenerHandle		312
+nim	listenRawSignalOnce	boogie/signals.html#listenRawSignalOnce,int,SignalCallback	proc listenRawSignalOnce(signo: int; cb: SignalCallback): ListenerHandle		332
+nim	listenSignal	boogie/signals.html#listenSignal,OsSignal,SignalCallback	proc listenSignal(s: OsSignal; cb: SignalCallback): ListenerHandle		349
+nim	listenSignalOnce	boogie/signals.html#listenSignalOnce,OsSignal,SignalCallback	proc listenSignalOnce(s: OsSignal; cb: SignalCallback): ListenerHandle		353
+nim	listenCustom	boogie/signals.html#listenCustom,int,SignalCallback	proc listenCustom(id: int; cb: SignalCallback): ListenerHandle		357
+nim	listenCustomOnce	boogie/signals.html#listenCustomOnce,int,SignalCallback	proc listenCustomOnce(id: int; cb: SignalCallback): ListenerHandle		363
+nim	unlisten	boogie/signals.html#unlisten,ListenerHandle	proc unlisten(h: ListenerHandle)		367
+nim	emitSignal	boogie/signals.html#emitSignal,int	proc emitSignal(signo: int)		387
+nim	watchOsSignals	boogie/signals.html#watchOsSignals,openArray[OsSignal]	proc watchOsSignals(signals: openArray[OsSignal])		412
+nim	watchedSignals	boogie/signals.html#watchedSignals	proc watchedSignals(): seq[int]		425
+nim	installFatalHandler	boogie/signals.html#installFatalHandler,openArray[OsSignal],SignalCallback	proc installFatalHandler(signals: openArray[OsSignal]; cb: SignalCallback)		459

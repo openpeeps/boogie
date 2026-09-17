@@ -30,4 +30,5 @@ nim	withSlotRead	boogie/concurrency.html#withSlotRead.t,TableSlot[T],untyped	tem
 nim	withSlotWrite	boogie/concurrency.html#withSlotWrite.t,TableSlot[T],untyped	template withSlotWrite[T](slot: TableSlot[T]; body: untyped)		356
 nim	withMetaRead	boogie/concurrency.html#withMetaRead.t,ConcurrentState[T],untyped	template withMetaRead[T](cc: ConcurrentState[T]; body: untyped)		363
 nim	withMetaWrite	boogie/concurrency.html#withMetaWrite.t,ConcurrentState[T],untyped	template withMetaWrite[T](cc: ConcurrentState[T]; body: untyped)		370
+nim	withWalLock	boogie/concurrency.html#withWalLock.t,ConcurrentState[T],untyped	template withWalLock[T](cc: ConcurrentState[T]; body: untyped)		377
 nimgrp	submit	boogie/concurrency.html#submit-procs-all	proc		204

@@ -2,4 +2,4 @@ nimTitle	filelock	boogie/filelock.html	module boogie/filelock		0
 nim	FileLockError	boogie/filelock.html#FileLockError	object FileLockError		40
 nim	FileLock	boogie/filelock.html#FileLock	object FileLock		49
 nim	`=destroy`	boogie/filelock.html#=destroy,FileLock	proc `=destroy`(l: var FileLock)		66
-nim	acquireFileLock	boogie/filelock.html#acquireFileLock,string	proc acquireFileLock(lockPath: string): FileLock		88
+nim	acquireFileLock	boogie/filelock.html#acquireFileLock,string	proc acquireFileLock(lockPath: string): FileLock		90

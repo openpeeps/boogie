@@ -6,17 +6,17 @@ nim	DocumentStoreError	boogie/stores/docstore.html#DocumentStoreError	object Doc
 nim	DocumentStore	boogie/stores/docstore.html#DocumentStore	object DocumentStore		37
 nim	recoverFromWal	boogie/stores/docstore.html#recoverFromWal,DocumentStore	proc recoverFromWal(s: var DocumentStore)		175
 nim	openDocumentStore	boogie/stores/docstore.html#openDocumentStore,string,string,uint32,uint32	proc openDocumentStore(path: string; name = "documents"; defaultEncoding = deJson;\n                  enableSnapshots = true; checkpointEveryOps: uint32 = 1000'u32;\n                  walFlushEveryOps: uint32 = 1000'u32): DocumentStore		196
-nim	checkpoint	boogie/stores/docstore.html#checkpoint,DocumentStore	proc checkpoint(store: var DocumentStore)		228
-nim	close	boogie/stores/docstore.html#close,DocumentStore	proc close(store: var DocumentStore)		234
-nim	len	boogie/stores/docstore.html#len,DocumentStore	proc len(store: DocumentStore): int		240
-nim	hasKey	boogie/stores/docstore.html#hasKey,DocumentStore,string	proc hasKey(store: DocumentStore; key: string): bool		244
-nim	get	boogie/stores/docstore.html#get,DocumentStore,string	proc get(store: DocumentStore; key: string): Option[JsonNode]		248
-nim	insert	boogie/stores/docstore.html#insert,DocumentStore,string,JsonNode,DocumentEncoding	proc insert(store: var DocumentStore; key: string; doc: JsonNode; sync = true;\n       enc: DocumentEncoding = deJson)		255
-nim	upsert	boogie/stores/docstore.html#upsert,DocumentStore,string,JsonNode,DocumentEncoding	proc upsert(store: var DocumentStore; key: string; doc: JsonNode; sync = true;\n       enc: DocumentEncoding = deJson)		270
-nim	delete	boogie/stores/docstore.html#delete,DocumentStore,string	proc delete(store: var DocumentStore; key: string; sync = true): bool		280
-nim	putObj	boogie/stores/docstore.html#putObj,DocumentStore,string,T,DocumentEncoding	proc putObj[T: object | ref object](store: var DocumentStore; key: string; value: T;\n                               sync = true; enc: DocumentEncoding = deJson)		290
-nim	getObj	boogie/stores/docstore.html#getObj,DocumentStore,string,typedesc[T]	proc getObj[T](store: DocumentStore; key: string; _: typedesc[T]): Option[T]		299
-nim	getBson	boogie/stores/docstore.html#getBson,DocumentStore,string,int32	proc getBson(store: DocumentStore; key: string; version: int32 = 1'i32): Option[\n    BSONDocument]		310
-nim	writeBSONDocument	boogie/stores/docstore.html#writeBSONDocument,DocumentStore,string,string,int32	proc writeBSONDocument(store: DocumentStore; key, path: string;\n                  version: int32 = 1'i32): bool		318
-nim	openBSONDocument	boogie/stores/docstore.html#openBSONDocument,DocumentStore,string,string	proc openBSONDocument(store: var DocumentStore; key, path: string; sync = true): bool		328
-nim	pairs	boogie/stores/docstore.html#pairs.i,DocumentStore	iterator pairs(store: DocumentStore): (string, JsonNode)		338
+nim	checkpoint	boogie/stores/docstore.html#checkpoint,DocumentStore	proc checkpoint(store: var DocumentStore)		240
+nim	close	boogie/stores/docstore.html#close,DocumentStore	proc close(store: var DocumentStore)		246
+nim	len	boogie/stores/docstore.html#len,DocumentStore	proc len(store: DocumentStore): int		252
+nim	hasKey	boogie/stores/docstore.html#hasKey,DocumentStore,string	proc hasKey(store: DocumentStore; key: string): bool		256
+nim	get	boogie/stores/docstore.html#get,DocumentStore,string	proc get(store: DocumentStore; key: string): Option[JsonNode]		260
+nim	insert	boogie/stores/docstore.html#insert,DocumentStore,string,JsonNode,DocumentEncoding	proc insert(store: var DocumentStore; key: string; doc: JsonNode; sync = true;\n       enc: DocumentEncoding = deJson)		267
+nim	upsert	boogie/stores/docstore.html#upsert,DocumentStore,string,JsonNode,DocumentEncoding	proc upsert(store: var DocumentStore; key: string; doc: JsonNode; sync = true;\n       enc: DocumentEncoding = deJson)		282
+nim	delete	boogie/stores/docstore.html#delete,DocumentStore,string	proc delete(store: var DocumentStore; key: string; sync = true): bool		292
+nim	putObj	boogie/stores/docstore.html#putObj,DocumentStore,string,T,DocumentEncoding	proc putObj[T: object | ref object](store: var DocumentStore; key: string; value: T;\n                               sync = true; enc: DocumentEncoding = deJson)		302
+nim	getObj	boogie/stores/docstore.html#getObj,DocumentStore,string,typedesc[T]	proc getObj[T](store: DocumentStore; key: string; _: typedesc[T]): Option[T]		311
+nim	getBson	boogie/stores/docstore.html#getBson,DocumentStore,string,int32	proc getBson(store: DocumentStore; key: string; version: int32 = 1'i32): Option[\n    BSONDocument]		322
+nim	writeBSONDocument	boogie/stores/docstore.html#writeBSONDocument,DocumentStore,string,string,int32	proc writeBSONDocument(store: DocumentStore; key, path: string;\n                  version: int32 = 1'i32): bool		330
+nim	openBSONDocument	boogie/stores/docstore.html#openBSONDocument,DocumentStore,string,string	proc openBSONDocument(store: var DocumentStore; key, path: string; sync = true): bool		340
+nim	pairs	boogie/stores/docstore.html#pairs.i,DocumentStore	iterator pairs(store: DocumentStore): (string, JsonNode)		350

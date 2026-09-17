@@ -848,9 +848,11 @@
           data-doc-search-tag="rdbms: proc newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
          checkpointEveryOps: uint32 = 0'u32;
          walFlushEveryOps: uint32 = 1000'u32;
-         enableConcurrency: static bool = false): Store" href="boogie/stores/rdbms.html#newStore%2Cstring%2CStorageMode%2Cbool%2Cuint32%2Cuint32%2Cstaticbool">rdbms: proc newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
+         walMaxBytes: uint32 = 65536'u32 * 1024;
+         enableConcurrency: static bool = false): Store" href="boogie/stores/rdbms.html#newStore%2Cstring%2CStorageMode%2Cbool%2Cuint32%2Cuint32%2Cuint32%2Cstaticbool">rdbms: proc newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
          checkpointEveryOps: uint32 = 0'u32;
          walFlushEveryOps: uint32 = 1000'u32;
+         walMaxBytes: uint32 = 65536'u32 * 1024;
          enableConcurrency: static bool = false): Store</a></li>
           </ul></dd>
 <dt><a name="newTable" href="#newTable"><span>newTable:</span></a></dt><dd><ul class="simple">
@@ -1012,6 +1014,10 @@
 <dt><a name="retainedValueBytes" href="#retainedValueBytes"><span>retainedValueBytes:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="kv: proc retainedValueBytes(s: KvStore): int64" href="boogie/stores/kv.html#retainedValueBytes%2CKvStore">kv: proc retainedValueBytes(s: KvStore): int64</a></li>
+          </ul></dd>
+<dt><a name="rewriteEntries" href="#rewriteEntries"><span>rewriteEntries:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="wal: proc rewriteEntries(w: var Wal; entries: openArray[WalEntry])" href="boogie/wal.html#rewriteEntries%2CWal%2CopenArray%5BWalEntry%5D">wal: proc rewriteEntries(w: var Wal; entries: openArray[WalEntry])</a></li>
           </ul></dd>
 <dt><a name="rollback" href="#rollback"><span>rollback:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -1247,6 +1253,10 @@
     uint64]" href="boogie/stores/graphstore.html#traverseBfs%2CGraphStore%2Cuint64%2Cint%2Cstring">graphstore: proc traverseBfs(s: GraphStore; startNode: uint64; maxDepth: int; relType = &quot;&quot;): seq[
     uint64]</a></li>
           </ul></dd>
+<dt><a name="truncate" href="#truncate"><span>truncate:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="wal: proc truncate(w: var Wal)" href="boogie/wal.html#truncate%2CWal">wal: proc truncate(w: var Wal)</a></li>
+          </ul></dd>
 <dt><a name="unlisten" href="#unlisten"><span>unlisten:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="signals: proc unlisten(h: ListenerHandle)" href="boogie/signals.html#unlisten%2CListenerHandle">signals: proc unlisten(h: ListenerHandle)</a></li>
@@ -1313,6 +1323,10 @@
 <li><a class="reference external"
           data-doc-search-tag="wal: object WalError" href="boogie/wal.html#WalError">wal: object WalError</a></li>
           </ul></dd>
+<dt><a name="walFileSize" href="#walFileSize"><span>walFileSize:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="wal: proc walFileSize(w: Wal): int64" href="boogie/wal.html#walFileSize%2CWal">wal: proc walFileSize(w: Wal): int64</a></li>
+          </ul></dd>
 <dt><a name="WalMagic" href="#WalMagic"><span>WalMagic:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: const WalMagic" href="boogie/wal.html#WalMagic">wal: const WalMagic</a></li>
@@ -1348,6 +1362,10 @@
 <dt><a name="withSlotWrite" href="#withSlotWrite"><span>withSlotWrite:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="concurrency: template withSlotWrite[T](slot: TableSlot[T]; body: untyped)" href="boogie/concurrency.html#withSlotWrite.t%2CTableSlot%5BT%5D%2Cuntyped">concurrency: template withSlotWrite[T](slot: TableSlot[T]; body: untyped)</a></li>
+          </ul></dd>
+<dt><a name="withWalLock" href="#withWalLock"><span>withWalLock:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="concurrency: template withWalLock[T](cc: ConcurrentState[T]; body: untyped)" href="boogie/concurrency.html#withWalLock.t%2CConcurrentState%5BT%5D%2Cuntyped">concurrency: template withWalLock[T](cc: ConcurrentState[T]; body: untyped)</a></li>
           </ul></dd>
 <dt><a name="woCreateTable" href="#woCreateTable"><span>woCreateTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -1387,7 +1405,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-16 12:13:07 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-17 12:47:46 UTC</small>
       </div>
     </div>
   </div>

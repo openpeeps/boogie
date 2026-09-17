@@ -149,6 +149,18 @@
   <li><a class="reference" href="#reset%2CWal" title="reset(w: var Wal)">reset(w: var Wal)</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">rewriteEntries
+  <li><a class="reference" href="#rewriteEntries%2CWal%2CopenArray%5BWalEntry%5D" title="rewriteEntries(w: var Wal; entries: openArray[WalEntry])">rewriteEntries(w: var Wal; entries: openArray[WalEntry])</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">truncate
+  <li><a class="reference" href="#truncate%2CWal" title="truncate(w: var Wal)">truncate(w: var Wal)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">walFileSize
+  <li><a class="reference" href="#walFileSize%2CWal" title="walFileSize(w: Wal): int64">walFileSize(w: Wal): int64</a></li>
+
+</ul>
 
     </ul>
   </details>
@@ -422,6 +434,45 @@
 </div>
 
 </div>
+<div id="rewriteEntries-procs-all">
+  <div id="rewriteEntries,Wal,openArray[WalEntry]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#rewriteEntries%2CWal%2CopenArray%5BWalEntry%5D"><span class="Identifier">rewriteEntries</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#Wal"><span class="Identifier">Wal</span></a><span class="Other">;</span> <span class="Identifier">entries</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><a href="#WalEntry"><span class="Identifier">WalEntry</span></a><span class="Other">]</span><span class="Other">)</span> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
+    <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Atomically replaces the log file with exactly <tt class="docutils literal"><span class="pre"><span class="Identifier">entries</span></span></tt> (crash-safe via tmp file + rename, so a crash leaves the previous log intact). <tt class="docutils literal"><span class="pre"><span class="Identifier">nextLsn</span></span></tt> is left untouched: callers assign LSNs continuing from it, so LSNs stay monotonic across the rewrite. Pending entries are dropped by the caller beforehand (they must already be reflected in <tt class="docutils literal"><span class="pre"><span class="Identifier">entries</span></span></tt>). Callers must hold whatever lock serializes concurrent appends.
+    
+  </dd>
+</div>
+
+</div>
+<div id="truncate-procs-all">
+  <div id="truncate,Wal">
+  <dt><pre><span class="Keyword">proc</span> <a href="#truncate%2CWal"><span class="Identifier">truncate</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#Wal"><span class="Identifier">Wal</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span>
+                            <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Drops all log records, keeping <tt class="docutils literal"><span class="pre"><span class="Identifier">nextLsn</span></span></tt> monotonic. Only safe right after the logged state was made durable elsewhere (e.g. an RDBMS snapshot): recovery skips entries at or below the snapshot's checkpoint LSN, so the truncated prefix is redundant. A crash between the snapshot and this call just replays the old log over the snapshot.
+    
+  </dd>
+</div>
+
+</div>
+<div id="walFileSize-procs-all">
+  <div id="walFileSize,Wal">
+  <dt><pre><span class="Keyword">proc</span> <a href="#walFileSize%2CWal"><span class="Identifier">walFileSize</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <a href="#Wal"><span class="Identifier">Wal</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int64</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span>
+                                  <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span>
+                                  <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    On-disk size of the WAL file in bytes (0 when absent). Used to decide when a checkpoint should also compact or truncate the log.
+    
+  </dd>
+</div>
+
+</div>
 
   </dl>
 </div>
@@ -464,7 +515,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-16 12:13:07 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-17 12:47:46 UTC</small>
       </div>
     </div>
   </div>

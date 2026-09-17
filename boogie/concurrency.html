@@ -185,6 +185,10 @@
   <li><a class="reference" href="#withSlotWrite.t%2CTableSlot%5BT%5D%2Cuntyped" title="withSlotWrite[T](slot: TableSlot[T]; body: untyped)">withSlotWrite[T](slot: TableSlot[T]; body: untyped)</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">withWalLock
+  <li><a class="reference" href="#withWalLock.t%2CConcurrentState%5BT%5D%2Cuntyped" title="withWalLock[T](cc: ConcurrentState[T]; body: untyped)">withWalLock[T](cc: ConcurrentState[T]; body: untyped)</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">writeWith
   <li><a class="reference" href="#writeWith.t%2CRwLock%2Cuntyped" title="writeWith(a: var RwLock; body: untyped)">writeWith(a: var RwLock; body: untyped)</a></li>
 
@@ -548,6 +552,17 @@
 </div>
 
 </div>
+<div id="withWalLock-templates-all">
+  <div id="withWalLock.t,ConcurrentState[T],untyped">
+  <dt><pre><span class="Keyword">template</span> <a href="#withWalLock.t%2CConcurrentState%5BT%5D%2Cuntyped"><span class="Identifier">withWalLock</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">cc</span><span class="Other">:</span> <a href="#ConcurrentState"><span class="Identifier">ConcurrentState</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">body</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">)</span></pre></dt>
+  <dd>
+    
+    Serializes against concurrent WAL appends (<tt class="docutils literal"><span class="pre"><span class="Identifier">appendWal</span></span></tt>/<tt class="docutils literal"><span class="pre"><span class="Identifier">flushWal</span></span></tt> take the same lock). Used for log maintenance such as compaction, which must not interleave with an append. Never hold a slot write lock while acquiring this (consumer takes slot-write then wal-lock); the safe order is slot-reads first, wal-lock second.
+    
+  </dd>
+</div>
+
+</div>
 <div id="writeWith-templates-all">
   <div id="writeWith.t,RwLock,untyped">
   <dt><pre><span class="Keyword">template</span> <a href="#writeWith.t%2CRwLock%2Cuntyped"><span class="Identifier">writeWith</span></a><span class="Other">(</span><span class="Identifier">a</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#RwLock"><span class="Identifier">RwLock</span></a><span class="Other">;</span> <span class="Identifier">body</span><span class="Other">:</span> <span class="Identifier">untyped</span><span class="Other">)</span></pre></dt>
@@ -569,7 +584,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-16 12:13:07 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-17 12:47:46 UTC</small>
       </div>
     </div>
   </div>
