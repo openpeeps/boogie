@@ -462,12 +462,12 @@
 </div>
 <div id="walFileSize-procs-all">
   <div id="walFileSize,Wal">
-  <dt><pre><span class="Keyword">proc</span> <a href="#walFileSize%2CWal"><span class="Identifier">walFileSize</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <a href="#Wal"><span class="Identifier">Wal</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int64</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span>
+  <dt><pre><span class="Keyword">proc</span> <a href="#walFileSize%2CWal"><span class="Identifier">walFileSize</span></a><span class="Other">(</span><span class="Identifier">w</span><span class="Other">:</span> <a href="#Wal"><span class="Identifier">Wal</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int64</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">]</span><span class="Other">,</span>
                                   <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span>
                                   <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    On-disk size of the WAL file in bytes (0 when absent). Used to decide when a checkpoint should also compact or truncate the log.
+    On-disk size of the WAL file in bytes (0 when absent). Used to decide when a checkpoint should also compact or truncate the log. Measured through a fresh read handle: stat-by-path goes stale on Windows while the append handle is open, which would hide growth from size budgets.
     
   </dd>
 </div>
@@ -515,7 +515,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-17 13:55:40 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-17 14:47:16 UTC</small>
       </div>
     </div>
   </div>

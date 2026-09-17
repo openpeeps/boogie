@@ -104,7 +104,7 @@
 <li>a crashing holder releases the lock automatically (the OS drops <tt class="docutils literal"><span class="pre"><span class="Identifier">flock</span></span></tt> with the file description), so there are no stale locks to break;</li>
 <li>nested opens of the same path inside ONE process share the lock via a process-local refcount (a second <tt class="docutils literal"><span class="pre"><span class="Identifier">flock</span></span></tt> from the same process on another fd could otherwise refuse/ deadlock), preserving the old single-process behavior (e.g. reopen-without-close in tests).</li>
 </ul>
-<p>In-memory stores pass no path and get no lock. On non-POSIX platforms the lock is a no-op (returns a zero handle).</p>
+<p>In-memory stores pass no path and get no lock. On unknown platforms (neither POSIX nor Windows) the lock is a no-op (returns a zero handle).</p>
 </p>
     <div class="section" id="7">
   <h1><a class="toc-backref" href="#7">Types</a></h1>
@@ -172,7 +172,7 @@
 <li><tt class="docutils literal"><span class="pre"><span class="Identifier">blocking</span> <span class="Operator">=</span> <span class="Identifier">true</span></span></tt> (default) waits until the lock is held, preserving the historical behavior. <tt class="docutils literal"><span class="pre"><span class="Identifier">blocking</span> <span class="Operator">=</span> <span class="Identifier">false</span></span></tt> tries once and raises <tt class="docutils literal"><span class="pre"><span class="Identifier">FileLockBusyError</span></span></tt> instead of waiting.</li>
 <li><tt class="docutils literal"><span class="pre"><span class="Identifier">timeoutMs</span> <span class="Operator">&gt;=</span> <span class="DecNumber">0</span></span></tt> bounds a blocking wait: polls with <tt class="docutils literal"><span class="pre"><span class="Identifier">LOCK_NB</span></span></tt> and raises <tt class="docutils literal"><span class="pre"><span class="Identifier">FileLockBusyError</span></span></tt> after the timeout expires. <tt class="docutils literal"><span class="pre"><span class="Operator">-</span><span class="DecNumber">1</span></span></tt> waits indefinitely.</li>
 </ul>
-<p>Same-process re-entry shares the held lock (refcounted). An exclusive holder already implies shared access, so requesting <tt class="docutils literal"><span class="pre"><span class="Identifier">lmShared</span></span></tt> while this process holds <tt class="docutils literal"><span class="pre"><span class="Identifier">lmExclusive</span></span></tt> just shares the handle. Requesting <tt class="docutils literal"><span class="pre"><span class="Identifier">lmExclusive</span></span></tt> while this process only holds <tt class="docutils literal"><span class="pre"><span class="Identifier">lmShared</span></span></tt> raises <tt class="docutils literal"><span class="pre"><span class="Identifier">FileLockError</span></span></tt> (a shared-to-exclusive upgrade cannot be done safely; close the read-only handle and reopen read-write instead). <tt class="docutils literal"><span class="pre"><span class="Identifier">lockPath</span></span></tt> itself is created if missing (its parent dir must exist). Returns a zero (nil-entry) handle on non-POSIX platforms.</p>
+<p>Same-process re-entry shares the held lock (refcounted). An exclusive holder already implies shared access, so requesting <tt class="docutils literal"><span class="pre"><span class="Identifier">lmShared</span></span></tt> while this process holds <tt class="docutils literal"><span class="pre"><span class="Identifier">lmExclusive</span></span></tt> just shares the handle. Requesting <tt class="docutils literal"><span class="pre"><span class="Identifier">lmExclusive</span></span></tt> while this process only holds <tt class="docutils literal"><span class="pre"><span class="Identifier">lmShared</span></span></tt> raises <tt class="docutils literal"><span class="pre"><span class="Identifier">FileLockError</span></span></tt> (a shared-to-exclusive upgrade cannot be done safely; close the read-only handle and reopen read-write instead). <tt class="docutils literal"><span class="pre"><span class="Identifier">lockPath</span></span></tt> itself is created if missing (its parent dir must exist). Returns a zero (nil-entry) handle on unknown platforms (neither POSIX nor Windows).</p>
 
     
   </dd>
@@ -202,7 +202,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-17 13:55:40 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-17 14:47:17 UTC</small>
       </div>
     </div>
   </div>
