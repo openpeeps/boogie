@@ -116,8 +116,11 @@ type
     cc: ConcurrentState[RdbWriteTask]
       ## Store-level concurrency state; nil unless `enableConcurrency = true`.
     lock: FileLock
-      ## Cross-process exclusive lock held for the store lifetime (disk mode).
-      ## A second process opening the same path blocks here instead of racing.
+      ## Cross-process lock held for the store lifetime (disk mode): exclusive
+      ## for writers, shared for `readOnly` opens.
+    readOnly*: bool
+      ## When true the store holds a shared lock, never writes to the
+      ## WAL/snapshot, and every mutating store-level proc raises.
 
   StoreError* = object of CatchableError
 
@@ -129,6 +132,10 @@ type
     kind: RdbWriteOp
     pk: string
     data: RowData
+
+proc ensureWritable(s: Store) =
+  if s.readOnly:
+    raise newException(StoreError, "store is read-only")
 
 # fwd declarations
 proc where*(t: DbTable, column: string, value: Value): seq[(string, RowData)]
@@ -164,7 +171,8 @@ proc newStore*(path: string, mode: StorageMode = smDisk,
     enableWal: bool = true, checkpointEveryOps: uint32 = 0'u32,
     walFlushEveryOps: uint32 = 1000'u32,
     walMaxBytes: uint32 = 64'u32 * 1024 * 1024,
-    enableConcurrency: static bool = false
+    enableConcurrency: static bool = false,
+    readOnly = false
   ): Store =
   ## Create a new Store instance. Use `smInMemory` for an in-memory
   ## store (no persistence) or `smDisk` for a disk-backed store.
@@ -182,6 +190,12 @@ proc newStore*(path: string, mode: StorageMode = smDisk,
   ##
   ## With `enableConcurrency = true` reads are concurrent per table and writes
   ## are serialized per table through a bounded worker pool (WAL-only durability).
+  ##
+  ## With `readOnly = true` (disk mode only) the store holds a shared
+  ## cross-process lock so concurrent reader processes can open the same path
+  ## without hanging. The open never writes to the WAL or snapshot, and every
+  ## mutating store-level proc raises. A read-only open still blocks while a
+  ## writer holds the path, and a writer still blocks while any reader holds it.
   var
     dbPath: string
     hasDb: bool
@@ -189,15 +203,22 @@ proc newStore*(path: string, mode: StorageMode = smDisk,
     walObj: Wal
     fLock: FileLock
 
+  when enableConcurrency:
+    if readOnly:
+      raise newException(StoreError, "readOnly is not supported with enableConcurrency")
+
   case mode
   of smInMemory:
+    if readOnly:
+      raise newException(StoreError, "readOnly requires disk mode")
     discard
   of smDisk:
     if path.len == 0:
       raise newException(StoreError, "path cannot be empty in disk mode")
     # Serialize whole-lifetime against other processes on this path BEFORE
-    # touching the snapshot or WAL (blocks until the holder closes).
-    fLock = acquireFileLock(path.changeFileExt(".lock"))
+    # touching the snapshot or WAL. Writers take exclusive; readers shared.
+    fLock = acquireFileLock(path.changeFileExt(".lock"),
+      if readOnly: lmShared else: lmExclusive)
     hasDb = true
     dbPath = path.changeFileExt(".db")
     if enableWal:
@@ -218,6 +239,7 @@ proc newStore*(path: string, mode: StorageMode = smDisk,
     walFlushEveryOps: walFlushEveryOps,
     walMaxBytes: walMaxBytes,
     lock: fLock,
+    readOnly: readOnly,
   )
 
   when enableConcurrency:
@@ -263,13 +285,14 @@ proc newStore*(path: string, mode: StorageMode = smDisk,
     raise
 
   let s = result
-  registerStoreFlush(cast[pointer](s), proc() {.gcsafe.} =
-    if s.hasWal:
-      if s.cc != nil:
-        s.cc.flushWal(s.wal, clear = false)
-      else:
-        s.wal.flushNoClear()
-  )
+  if not s.readOnly:
+    registerStoreFlush(cast[pointer](s), proc() {.gcsafe.} =
+      if s.hasWal:
+        if s.cc != nil:
+          s.cc.flushWal(s.wal, clear = false)
+        else:
+          s.wal.flushNoClear()
+    )
 
 proc newInMemoryStore*(): Store =
   ## Create a new in-memory store (no persistence, no WAL)
@@ -941,6 +964,7 @@ proc checkpoint*(s: Store) =
   ## WAL (entries at or below the snapshot LSN are redundant). Concurrent
   ## (WAL-only) stores flush the WAL and rewrite it from live state once it
   ## reaches `walMaxBytes`.
+  s.ensureWritable()
   if s.cc != nil:
     s.cc.flushWal(s.wal)
     if s.needsWalCompact():
@@ -956,10 +980,11 @@ proc checkpoint*(s: Store) =
 proc close*(s: Store) =
   ## Stops the write workers (if concurrent) and flushes the WAL.
   unregisterStoreFlush(cast[pointer](s))
-  if s.cc != nil:
-    s.cc.close(s.wal)
-  else:
-    s.flushWalIfNeeded(force = true)
+  if not s.readOnly:
+    if s.cc != nil:
+      s.cc.close(s.wal)
+    else:
+      s.flushWalIfNeeded(force = true)
   s.lock = FileLock()
 
 #
@@ -978,6 +1003,7 @@ proc getTable*(s: Store, name: string): Option[DbTable] =
 
 proc createTable*(s: Store, t: DbTable) =
   ## Create a new table in the store. This will write to the WAL and commit the transaction.
+  s.ensureWritable()
   if s.cc != nil:
     t.slot = newTableSlot[RdbWriteTask](cast[pointer](t))
     withMetaWrite(s.cc):
@@ -1000,6 +1026,7 @@ proc createTableIfNotExist*(s: Store, t: DbTable) =
 
 proc dropTable*(s: Store, name: string) =
   ## Drop a table from the store. This will write to the WAL and commit the transaction.
+  s.ensureWritable()
   if s.cc != nil:
     withMetaWrite(s.cc):
       for childName, child in s.tables.pairs:
@@ -1092,6 +1119,7 @@ proc insertRow*(s: Store, tableName: string, pk: string, data: RowData) =
   ## Insert a row into the specified table with the given primary key and data. This will
   ## write to the WAL and commit the transaction. The primary key can be empty for tables with
   ## serial PK mode, in which case it will be auto-generated
+  s.ensureWritable()
   if s.cc != nil:
     var slot: ptr TableSlot[RdbWriteTask]
     withMetaRead(s.cc):
@@ -1135,6 +1163,7 @@ proc insertRow*(t: DbTable, data: RowData): string =
   result = t.insertRowNoWal("", d)
 
 proc insertRow*(s: Store, tableName: string, data: RowData): string {.discardable.}=
+  s.ensureWritable()
   if s.cc != nil:
     var slot: ptr TableSlot[RdbWriteTask]
     withMetaRead(s.cc):
@@ -1180,6 +1209,7 @@ proc insertRow*(s: Store, tableName: string, data: RowData): string {.discardabl
 
 proc deleteRow*(s: Store, tableName: string, pk: string): bool {.discardable.} =
   ## Delete a row by primary key. Returns true if a row was deleted, false if not found
+  s.ensureWritable()
   if s.cc != nil:
     var slot: ptr TableSlot[RdbWriteTask]
     withMetaRead(s.cc):
@@ -1207,6 +1237,7 @@ proc updateRow*(s: Store, tableName: string, pk: string, data: RowData) =
   ## Replace an existing row identified by `pk` with `data`. The payload is the
   ## complete new row; callers doing partial updates are expected to fetch,
   ## merge and pass back the full row. Concurrency slots are not supported yet.
+  s.ensureWritable()
   if s.cc != nil:
     raise newException(StoreError, "updateRow is not supported in concurrent mode yet")
   if unlikely(not s.tables.hasKey(tableName)):
@@ -1320,11 +1351,13 @@ proc recoverFromWal*(s: Store) =
  
   # After recovery, flush WAL and checkpoint to ensure
   # a clean state on disk with no pending WAL entries.
-  s.flushWalIfNeeded(force = true)
+  # Read-only opens skip every write: recovery is replay-only.
+  if not s.readOnly:
+    s.flushWalIfNeeded(force = true)
 
-  # Only checkpoint if we loaded a snapshot or applied WAL entries.
-  # If neither happened, we can skip the snapshot write and just reset pendingOps.
-  s.saveSnapshotIfEnabled()
+    # Only checkpoint if we loaded a snapshot or applied WAL entries.
+    # If neither happened, we can skip the snapshot write and just reset pendingOps.
+    s.saveSnapshotIfEnabled()
   s.pendingOps = 0'u32
   s.pendingWalOps = 0'u32
 

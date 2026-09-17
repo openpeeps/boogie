@@ -90,10 +90,17 @@ type
     cc: ConcurrentState[VecWriteTask]
       ## Store-level concurrency state; nil unless `enableConcurrency = true`.
     lock: FileLock
-      ## Cross-process exclusive lock held for the store lifetime (disk mode).
-      ## A second process opening the same path blocks here instead of racing.
+      ## Cross-process lock held for the store lifetime (disk mode): exclusive
+      ## for writers, shared for `readOnly` opens.
+    readOnly*: bool
+      ## When true the store holds a shared lock, never writes to the
+      ## WAL/snapshot, and every mutating proc raises.
 
   VectorStoreError* = object of CatchableError
+
+proc ensureWritable(s: VectorStore) =
+  if s.readOnly:
+    raise newException(VectorStoreError, "store is read-only")
     ## Custom exception type for errors related to the vector store operations,
     ## such as invalid input, collection not found, or WAL issues.
 
@@ -347,6 +354,7 @@ proc checkpoint*(s: VectorStore) =
   ## Manually triggers a checkpoint by flushing the WAL and saving a snapshot to disk, ensuring that all
   ## committed operations are persisted and the WAL is truncated up to the checkpoint LSN. This can be used
   ## to reduce recovery time after a crash by minimizing the number of WAL entries that need to be replayed.
+  s.ensureWritable()
   if s.cc != nil:
     s.cc.flushWal(s.wal)
     return
@@ -359,10 +367,11 @@ proc checkpoint*(s: VectorStore) =
 proc close*(s: VectorStore) =
   ## Stops the write workers (if concurrent) and flushes the WAL.
   unregisterStoreFlush(cast[pointer](s))
-  if s.cc != nil:
-    s.cc.close(s.wal)
-  else:
-    s.flushWalIfNeeded(force = true)
+  if not s.readOnly:
+    if s.cc != nil:
+      s.cc.close(s.wal)
+    else:
+      s.flushWalIfNeeded(force = true)
   s.lock = FileLock()
 
 proc applyWalEntry(s: VectorStore, e: WalEntry) =
@@ -405,17 +414,24 @@ proc recoverFromWal*(s: VectorStore) =
       s.applyWalEntry(e)
       s.checkpointLsn = e.lsn
 
-  s.flushWalIfNeeded(force = true)
-  s.saveSnapshotIfEnabled()
+  if not s.readOnly:
+    s.flushWalIfNeeded(force = true)
+    s.saveSnapshotIfEnabled()
   s.pendingOps = 0'u32
   s.pendingWalOps = 0'u32
 
 proc newVectorStore*(path: string, mode: VectorStorageMode = smDisk, enableWal: bool = true,
           checkpointEveryOps: uint32 = 0'u32, walFlushEveryOps: uint32 = 1000'u32,
-          enableConcurrency: static bool = false): VectorStore =
+          enableConcurrency: static bool = false,
+          readOnly = false): VectorStore =
   ## Creates a new `VectorStore` instance with the specified storage mode, WAL settings,
   ## and checkpointing configuration. With `enableConcurrency = true` reads are concurrent
   ## per collection and writes are serialized per collection through a bounded worker pool.
+  ##
+  ## With `readOnly = true` (disk mode only) the store holds a shared
+  ## cross-process lock so concurrent reader processes can open the same path
+  ## without hanging. The open never writes to the WAL or snapshot, and every
+  ## mutating proc raises.
   var
     dbPath: string
     hasDb: bool
@@ -423,15 +439,22 @@ proc newVectorStore*(path: string, mode: VectorStorageMode = smDisk, enableWal: 
     walObj: Wal
     fLock: FileLock
 
+  when enableConcurrency:
+    if readOnly:
+      raise newException(VectorStoreError, "readOnly is not supported with enableConcurrency")
+
   case mode
   of smInMemory:
+    if readOnly:
+      raise newException(VectorStoreError, "readOnly requires disk mode")
     discard
   of smDisk:
     if path.len == 0:
       raise newException(VectorStoreError, "path cannot be empty in disk mode")
     # Serialize whole-lifetime against other processes on this path BEFORE
-    # touching the snapshot or WAL (blocks until the holder closes).
-    fLock = acquireFileLock(path.changeFileExt(".lock"))
+    # touching the snapshot or WAL. Writers take exclusive; readers shared.
+    fLock = acquireFileLock(path.changeFileExt(".lock"),
+      if readOnly: lmShared else: lmExclusive)
     hasDb = true
 
   when enableConcurrency:
@@ -453,6 +476,7 @@ proc newVectorStore*(path: string, mode: VectorStorageMode = smDisk, enableWal: 
     checkpointEveryOps: checkpointEveryOps,
     walFlushEveryOps: walFlushEveryOps,
     lock: fLock,
+    readOnly: readOnly,
   )
 
   when enableConcurrency:
@@ -493,13 +517,14 @@ proc newVectorStore*(path: string, mode: VectorStorageMode = smDisk, enableWal: 
     raise
 
   let s = result
-  registerStoreFlush(cast[pointer](s), proc() {.gcsafe.} =
-    if s.hasWal:
-      if s.cc != nil:
-        s.cc.flushWal(s.wal, clear = false)
-      else:
-        s.wal.flushNoClear()
-  )
+  if not s.readOnly:
+    registerStoreFlush(cast[pointer](s), proc() {.gcsafe.} =
+      if s.hasWal:
+        if s.cc != nil:
+          s.cc.flushWal(s.wal, clear = false)
+        else:
+          s.wal.flushNoClear()
+    )
 
 proc newInMemoryVectorStore*: VectorStore =
   ## Convenience procedure to create a new in-memory vector store without
@@ -509,6 +534,7 @@ proc newInMemoryVectorStore*: VectorStore =
 proc createCollection*(s: VectorStore, c: VectorCollection) =
   ## Creates a new collection in the vector store with the specified name and dimension,
   ## logging the operation in the WAL if enabled
+  s.ensureWritable()
   if s.cc != nil:
     c.slot = newTableSlot[VecWriteTask](cast[pointer](c))
     withMetaWrite(s.cc):
@@ -525,6 +551,7 @@ proc createCollection*(s: VectorStore, c: VectorCollection) =
 proc dropCollection*(s: VectorStore, name: string) =
   ## Drops the specified collection from the vector store,
   ## logging the operation in the WAL if enabled
+  s.ensureWritable()
   if s.cc != nil:
     withMetaWrite(s.cc):
       s.dropCollectionNoWal(name)
@@ -542,6 +569,7 @@ proc insert*(s: VectorStore, collection, pk: string, vec: seq[float32], partitio
   ## validated against the collection's dimension, and the operation is logged in the WAL if enabled.
   ## An optional `partition` groups the vector into a named locality scope that `nearest` can
   ## restrict a search to (like a KoutenDB ring), bounding the scanned candidate set.
+  s.ensureWritable()
   if s.cc != nil:
     var slot: ptr TableSlot[VecWriteTask]
     withMetaRead(s.cc):
@@ -564,6 +592,7 @@ proc delete*(s: VectorStore, collection, pk: string): bool =
   ## Delete a vector from the specified collection by primary key (pk). The operation
   ## is logged in the WAL if enabled. Returns true if successfully deleted,
   ## false if the pk was not found.
+  s.ensureWritable()
   if s.cc != nil:
     var slot: ptr TableSlot[VecWriteTask]
     withMetaRead(s.cc):

@@ -2,11 +2,18 @@
 # Modes:
 #   hupkill <dir>  - put N keys with a huge flush interval (nothing durable),
 #                    print READY, then sleep until killed. Used with SIGHUP
-#                    (crashsafe flushes, process survives) followed by SIGKILL
-#                    (no cleanup possible): surviving data proves the HUP
-#                    handler flushed.
+#                    (crashsafe flushes, then the process DIES by SIGHUP since
+#                    nobody else listens for it) followed by SIGKILL (a no-op
+#                    once dead; kept to prove no cleanup is needed): surviving
+#                    data proves the HUP handler flushed before terminating.
+#   hupsurvive <dir> - same setup, but opts out via setTerminateSignals({}):
+#                    SIGHUP flushes and the process SURVIVES. The parent
+#                    asserts aliveness, then SIGKILLs; reopened data proves
+#                    the HUP-time flush.
 #   term <dir>     - same setup, but exits gracefully on SIGTERM via a custom
-#                    listener (marker file + close + quit 0).
+#                    listener (marker file + close + quit 0). The custom
+#                    listener suppresses crashsafe's terminate-on-signal, so
+#                    the host owns the outcome.
 #   custom <dir>   - waits for SIGUSR1 (raw number) and SIGUSR2 (enum), writes
 #                    a marker per signal, then exits 0.
 #   segv <dir>      - put N keys unflushed, print READY, then die with a real
@@ -16,6 +23,7 @@
 import std/[os, strutils, atomics]
 import ../../src/boogie/stores/kv
 import ../../src/boogie/signals
+import ../../src/boogie/crashsafe
 
 when defined(posix):
   import std/posix as ops
@@ -42,6 +50,16 @@ proc modeHupkill(dir: string) =
   while true:
     sleep(200)
     # Keep the store alive; reference it so it is not optimized away.
+    if kv.len < 0:
+      quit(1)
+
+proc modeHupSurvive(dir: string) =
+  # Opt out of flush-then-terminate: HUP flushes but the process lives on.
+  setTerminateSignals({})
+  let kv = putUnflushed(dir)
+  ready()
+  while true:
+    sleep(200)
     if kv.len < 0:
       quit(1)
 
@@ -95,11 +113,12 @@ proc modeSegv(dir: string) =
 
 proc main() =
   if paramCount() < 2:
-    quit("usage: worker_signal <hupkill|term|custom|segv> <dir>", 1)
+    quit("usage: worker_signal <hupkill|hupsurvive|term|custom|segv> <dir>", 1)
   let mode = paramStr(1)
   let dir = paramStr(2)
   case mode
   of "hupkill": modeHupkill(dir)
+  of "hupsurvive": modeHupSurvive(dir)
   of "term": modeTerm(dir)
   of "custom": modeCustom(dir)
   of "segv": modeSegv(dir)

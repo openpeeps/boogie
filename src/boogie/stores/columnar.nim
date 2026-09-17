@@ -85,8 +85,15 @@ type
     walFlushEveryOps*: int
     pendingOps*: int
     lock: FileLock
-      ## Cross-process exclusive lock held while the store is alive. A second
-      ## process opening the same root blocks here instead of racing.
+      ## Cross-process lock held while the store is alive: exclusive for
+      ## writers, shared for `readOnly` opens.
+    readOnly*: bool
+      ## When true the store holds a shared lock, never writes to the
+      ## WAL/snapshot, and every mutating proc raises.
+
+proc ensureWritable(s: ColumnarStore) =
+  if s.readOnly:
+    raise newException(ColumnarError, "store is read-only")
 
 proc tablesRoot(s: ColumnarStore): string = s.rootDir / "tables"
 proc tableDir(s: ColumnarStore, table: string): string = s.tablesRoot / table
@@ -271,14 +278,16 @@ proc maybeFlushWal(s: var ColumnarStore) =
     s.pendingOps = 0
 
 proc checkpoint*(s: var ColumnarStore) =
+  s.ensureWritable()
   s.wal.flush()
   s.wal.reset()
   s.pendingOps = 0
 
 proc close*(s: var ColumnarStore) =
   ## Flushes pending WAL writes and releases the cross-process lock.
-  s.wal.flush()
-  s.pendingOps = 0
+  if not s.readOnly:
+    s.wal.flush()
+    s.pendingOps = 0
   s.lock = FileLock()
 
 proc createTableInternal(s: var ColumnarStore, schema: TableSchema, emitWal: bool, sync: bool) =
@@ -411,25 +420,40 @@ proc recoverFromWal(s: var ColumnarStore) =
     of woDeleteRow, woUpdateRow:
       discard
 
-  # clear replayed log to prevent reapplication on next open.
-  s.checkpoint()
+  # Clear replayed log to prevent reapplication on next open.
+  # Read-only opens must never reset the shared WAL, so they skip this.
+  if not s.readOnly:
+    s.checkpoint()
 
-proc openColumnarStore*(rootDir: string, walPath: string = "", walFlushEveryOps: int = 100): ColumnarStore =
+proc openColumnarStore*(rootDir: string, walPath: string = "", walFlushEveryOps: int = 100,
+    readOnly = false): ColumnarStore =
   ## Open or create a columnar store at the given root directory. If walPath is
   ## provided, use that for the WAL file; otherwise, use a default path under rootDir.
   ## The walFlushEveryOps parameter controls how many operations can be buffered in
   ## memory before an automatic flush to disk is triggered.
+  ##
+  ## With `readOnly = true` the store holds a shared cross-process lock so
+  ## concurrent reader processes can open the same root without hanging. The
+  ## open never resets the WAL, and every mutating proc raises. Note: replay
+  ## still applies pending WAL entries to the on-disk column files, so
+  ## read-only opens are only safe when no writer is active and the WAL was
+  ## checkpointed (the default `sync = true` writes checkpoint every op).
+  if readOnly and not dirExists(rootDir):
+    raise newException(ColumnarError, "readOnly requires an existing path: " & rootDir)
   result.rootDir = rootDir
   result.tables = initTable[string, ColumnarTable]()
   result.walFlushEveryOps = max(1, walFlushEveryOps)
   result.pendingOps = 0
+  result.readOnly = readOnly
 
-  ensureDir(rootDir)
-  ensureDir(result.tablesRoot)
+  if not readOnly:
+    ensureDir(rootDir)
+    ensureDir(result.tablesRoot)
 
-  # Serialize against other processes on this root BEFORE touching the WAL
-  # (blocks until the holder closes).
-  result.lock = acquireFileLock(rootDir / "boogie.lock")
+  # Serialize against other processes on this root BEFORE touching the WAL.
+  # Writers take exclusive; readers shared.
+  result.lock = acquireFileLock(rootDir / "boogie.lock",
+    if readOnly: lmShared else: lmExclusive)
 
   # A failed open must release the lock deterministically: unwinding past a
   # raise this deep does not reliably run the FileLock destructors, which
@@ -458,12 +482,15 @@ proc openColumnarStore*(rootDir: string, walPath: string = "", walFlushEveryOps:
     raise
 
 proc createTable*(s: var ColumnarStore, schema: TableSchema, sync: bool = true) =
+  s.ensureWritable()
   s.createTableInternal(schema, emitWal = true, sync = sync)
 
 proc dropTable*(s: var ColumnarStore, table: string, sync: bool = true) =
+  s.ensureWritable()
   s.dropTableInternal(table, emitWal = true, sync = sync)
 
 proc insertBatch*(s: var ColumnarStore, table: string, rows: seq[JsonNode], sync: bool = true) =
+  s.ensureWritable()
   s.insertBatchInternal(table, rows, emitWal = true, sync = sync)
 
 proc scan*(s: ColumnarStore, table: string,

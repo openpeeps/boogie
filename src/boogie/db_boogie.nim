@@ -56,22 +56,47 @@ proc newDbConn(store: Store): DbConn =
   result = DbConn(store: store)
   result.eng = newSqlEngine(store)
 
-proc open*(connection, user, password, database: string): DbConn =
+proc open*(connection, user, password, database: string,
+    readOnly = false): DbConn =
   ## Opens a database. `connection` is the store path; passing ":memory:"
-  ## creates a non-persistent in-memory store. The remaining arguments exist
-  ## for API compatibility with other db_connector drivers and are ignored.
+  ## creates a non-persistent in-memory store. The `user`, `password` and
+  ## `database` arguments exist for API compatibility with other db_connector
+  ## drivers and are ignored.
+  ##
+  ## With `readOnly = true` the underlying store holds a shared
+  ## cross-process lock, so concurrent reader processes can open the same path
+  ## without hanging. Writes through the connection raise. A trailing
+  ## `"?readonly"` / `"?readonly=1"` on the connection string implies
+  ## `readOnly = true`.
   try:
     if connection == ":memory:":
+      if readOnly:
+        dbError("readOnly requires a disk-backed path, not :memory:")
       result = newDbConn(newInMemoryStore())
     else:
-      result = newDbConn(newStore(connection))
+      var path = connection
+      var ro = readOnly
+      let q = path.find('?')
+      if q >= 0:
+        let opts = path[q + 1 .. ^1].toLowerAscii()
+        path = path[0 ..< q]
+        if opts == "readonly" or opts == "readonly=1":
+          ro = true
+      result = newDbConn(newStore(path, readOnly = ro))
   except CatchableError as e:
     dbError(e.msg)
 
+proc openReadOnly*(connection, user, password, database: string): DbConn =
+  ## Opens a database read-only: equivalent to `open` with `readOnly = true`.
+  ## Concurrent reader processes can share the same path without hanging.
+  open(connection, user, password, database, readOnly = true)
+
 proc close*(db: DbConn) =
   ## Closes the database, flushing pending WAL writes and taking a checkpoint
+  ## (skipped for read-only connections, which never write).
   if db != nil:
-    db.store.checkpoint()
+    if not db.store.readOnly:
+      db.store.checkpoint()
     db.store.close()
 
 proc dbQuote(s: string): string =

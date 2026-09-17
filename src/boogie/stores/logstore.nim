@@ -103,14 +103,21 @@ type
       ## there until the next flush lands them on disk.
     cache: LruCache
     lock: FileLock
-      ## Cross-process exclusive lock held for the store lifetime (disk mode).
-      ## A second process opening the same path blocks here instead of racing.
+      ## Cross-process lock held for the store lifetime (disk mode): exclusive
+      ## for writers, shared for `readOnly` opens.
+    readOnly*: bool
+      ## When true the store holds a shared lock, never appends to the WAL,
+      ## and every mutating proc raises.
 
 const FooterSize = 9'i64
   ## Size of the `<tag> <u64 lastLsn>` footer every WAL flush appends
 
 proc fail(msg: string) {.noreturn.} =
   raise newException(LogStoreError, msg)
+
+proc ensureWritable(s: LogStore) =
+  if s.readOnly:
+    fail("store is read-only")
 
 #
 # payload framing: `<u64 LE tsUnix> <user payload>`, so precise per-record
@@ -289,8 +296,9 @@ proc recoverFromWal*(s: LogStore) =
       fail("non-contiguous sequence number " & $seqNum & " in stream " & e.table)
     slot[].offsets.add(off)
     s.indexTs(e.table, seqNum, ts)
-  if s.hasDisk:
-    # everything recovered from disk is durable; appends continue at EOF
+  if s.hasDisk and not s.readOnly:
+    # everything recovered from disk is durable; appends continue at EOF.
+    # Read-only opens never append, so they leave the cursor untouched.
     s.cursor = s.wal.logPos()
     s.durableUpTo = s.cursor
 
@@ -299,7 +307,8 @@ proc recoverFromWal*(s: LogStore) =
 #
 proc openLogStore*(path: string, name = "logs",
                    walFlushEveryOps: uint32 = 1000'u32,
-                   cacheCapacity = 1024): LogStore =
+                   cacheCapacity = 1024,
+                   readOnly = false): LogStore =
   ## Opens a disk-backed log store at `path`, creating the directory if needed.
   ## If the store was opened before, all stream indexes are rebuilt from the
   ## existing log and subsequent appends continue after the last sequence
@@ -307,15 +316,22 @@ proc openLogStore*(path: string, name = "logs",
   ##
   ## `walFlushEveryOps` controls how many appends may accumulate before a
   ## group commit; `cacheCapacity` bounds the LRU record cache (0 disables it).
+  ##
+  ## With `readOnly = true` the store holds a shared cross-process lock so
+  ## concurrent reader processes can open the same path without hanging. The
+  ## open never appends to the WAL and every mutating proc raises.
   if path.len == 0:
     fail("path cannot be empty")
   if not dirExists(path):
+    if readOnly:
+      fail("readOnly requires an existing path: " & path)
     createDir(path)
 
   let base = path / name
   # Serialize whole-lifetime against other processes on this path BEFORE
-  # touching the WAL (blocks until the holder closes).
-  let fLock = acquireFileLock(base.changeFileExt(".lock"))
+  # touching the WAL. Writers take exclusive; readers shared.
+  let fLock = acquireFileLock(base.changeFileExt(".lock"),
+    if readOnly: lmShared else: lmExclusive)
   result = LogStore(
     name: name,
     wal: openWal(base),
@@ -324,6 +340,7 @@ proc openLogStore*(path: string, name = "logs",
     pendingWalOps: 0'u32,
     cache: newLruCache(cacheCapacity),
     lock: fLock,
+    readOnly: readOnly,
   )
   # A failed open must release the lock deterministically: unwinding past a
   # raise this deep does not reliably run the FileLock destructors for
@@ -332,7 +349,8 @@ proc openLogStore*(path: string, name = "logs",
   # Catch-all: the lock must be released no matter what (even a Defect from
   # corrupt input); the original exception is re-raised untouched.
   try:
-    openLog(result.wal)
+    if not result.readOnly:
+      openLog(result.wal)
     result.reader = openLogReader(result.wal)
     result.recoverFromWal()
   except:
@@ -342,6 +360,8 @@ proc openLogStore*(path: string, name = "logs",
     raise
 
   let store = result
+  if store.readOnly:
+    return result
   registerStoreFlush(cast[pointer](store), proc() {.gcsafe.} =
     store.wal.flushNoClear()
   )
@@ -360,6 +380,7 @@ proc newInMemoryLogStore*(): LogStore =
 proc checkpoint*(s: LogStore) =
   ## Flushes all pending appends to disk. With no snapshot file, checkpoints
   ## only bound how much of the log remains vulnerable to a crash.
+  s.ensureWritable()
   s.flushWalIfNeeded(force = true)
 
 proc close*(s: LogStore) =
@@ -368,7 +389,8 @@ proc close*(s: LogStore) =
   unregisterStoreFlush(cast[pointer](s))
   if s.hasDisk:
     try:
-      s.flushWalIfNeeded(force = true)
+      if not s.readOnly:
+        s.flushWalIfNeeded(force = true)
     finally:
       s.reader.close()
   s.lock = FileLock()
@@ -379,6 +401,7 @@ proc close*(s: LogStore) =
 proc createStream*(s: LogStore, stream: string) =
   ## Explicitly creates an empty stream. Appends auto-create streams, so this
   ## is only needed to pin down existence up front. Raises if it already exists.
+  s.ensureWritable()
   if stream.len == 0:
     fail("stream name cannot be empty")
   if s.streams.hasKey(stream) or s.memRecords.hasKey(stream):
@@ -407,6 +430,7 @@ proc append*(s: LogStore, stream: string, payload: string,
   ## With `sync = true` the WAL is flushed before returning; otherwise the
   ## write joins the current group commit batch (still immediately visible
   ## to reads). Records are immutable once written.
+  s.ensureWritable()
   if stream.len == 0:
     fail("stream name cannot be empty")
   let ts = if tsUnix == 0'i64: getTime().toUnix() else: tsUnix

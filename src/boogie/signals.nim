@@ -77,7 +77,7 @@ type
     ## via `installFatalHandler`, which run in handler context and must only
     ## use async-signal-safe operations.
 
-proc signalNumber*(s: OsSignal): cint =
+proc signalNumber*(s: OsSignal): cint {.gcsafe.} =
   ## Numeric signal value on the current platform. Raises `SignalError` for
   ## platform-only signals used on the wrong platform.
   when defined(macosx) or defined(freebsd) or defined(netbsd) or
@@ -162,6 +162,21 @@ proc registry(): SigRegistry =
 
 # ------------------------------------------------- platform delivery ---
 
+proc dropOnceListeners(r: SigRegistry, signo: int, ids: openArray[int]) =
+  ## Removes `once` subscriptions by id. Idempotent with a concurrent
+  ## `unlisten` (a missing id is a no-op). Shared by the posix and Windows
+  ## dispatch loops.
+  acquire(r.mu)
+  if r.listeners.hasKey(signo):
+    for id in ids:
+      var i = 0
+      while i < r.listeners[signo].len:
+        if r.listeners[signo][i].id == id:
+          r.listeners[signo].delete(i)
+          break
+        inc i
+  release(r.mu)
+
 when defined(posix):
   var SA_RESTART {.importc: "SA_RESTART", header: "<signal.h>".}: cint
   var gPipeRd: cint = -1
@@ -175,21 +190,26 @@ when defined(posix):
 
   proc dispatch(r: SigRegistry, signo: int) =
     var cbs: seq[SignalCallback] = @[]
+    var onceIds: seq[int] = @[]
     acquire(r.mu)
     if r.listeners.hasKey(signo):
-      # Snapshot + drop once-listeners while holding the lock; invoke outside.
-      var keep: seq[SignalListener] = @[]
+      # Snapshot while holding the lock; invoke outside. Once-listeners are
+      # removed AFTER the callback loop (not before) so that competing
+      # callbacks within the same dispatch still observe each other — e.g.
+      # crashsafe's terminate check must see a host `once` listener that is
+      # about to handle the signal.
       for li in r.listeners[signo]:
         cbs.add(li.cb)
-        if not li.once:
-          keep.add(li)
-      r.listeners[signo] = keep
+        if li.once:
+          onceIds.add(li.id)
     release(r.mu)
     for cb in cbs:
       try:
         cb(cint(signo))
       except CatchableError, Defect:
         discard
+    if onceIds.len > 0:
+      r.dropOnceListeners(signo, onceIds)
 
   proc watcherLoop(r: SigRegistry) {.thread.} =
     var buf: array[32, byte]
@@ -289,20 +309,21 @@ elif defined(windows):
   proc dispatchWin(signo: int) =
     let r = registry()
     var cbs: seq[SignalCallback] = @[]
+    var onceIds: seq[int] = @[]
     acquire(r.mu)
     if r.listeners.hasKey(signo):
-      var keep: seq[SignalListener] = @[]
       for li in r.listeners[signo]:
         cbs.add(li.cb)
-        if not li.once:
-          keep.add(li)
-      r.listeners[signo] = keep
+        if li.once:
+          onceIds.add(li.id)
     release(r.mu)
     for cb in cbs:
       try:
         cb(cint(signo))
       except CatchableError, Defect:
         discard
+    if onceIds.len > 0:
+      r.dropOnceListeners(signo, onceIds)
 
   proc ctrlHook() {.noconv.} =
     dispatchWin(2) # synthetic SIGINT
@@ -330,7 +351,9 @@ proc listenRawSignal*(signo: int, cb: SignalCallback): ListenerHandle =
   ListenerHandle(signo: signo, id: id, alive: true)
 
 proc listenRawSignalOnce*(signo: int, cb: SignalCallback): ListenerHandle =
-  ## Like `listenRawSignal` but the callback fires at most once.
+  ## Like `listenRawSignal` but the callback fires at most once (per
+  ## dispatch; a callback that synchronously re-emits its own signal from
+  ## inside itself is unsupported and may refire).
   let r = registry()
   acquire(r.mu)
   let id = r.nextId
@@ -429,6 +452,25 @@ proc watchedSignals*(): seq[int] =
   for k in r.armed.keys:
     result.add(k)
   release(r.mu)
+
+proc countSignalListeners*(signo: int): int =
+  ## Number of live subscriptions for `signo` (OS listeners and pure
+  ## in-process channels alike). Used by `boogie/crashsafe` to decide whether
+  ## its internal termination-signal handler owns the signal outright (no
+  ## host-registered listener competes) or must defer to the host.
+  let r = registry()
+  acquire(r.mu)
+  if r.listeners.hasKey(signo):
+    result = r.listeners[signo].len
+  release(r.mu)
+
+proc countSignalListeners*(s: OsSignal): int =
+  ## Enum overload of `countSignalListeners`. Returns 0 for platform-only
+  ## signals used on the wrong platform.
+  try:
+    countSignalListeners(int(s.signalNumber))
+  except SignalError:
+    0
 
 # ------------------------------------------------------ fatal path ---
 

@@ -70,11 +70,20 @@ type
     slot: TableSlot[KvWriteTask]
       ## The store's single table slot; nil unless `enableConcurrency = true`.
     lock: FileLock
-      ## Cross-process exclusive lock held for the store lifetime (disk mode).
-      ## A second process opening the same path blocks here instead of racing.
+      ## Cross-process lock held for the store lifetime (disk mode): exclusive
+      ## for writers, shared for `readOnly` opens. Shared holders allow any
+      ## number of concurrent reader processes; a writer still excludes
+      ## everyone.
+    readOnly*: bool
+      ## When true the store was opened read-only: it holds a shared lock,
+      ## never writes to the WAL/snapshot, and every mutating proc raises.
 
 const
   KvTableName = "__kv__"
+
+proc ensureWritable(s: KvStore) =
+  if s.readOnly:
+    raise newException(KvStoreError, "store is read-only")
 
 proc recoverFromWal*(s: KvStore)
 
@@ -190,7 +199,8 @@ proc applyWalEntry(s: KvStore, e: WalEntry) =
 #
 proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = true,
         checkpointEveryOps: uint32 = 0'u32, walFlushEveryOps: uint32 = 1000'u32,
-        lazyReads = false, enableConcurrency: static bool = false): KvStore =
+        lazyReads = false, enableConcurrency: static bool = false,
+        readOnly = false): KvStore =
   ## Creates a new key-value store. If `mode` is `ksmDisk`, a file-based
   ## store is created at the given `path`. If `enableWal` is true, write-ahead
   ## logging is enabled for durability. The `checkpointEveryOps` parameter controls
@@ -206,6 +216,13 @@ proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = 
   ## and writes are serialized through a bounded worker pool (synchronous
   ## visibility, async batched WAL durability). Concurrent mode is WAL-only
   ## (no snapshots).
+  ##
+  ## With `readOnly = true` (disk mode only) the store holds a shared
+  ## cross-process lock instead of an exclusive one, so any number of reader
+  ## processes can open the same path concurrently. The open never writes to
+  ## the WAL or snapshot, and every mutating proc (`put`, `delete`,
+  ## `checkpoint`) raises. A read-only open still blocks while a writer holds
+  ## the path, and a writer still blocks while any reader holds it.
   var
     dbPath: string
     hasDb: bool
@@ -213,15 +230,23 @@ proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = 
     walObj: Wal
     fLock: FileLock
 
+  when enableConcurrency:
+    if readOnly:
+      raise newException(KvStoreError, "readOnly is not supported with enableConcurrency")
+
   case mode
   of ksmInMemory:
+    if readOnly:
+      raise newException(KvStoreError, "readOnly requires disk mode")
     discard
   of ksmDisk:
     if path.len == 0:
       raise newException(KvStoreError, "path cannot be empty in disk mode")
     # Serialize whole-lifetime against other processes on this path BEFORE
-    # touching the snapshot or WAL (blocks until the holder closes).
-    fLock = acquireFileLock(path.changeFileExt(".lock"))
+    # touching the snapshot or WAL. Writers take an exclusive lock; read-only
+    # opens take a shared lock so concurrent readers do not hang.
+    fLock = acquireFileLock(path.changeFileExt(".lock"),
+      if readOnly: lmShared else: lmExclusive)
     hasDb = not lazyReads
     dbPath = path.changeFileExt(".db")
     if enableWal:
@@ -244,6 +269,7 @@ proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = 
     lazyReads: lazyReads,
     valueOffsets: initTable[string, int64](),
     lock: fLock,
+    readOnly: readOnly,
   )
 
   when enableConcurrency:
@@ -284,13 +310,14 @@ proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = 
     raise
 
   let s = result
-  registerStoreFlush(cast[pointer](s), proc() {.gcsafe.} =
-    if s.hasWal:
-      if s.cc != nil:
-        s.cc.flushWal(s.wal, clear = false)
-      else:
-        s.wal.flushNoClear()
-  )
+  if not s.readOnly:
+    registerStoreFlush(cast[pointer](s), proc() {.gcsafe.} =
+      if s.hasWal:
+        if s.cc != nil:
+          s.cc.flushWal(s.wal, clear = false)
+        else:
+          s.wal.flushNoClear()
+    )
 
 proc newInMemoryKvStore*(): KvStore =
   ## Creates a new in-memory key-value store with no persistence or WAL.
@@ -302,6 +329,7 @@ proc checkpoint*(s: KvStore) =
   ## ensure that all operations up to the current LSN are persisted to disk,
   ## which can speed up recovery time in case of a crash. If WAL is enabled,
   ## the WAL is flushed before taking the snapshot to ensure durability.
+  s.ensureWritable()
   if s.cc != nil:
     s.cc.flushWal(s.wal)
     return
@@ -314,16 +342,18 @@ proc checkpoint*(s: KvStore) =
 proc close*(s: KvStore) =
   ## Stops the write workers (if concurrent) and flushes the WAL.
   unregisterStoreFlush(cast[pointer](s))
-  if s.cc != nil:
-    s.cc.close(s.wal)
-  else:
-    s.flushWalIfNeeded(force = true)
+  if not s.readOnly:
+    if s.cc != nil:
+      s.cc.close(s.wal)
+    else:
+      s.flushWalIfNeeded(force = true)
   s.lock = FileLock()
 
 proc put*(s: KvStore, key, value: string) =
   ## Inserts or updates the value for the given key. If WAL is enabled,
   ## the operation is first appended to the WAL before being applied to
   ## the in-memory store. The checkpoint LSN is updated accordingly.
+  s.ensureWritable()
   if s.cc != nil:
     let mySeq = s.cc.submit(s.slot, KvWriteTask(kind: woPut, key: key, value: value))
     s.slot.waitApplied(mySeq)
@@ -374,6 +404,7 @@ proc delete*(s: KvStore, key: string): bool {.discardable.} =
   ## operation is first appended to the WAL before being applied to the in-memory store.
   ## 
   ## Returns true if the key was found and deleted, false if the key was not found.
+  s.ensureWritable()
   if s.cc != nil:
     let mySeq = s.cc.submit(s.slot, KvWriteTask(kind: woDelete, key: key))
     s.slot.waitApplied(mySeq)
@@ -460,8 +491,9 @@ proc recoverFromWal*(s: KvStore) =
         else:
           raise newException(KvStoreError, "WAL replay: unsupported op for kvstore: " & $e.op)
         s.checkpointLsn = e.lsn
-    s.wal.openLog()
-    s.flushWalIfNeeded(force = true)
+    if not s.readOnly:
+      s.wal.openLog()
+      s.flushWalIfNeeded(force = true)
     s.pendingOps = 0'u32
     s.pendingWalOps = 0'u32
     return
@@ -475,7 +507,8 @@ proc recoverFromWal*(s: KvStore) =
       s.applyWalEntry(e)
       s.checkpointLsn = e.lsn
 
-  s.flushWalIfNeeded(force = true)
-  s.saveSnapshotIfEnabled()
+  if not s.readOnly:
+    s.flushWalIfNeeded(force = true)
+    s.saveSnapshotIfEnabled()
   s.pendingOps = 0'u32
   s.pendingWalOps = 0'u32

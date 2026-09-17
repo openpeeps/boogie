@@ -12,10 +12,12 @@ when defined(posix):
 # be thread-safe (atomics below, never bare `var` captures).
 # - relay unit tests (listen/emit/once/unlisten/custom channels)
 # - in-process self-delivery of SIGUSR1
-# - multi-process: SIGHUP flushes unflushed WAL (proves the crashsafe signal
-#   path: the worker is SIGKILLed right after, so only a HUP-time flush could
-#   have persisted the data), SIGTERM exits gracefully via a custom listener,
-#   and custom signals (raw SIGUSR1 + enum SIGUSR2) reach user callbacks.
+# - multi-process: SIGHUP flushes unflushed WAL then terminates the worker
+#   (nobody else listens, so crashsafe owns the outcome — a lingering worker
+#   here is the hung-shell bug); the opt-out (setTerminateSignals({}))
+#   flushes but survives; SIGTERM exits gracefully via a custom listener
+#   (which suppresses termination); and custom signals (raw SIGUSR1 + enum
+#   SIGUSR2) reach user callbacks.
 # Run with: clue test
 # ---------------------------------------------------------------------------
 
@@ -152,15 +154,18 @@ when defined(posix):
           raise newException(CatchableError, "worker did not exit in time")
       p.peekExitCode
 
-    test "SIGHUP flushes unflushed WAL (SIGKILL afterwards proves it)":
+    test "SIGHUP flushes unflushed WAL then terminates the process":
       let root = testRoot()
       var p = spawnWorker("hupkill", root)
       waitReady(p)
       sleep(300) # let all puts land in the group-commit buffer
       discard ops.kill(Pid(p.processID), ops.SIGHUP)
-      sleep(1000) # let the watcher-thread flush land on disk
-      discard ops.kill(Pid(p.processID), ops.SIGKILL) # no cleanup possible past this point
+      # Nobody else listens for SIGHUP, so crashsafe terminates after
+      # flushing: the worker must exit PROMPTLY on its own (a hang here is
+      # the terminal-tab-close bug — the process must die, not linger).
       discard waitExitOk(p)
+      check not p.running
+      discard ops.kill(Pid(p.processID), ops.SIGKILL) # no-op once dead
       p.close()
       let kv = newKvStore(root / "sig", ksmDisk, enableWal = true)
       var count = 0
@@ -169,6 +174,22 @@ when defined(posix):
           inc count
       check count == 3
       check kv.len == 300
+      kv.close()
+
+    test "SIGHUP opt-out via setTerminateSignals({}) flushes but survives":
+      let root = testRoot()
+      var p = spawnWorker("hupsurvive", root)
+      waitReady(p)
+      sleep(300)
+      discard ops.kill(Pid(p.processID), ops.SIGHUP)
+      sleep(1000) # let the watcher-thread flush land on disk
+      check p.running # opt-out: still alive after SIGHUP
+      discard ops.kill(Pid(p.processID), ops.SIGKILL) # no cleanup possible past this point
+      discard waitExitOk(p)
+      p.close()
+      let kv = newKvStore(root / "sig", ksmDisk, enableWal = true)
+      check kv.len == 300
+      check kv.get("k299").isSome
       kv.close()
 
     test "SIGTERM runs a custom listener and exits gracefully":

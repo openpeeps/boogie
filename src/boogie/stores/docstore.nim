@@ -52,11 +52,18 @@ type
     walFlushEveryOps: uint32
     pendingWalOps: uint32
     lock: FileLock
-      ## Cross-process exclusive lock held while the store is alive. A second
-      ## process opening the same path blocks here instead of racing.
+      ## Cross-process lock held while the store is alive: exclusive for
+      ## writers, shared for `readOnly` opens.
+    readOnly*: bool
+      ## When true the store holds a shared lock, never writes to the
+      ## WAL/snapshot, and every mutating proc raises.
 
 proc fail(msg: string) {.noreturn.} =
   raise newException(DocumentStoreError, msg)
+
+proc ensureWritable(store: DocumentStore) =
+  if store.readOnly:
+    fail("store is read-only")
 
 proc writeTextAtomic(path, content: string) =
   let tmp = path & ".tmp"
@@ -188,8 +195,9 @@ proc recoverFromWal*(s: var DocumentStore) =
     s.applyWalEntry(e)
     s.checkpointLsn = e.lsn
 
-  s.flushWalIfNeeded(force = true)
-  s.saveSnapshotIfEnabled()
+  if not s.readOnly:
+    s.flushWalIfNeeded(force = true)
+    s.saveSnapshotIfEnabled()
   s.pendingOps = 0'u32
   s.pendingWalOps = 0'u32
 
@@ -197,18 +205,26 @@ proc openDocumentStore*(path: string, name = "documents",
                   defaultEncoding = deJson,
                   enableSnapshots = true,
                   checkpointEveryOps: uint32 = 1000'u32,
-                  walFlushEveryOps: uint32 = 1000'u32): DocumentStore =
+                  walFlushEveryOps: uint32 = 1000'u32,
+                  readOnly = false): DocumentStore =
   ## Opens a document store with the given name at the specified path.
-  ## 
+  ##
   ## If the WAL file already exists, it will be replayed to reconstruct the in-memory state of the store.
   ## The default encoding for documents can be set to either JSON or BSON.
+  ##
+  ## With `readOnly = true` the store holds a shared cross-process lock so
+  ## concurrent reader processes can open the same path without hanging. The
+  ## open never writes to the WAL or snapshot, and every mutating proc raises.
   if path.len > 0 and not dirExists(path):
+    if readOnly:
+      fail("readOnly requires an existing path: " & path)
     createDir(path)
 
   let base = path / name
   # Serialize whole-lifetime against other processes on this path BEFORE
-  # touching the WAL (blocks until the holder closes).
-  let fLock = acquireFileLock(base.changeFileExt(".lock"))
+  # touching the WAL. Writers take exclusive; readers shared.
+  let fLock = acquireFileLock(base.changeFileExt(".lock"),
+    if readOnly: lmShared else: lmExclusive)
   result = DocumentStore(
     name: name,
     wal: openWal(base),
@@ -222,6 +238,7 @@ proc openDocumentStore*(path: string, name = "documents",
     walFlushEveryOps: walFlushEveryOps,
     pendingWalOps: 0'u32,
     lock: fLock,
+    readOnly: readOnly,
   )
   # A failed open must release the lock deterministically: unwinding past a
   # raise this deep does not reliably run the FileLock destructors for
@@ -239,6 +256,7 @@ proc openDocumentStore*(path: string, name = "documents",
 
 proc checkpoint*(store: var DocumentStore) =
   ## Force snapshot checkpoint.
+  store.ensureWritable()
   store.flushWalIfNeeded(force = true)
   store.saveSnapshotIfEnabled()
   store.pendingOps = 0'u32
@@ -246,7 +264,8 @@ proc checkpoint*(store: var DocumentStore) =
 proc close*(store: var DocumentStore) =
   ## Flushes pending WAL writes, checkpoints the snapshot and releases the
   ## cross-process lock.
-  store.checkpoint()
+  if not store.readOnly:
+    store.checkpoint()
   store.lock = FileLock()
 
 proc len*(store: DocumentStore): int =
@@ -269,9 +288,10 @@ proc insert*(store: var DocumentStore, key: string, doc: JsonNode,
   ## Inserts a new document with the given key. If a document with the same key already exists,
   ## this will fail with an error. Use `upsert` if you want to insert or update a document
   ## without checking for existence.
-  ## 
+  ##
   ## The document is encoded using the specified encoding (JSON or BSON) and stored in the WAL
   ## for durability. The in-memory state is updated after the WAL entry is successfully appended.
+  store.ensureWritable()
   if store.docs.hasKey(key):
     fail("Duplicate key: " & key)
   let payload = encodePayload(doc, enc)
@@ -283,6 +303,7 @@ proc upsert*(store: var DocumentStore, key: string, doc: JsonNode,
           sync = true, enc: DocumentEncoding = deJson) =
   ## Inserts or updates a document with the given key. If the key already exists,
   ## it will be updated with the new document.
+  store.ensureWritable()
   let payload = encodePayload(doc, enc)
   let op = if store.docs.hasKey(key): woUpdateRow else: woInsertRow
   let lsn = store.appendWal(op, key, payload, sync)
@@ -292,6 +313,7 @@ proc upsert*(store: var DocumentStore, key: string, doc: JsonNode,
 proc delete*(store: var DocumentStore, key: string, sync = true): bool =
   ## Deletes the document with the given key. Returns true if the document
   ## was found and deleted, false if the key was not found.
+  store.ensureWritable()
   if not store.docs.hasKey(key):
     return false
   let lsn = store.appendWal(woDeleteRow, key, "", sync)
@@ -339,8 +361,9 @@ proc writeBSONDocument*(store: DocumentStore, key, path: string,
 
 proc openBSONDocument*(store: var DocumentStore, key, path: string, sync = true): bool {.discardable.} =
   ## Reads a BSON document from a file and upserts it into the store with the given key.
-  ## 
+  ##
   ## Returns true if the file was found and read, false if the file does not exist.
+  store.ensureWritable()
   if not fileExists(path):
     return false
   let d = bson.openBSONDocument(path)

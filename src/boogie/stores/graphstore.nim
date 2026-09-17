@@ -59,8 +59,11 @@ type
     wal*: Wal
     mu: RwLock
     lock: FileLock
-      ## Cross-process exclusive lock held for the store lifetime. A second
-      ## process opening the same root blocks here instead of racing.
+      ## Cross-process lock held for the store lifetime: exclusive for
+      ## writers, shared for `readOnly` opens.
+    readOnly*: bool
+      ## When true the store holds a shared lock, never writes to the
+      ## WAL/snapshot, and `beginTx`/`closeGraphStore` raise/skip writes.
 
     nextNodeId: uint64
     nextRelId: uint64
@@ -506,18 +509,24 @@ proc checkpointNoLock(s: GraphStore) =
 # Public API
 #
 var graphStoreRwLock = createRwLock()
-proc openGraphStore*(rootDir: string): GraphStore =
+proc openGraphStore*(rootDir: string, readOnly = false): GraphStore =
   ## Opens or creates a graph store at the specified root directory. The graph store
   ## will load any existing snapshot and WAL entries to reconstruct the in-memory graph state.
-  ## 
-  ## If the directory does not exist, it will be created. The returned `GraphStore` object can be used
-  ## to perform graph operations and transactions.
+  ##
+  ## If the directory does not exist, it will be created (writers only).
+  ## With `readOnly = true` the store holds a shared cross-process lock so
+  ## concurrent reader processes can open the same root without hanging. The
+  ## open never writes to the WAL or snapshot, and `beginTx` raises.
+  if readOnly and not dirExists(rootDir):
+    raise newException(GraphError, "readOnly requires an existing path: " & rootDir)
   createDir(rootDir)
   new(result)
   result.rootDir = rootDir
+  result.readOnly = readOnly
   # Serialize whole-lifetime against other processes on this root BEFORE
-  # touching the snapshot or WAL (blocks until the holder closes).
-  result.lock = acquireFileLock(rootDir / "boogie.lock")
+  # touching the snapshot or WAL. Writers take exclusive; readers shared.
+  result.lock = acquireFileLock(rootDir / "boogie.lock",
+    if readOnly: lmShared else: lmExclusive)
   # A failed open must release the lock deterministically: unwinding past a
   # raise this deep does not reliably run the FileLock destructors, which
   # would leave a stale entry in the process lock table (and a wedged
@@ -541,18 +550,23 @@ proc openGraphStore*(rootDir: string): GraphStore =
       for e in s.wal.entries:
         applyWalEntryNoLock(s, e)
         replayed = true
-      if replayed:
+      # Read-only opens are replay-only: never write back a snapshot or
+      # reset the WAL (that would race other shared holders).
+      if replayed and not s.readOnly:
         checkpointNoLock(s)
   except:
     result.lock = FileLock()
     raise
 
 proc closeGraphStore*(s: GraphStore) =
-  writeWith graphStoreRwLock:
-    checkpointNoLock(s)
+  if not s.readOnly:
+    writeWith graphStoreRwLock:
+      checkpointNoLock(s)
   s.lock = FileLock()
 
 proc beginTx*(s: GraphStore): GraphTx =
+  if s.readOnly:
+    raise newException(GraphError, "store is read-only")
   GraphTx(store: s, ops: @[], finished: false)
 
 proc rollback*(tx: var GraphTx) =
