@@ -333,6 +333,10 @@ proc ensureLog(w: var Wal): File =
   if w.log == nil:
     w.log = new(LogFile)
     w.log.handle = open(w.path, fmAppend)
+    # MSVCRT leaves ftell at 0 on a fresh append handle (glibc seeks to
+    # EOF), which corrupts every offset derived from logPos(). Seek to end
+    # so the handle starts positioned at EOF on every platform.
+    w.log.handle.setFilePos(0, fspEnd)
   w.log.handle
 
 proc openLog*(w: var Wal) =
@@ -469,11 +473,17 @@ proc reset*(w: var Wal) =
 
 proc walFileSize*(w: Wal): int64 =
   ## On-disk size of the WAL file in bytes (0 when absent). Used to decide
-  ## when a checkpoint should also compact or truncate the log.
+  ## when a checkpoint should also compact or truncate the log. Measured
+  ## through a fresh read handle: stat-by-path goes stale on Windows while
+  ## the append handle is open, which would hide growth from size budgets.
   if fileExists(w.path):
-    getFileSize(w.path)
+    let f = open(w.path, fmRead)
+    try:
+      result = getFileSize(f)
+    finally:
+      f.close()
   else:
-    0'i64
+    result = 0'i64
 
 proc truncate*(w: var Wal) =
   ## Drops all log records, keeping `nextLsn` monotonic. Only safe right

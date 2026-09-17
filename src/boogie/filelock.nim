@@ -25,8 +25,8 @@
 ##   fd could otherwise refuse/ deadlock), preserving the old single-process
 ##   behavior (e.g. reopen-without-close in tests).
 ##
-## In-memory stores pass no path and get no lock. On non-POSIX platforms the
-## lock is a no-op (returns a zero handle).
+## In-memory stores pass no path and get no lock. On unknown platforms
+## (neither POSIX nor Windows) the lock is a no-op (returns a zero handle).
 
 import std/[tables, locks, os, times, monotimes]
 
@@ -41,6 +41,20 @@ when defined(posix):
     FlockNb = 4.cint
     FSetFd = 2.cint
     FdCloExec = 1.cint
+
+when defined(windows):
+  import std/winlean
+  import std/widestrs
+  proc wLockFileEx(hFile: Handle, dwFlags, dwReserved, nLow, nHigh: DWORD,
+      lpOverlapped: POVERLAPPED): WINBOOL {.stdcall, dynlib: "kernel32",
+    importc: "LockFileEx".}
+  proc wUnlockFileEx(hFile: Handle, dwReserved, nLow, nHigh: DWORD,
+      lpOverlapped: POVERLAPPED): WINBOOL {.stdcall, dynlib: "kernel32",
+    importc: "UnlockFileEx".}
+  const
+    WinLockExclusive = 2'i32
+    WinLockFailImmediately = 1'i32
+    WinLockWhole = cast[DWORD](0xFFFFFFFF'u32)
 
 type
   FileLockError* = object of CatchableError
@@ -58,9 +72,12 @@ type
     ## One OS lock per canonical path per process. Shared by every `FileLock`
     ## handle for that path; closed when the last handle dies.
     path: string
-    fh: File
     refs: int
     mode: LockMode
+    when defined(posix):
+      fh: File
+    elif defined(windows):
+      hFile: Handle
 
   FileLock* = object
     ## Handle to a held lock. A zero `FileLock` holds nothing. Copying shares
@@ -80,7 +97,7 @@ proc canonical(p: string): string =
 # NOTE: lifecycle hooks must precede the first construction/destruction of the
 # type in this module, otherwise the compiler binds an implicit hook instead.
 proc `=destroy`*(l: var FileLock) =
-  when defined(posix):
+  when defined(posix) or defined(windows):
     if l.entry.isNil:
       return
     # Each handle detaches once. The entry may already be gone (fully released
@@ -88,30 +105,70 @@ proc `=destroy`*(l: var FileLock) =
     # detach when the table still holds OUR entry.
     let path = l.entry.path
     let self = cast[pointer](l.entry)
-    var fh: File
     var done = false
+    when defined(posix):
+      var fh: File
+    elif defined(windows):
+      var h: Handle
     acquire(flMu)
     try:
       if flHolds.hasKey(path) and cast[pointer](flHolds[path]) == self:
         dec flHolds[path].refs
         if flHolds[path].refs <= 0:
-          fh = flHolds[path].fh
+          when defined(posix):
+            fh = flHolds[path].fh
+          elif defined(windows):
+            h = flHolds[path].hFile
           flHolds.del(path)
           done = true
     finally:
       release(flMu)
     if done:
-      fh.close()
+      when defined(posix):
+        fh.close()
+      elif defined(windows):
+        var ov: OVERLAPPED
+        zeroMem(addr ov, sizeof(ov))
+        discard wUnlockFileEx(h, 0, WinLockWhole, WinLockWhole, addr ov)
+        discard closeHandle(h)
 
-proc flockOp(mode: LockMode, nonblock: bool): cint =
-  when defined(posix):
+when defined(posix):
+  proc flockOp(mode: LockMode, nonblock: bool): cint =
     let base =
       case mode
       of lmShared: FlockSh
       of lmExclusive: FlockEx
     if nonblock: base or FlockNb else: base
-  else:
-    0.cint
+
+when defined(windows):
+  proc winLockFlags(mode: LockMode, nonblock: bool): DWORD =
+    var f = 0'i32
+    if mode == lmExclusive:
+      f = f or WinLockExclusive
+    if nonblock:
+      f = f or WinLockFailImmediately
+    f
+
+  proc winTryLock(h: Handle, mode: LockMode, nonblock: bool): bool =
+    var ov: OVERLAPPED
+    zeroMem(addr ov, sizeof(ov))
+    wLockFileEx(h, winLockFlags(mode, nonblock), 0,
+      WinLockWhole, WinLockWhole, addr ov) != 0
+
+  proc winUnlock(h: Handle) =
+    var ov: OVERLAPPED
+    zeroMem(addr ov, sizeof(ov))
+    discard wUnlockFileEx(h, 0, WinLockWhole, WinLockWhole, addr ov)
+
+  proc winOpenLockFile(canon: string): Handle =
+    ## Opens (creating if needed) the sidecar lockfile with full sharing so
+    ## a second process can open it too and block on the byte-range lock
+    ## instead of failing with a sharing violation. Non-inheritable so
+    ## spawned workers never pin our lock.
+    createFileW(newWideCString(canon),
+      GENERIC_READ or GENERIC_WRITE,
+      FILE_SHARE_READ or FILE_SHARE_WRITE or FILE_SHARE_DELETE,
+      nil, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, Handle(0))
 
 proc lockBusy(lockPath: string): ref FileLockBusyError =
   result = newException(FileLockBusyError, "database is locked: " & lockPath)
@@ -138,14 +195,9 @@ proc acquireFileLock*(lockPath: string, mode: LockMode = lmExclusive,
   ## `FileLockError` (a shared-to-exclusive upgrade cannot be done safely;
   ## close the read-only handle and reopen read-write instead).
   ## `lockPath` itself is created if missing (its parent dir must exist).
-  ## Returns a zero (nil-entry) handle on non-POSIX platforms.
-  when not defined(posix):
-    discard lockPath
-    discard mode
-    discard blocking
-    discard timeoutMs
-    return FileLock()
-  else:
+  ## Returns a zero (nil-entry) handle on unknown platforms (neither
+  ## POSIX nor Windows).
+  when defined(posix):
     let canon = canonical(lockPath)
     acquire(flMu)
     try:
@@ -213,6 +265,72 @@ proc acquireFileLock*(lockPath: string, mode: LockMode = lmExclusive,
     finally:
       release(flMu)
     FileLock(entry: e)
+  elif defined(windows):
+    let canon = canonical(lockPath)
+    acquire(flMu)
+    try:
+      if flHolds.hasKey(canon):
+        let e = flHolds[canon]
+        if e.mode == lmExclusive or e.mode == mode:
+          inc e.refs
+          return FileLock(entry: e)
+        raise newException(FileLockError,
+          "cannot upgrade shared lock to exclusive for: " & canon &
+          " (close the read-only handle first)")
+    finally:
+      release(flMu)
+    # Slow path: open (creating if needed) with full sharing, then take a
+    # whole-file LockFileEx range lock. The file content is irrelevant.
+    let h = winOpenLockFile(canon)
+    if h == INVALID_HANDLE_VALUE:
+      raise newException(FileLockError, "cannot open lockfile: " & canon)
+    if not blocking or timeoutMs == 0:
+      if not winTryLock(h, mode, true):
+        discard closeHandle(h)
+        raise lockBusy(canon)
+    elif timeoutMs < 0:
+      if not winTryLock(h, mode, false):
+        discard closeHandle(h)
+        raise newException(FileLockError, "cannot lock: " & canon)
+    else:
+      let deadline = getMonoTime() + initDuration(milliseconds = timeoutMs)
+      while true:
+        if winTryLock(h, mode, true):
+          break
+        if getMonoTime() >= deadline:
+          discard closeHandle(h)
+          raise lockBusy(canon)
+        sleep(10)
+    let e = LockEntry(path: canon, hFile: h, refs: 1, mode: mode)
+    acquire(flMu)
+    try:
+      # A concurrent same-process acquire may have won while we blocked: fold
+      # into it instead of holding two handles.
+      if flHolds.hasKey(canon):
+        let prev = flHolds[canon]
+        if prev.mode == lmExclusive or prev.mode == mode:
+          inc prev.refs
+          winUnlock(h)
+          discard closeHandle(h)
+          return FileLock(entry: prev)
+        # Same-process mode conflict (shared held, exclusive requested):
+        # drop the just-acquired OS lock and fail loudly so the caller
+        # notices the SH->EX misuse instead of silently replacing the entry.
+        winUnlock(h)
+        discard closeHandle(h)
+        raise newException(FileLockError,
+          "cannot upgrade shared lock to exclusive for: " & canon &
+          " (close the read-only handle first)")
+      flHolds[canon] = e
+    finally:
+      release(flMu)
+    FileLock(entry: e)
+  else:
+    discard lockPath
+    discard mode
+    discard blocking
+    discard timeoutMs
+    return FileLock()
 
 proc tryAcquireFileLock*(lockPath: string,
     mode: LockMode = lmExclusive): FileLock =

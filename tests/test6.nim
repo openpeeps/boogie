@@ -1,5 +1,5 @@
 import std/[unittest, os, times, options, json, strformat, monotimes]
-import pkg/boogie/stores/docstore
+import ../src/boogie/stores/docstore
 
 proc testRoot(): string =
   let unique = $getTime().toUnix() & "_" & $getMonoTime().ticks

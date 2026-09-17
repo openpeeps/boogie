@@ -89,21 +89,29 @@ suite "signals: relay (in-process)":
     h.unlisten()
 
   test "signal numbers match the platform":
-    check SignalHup.signalNumber == 1
-    check SignalInt.signalNumber == 2
-    check SignalTerm.signalNumber == 15
-    check SignalKill.signalNumber == 9
-    when defined(macosx) or defined(freebsd) or defined(netbsd) or
-         defined(openbsd) or defined(dragonfly):
-      check SignalUsr1.signalNumber == 30
-      check SignalUsr2.signalNumber == 31
-      check SignalBus.signalNumber == 10
-    elif defined(linux):
-      check SignalUsr1.signalNumber == 10
-      check SignalUsr2.signalNumber == 12
-      check SignalBus.signalNumber == 7
-      check rtSignal(0) == 34
-      check rtSignal(30) == 64
+    when defined(windows):
+      # Only Ctrl+C-like signals exist on Windows; the rest raise.
+      check SignalInt.signalNumber == 2
+      check SignalTerm.signalNumber == 15
+      check SignalKill.signalNumber == 9
+      expect(SignalError):
+        discard SignalHup.signalNumber
+    else:
+      check SignalHup.signalNumber == 1
+      check SignalInt.signalNumber == 2
+      check SignalTerm.signalNumber == 15
+      check SignalKill.signalNumber == 9
+      when defined(macosx) or defined(freebsd) or defined(netbsd) or
+           defined(openbsd) or defined(dragonfly):
+        check SignalUsr1.signalNumber == 30
+        check SignalUsr2.signalNumber == 31
+        check SignalBus.signalNumber == 10
+      elif defined(linux):
+        check SignalUsr1.signalNumber == 10
+        check SignalUsr2.signalNumber == 12
+        check SignalBus.signalNumber == 7
+        check rtSignal(0) == 34
+        check rtSignal(30) == 64
 
   test "platform-only signals raise":
     when defined(linux):

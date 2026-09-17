@@ -22,6 +22,15 @@ proc countRows(db: Store, table: string): int =
   for _ in db.getTable(table).get.allRows:
     inc result
 
+proc walSize(path: string): int64 =
+  ## Fresh-handle size: stat-by-path goes stale on Windows while the
+  ## store's append handle is open, hiding real growth/shrinkage.
+  let f = open(path, fmRead)
+  try:
+    result = getFileSize(f)
+  finally:
+    f.close()
+
 suite "wal bounds: checkpoint clears the log":
   test "non-concurrent checkpoint truncates the WAL, LSNs stay monotonic":
     let root = testRoot()
@@ -42,7 +51,7 @@ suite "wal bounds: checkpoint clears the log":
           "v": newTextValue("value-" & $i & "-0123456789abcdef")}))
       db.checkpoint()
       # snapshot holds the state; the log must be back to a bare header
-      check getFileSize(dbFile.changeFileExt(".wal")) < 1024
+      check walSize(dbFile.changeFileExt(".wal")) < 1024
       check db.getRow("items", "k0").isSome
       db.close()
     block:
@@ -55,7 +64,7 @@ suite "wal bounds: checkpoint clears the log":
           "id": newTextValue("k" & $i),
           "v": newTextValue("value-" & $i)}))
       db.checkpoint()
-      check getFileSize(dbFile.changeFileExt(".wal")) < 1024
+      check walSize(dbFile.changeFileExt(".wal")) < 1024
       db.close()
     block:
       var db = newStore(dbFile, smDisk, enableWal = true)
@@ -82,9 +91,9 @@ suite "wal bounds: checkpoint clears the log":
           "body": newTextValue("payload-" & $i & "-0123456789abcdef")}))
       for i in 1 .. 200:
         discard db.deleteRow("docs", $i)
-      let before = getFileSize(dbFile.changeFileExt(".wal"))
+      let before = walSize(dbFile.changeFileExt(".wal"))
       db.checkpoint()
-      let after = getFileSize(dbFile.changeFileExt(".wal"))
+      let after = walSize(dbFile.changeFileExt(".wal"))
       # dead entries (deleted rows + their deletes) are gone from the log
       check after < before
       check after < 1024 * 1024
