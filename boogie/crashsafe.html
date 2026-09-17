@@ -73,6 +73,10 @@
   <li><a class="reference" href="#registerStoreFlush%2Cpointer%2Cproc%29" title="registerStoreFlush(storeId: pointer; flush: proc () {.gcsafe.})">registerStoreFlush(storeId: pointer; flush: proc () {.gcsafe.})</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">setTerminateSignals
+  <li><a class="reference" href="#setTerminateSignals%2Cset%5BOsSignal%5D" title="setTerminateSignals(s: set[OsSignal])">setTerminateSignals(s: set[OsSignal])</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">unregisterStoreFlush
   <li><a class="reference" href="#unregisterStoreFlush%2Cpointer" title="unregisterStoreFlush(storeId: pointer)">unregisterStoreFlush(storeId: pointer)</a></li>
 
@@ -96,6 +100,7 @@
 <li>termination signals (SIGINT/SIGTERM/SIGHUP/SIGQUIT), delivered through <tt class="docutils literal"><span class="pre"><span class="Identifier">boogie</span><span class="Operator">/</span><span class="Identifier">signals</span></span></tt> to a watcher thread that flushes outside signal context,</li>
 <li>fatal signals (SIGSEGV/SIGABRT/SIGBUS/SIGILL/SIGFPE), via a best-effort in-handler flush that uses no allocator and never blocks on a busy lock, then re-raises with the default disposition (core dumps still work).</li>
 </ul>
+<p>Lifecycle signals (SIGHUP/SIGTERM/SIGQUIT by default, see <tt class="docutils literal"><span class="pre"><span class="Identifier">setTerminateSignals</span></span></tt>) are flush-then-terminate: after flushing, the process dies with the signal's default disposition — unless the host registered its own listener for that signal through <tt class="docutils literal"><span class="pre"><span class="Identifier">boogie</span><span class="Operator">/</span><span class="Identifier">signals</span></span></tt>, in which case boogie defers to the host and only flushes. A library must never silently convert &quot;terminate&quot; into &quot;keep running&quot;: swallowing SIGHUP hangs terminal tab-close for shells, and swallowing SIGTERM breaks <tt class="docutils literal"><span class="pre"><span class="Identifier">kill</span></span></tt>, <tt class="docutils literal"><span class="pre"><span class="Identifier">docker</span> <span class="Identifier">stop</span></span></tt>, launchd and systemd for every embedder. SIGINT always stays flush-and-continue (interactive Ctrl+C must not kill a REPL).</p>
 <p>Stores register themselves here at construction via <tt class="docutils literal"><span class="pre"><span class="Identifier">registerStoreFlush</span></span></tt>, passing a store identity pointer (the ref cast to pointer) and a <tt class="docutils literal"><span class="pre"><span class="Punctuation">{</span><span class="Operator">.</span><span class="Identifier">gcsafe</span><span class="Operator">.</span><span class="Punctuation">}</span></span></tt> closure that flushes that store. The closure keeps the store alive for the process lifetime; <tt class="docutils literal"><span class="pre"><span class="Identifier">close</span></span></tt> removes it.</p>
 <p>Usage is automatic: every store constructor calls <tt class="docutils literal"><span class="pre"><span class="Identifier">registerStoreFlush</span></span></tt> and <tt class="docutils literal"><span class="pre"><span class="Identifier">close</span></span></tt> calls <tt class="docutils literal"><span class="pre"><span class="Identifier">unregisterStoreFlush</span></span></tt>.</p>
 </p>
@@ -125,7 +130,7 @@
                               <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    Installs the normal-exit flush hook plus OS signal handlers, and is safe to call repeatedly. Termination signals (INT/TERM/HUP/QUIT) flush via the watcher thread; fatal signals (SEGV/ABRT/BUS/ILL/FPE) flush best-effort in handler context and re-raise. Without <tt class="docutils literal"><span class="pre"><span class="Operator">--</span><span class="Identifier">threads</span><span class="Punctuation">:</span><span class="Identifier">on</span></span></tt> only the exit hook is installed (signal delivery needs the watcher thread).
+    Installs the normal-exit flush hook plus OS signal handlers, and is safe to call repeatedly. Termination signals (INT/TERM/HUP/QUIT) flush via the watcher thread; HUP/TERM/QUIT then terminate the process unless the host registered its own listener (see the module docs and <tt class="docutils literal"><span class="pre"><span class="Identifier">setTerminateSignals</span></span></tt>). Fatal signals (SEGV/ABRT/BUS/ILL/FPE) flush best-effort in handler context and re-raise. Without <tt class="docutils literal"><span class="pre"><span class="Operator">--</span><span class="Identifier">threads</span><span class="Punctuation">:</span><span class="Identifier">on</span></span></tt> only the exit hook is installed (signal delivery needs the watcher thread).
     
   </dd>
 </div>
@@ -138,6 +143,17 @@
   <dd>
     
     Registers a store's WAL flush for crash/exit durability.
+    
+  </dd>
+</div>
+
+</div>
+<div id="setTerminateSignals-procs-all">
+  <div id="setTerminateSignals,set[OsSignal]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#setTerminateSignals%2Cset%5BOsSignal%5D"><span class="Identifier">setTerminateSignals</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <span class="Identifier">set</span><span class="Other">[</span><a href="signals.html#OsSignal"><span class="Identifier">OsSignal</span></a><span class="Other">]</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Overrides which lifecycle signals kill the process after flushing (see the module docs). Applies process-wide, effective immediately, and independent of call order with store opens. Pass <tt class="docutils literal"><span class="pre"><span class="Punctuation">{</span><span class="Punctuation">}</span></span></tt> to restore pure flush-and-continue for every signal (e.g. daemons with their own SIGHUP reload handling — arm yours after the first store open and call <tt class="docutils literal"><span class="pre"><span class="Identifier">flushAllStores</span><span class="Punctuation">(</span><span class="Punctuation">)</span></span></tt> in it).
     
   </dd>
 </div>
@@ -160,7 +176,7 @@
 <div class="section" id="19">
   <h1><a class="toc-backref" href="#19">Exports</a></h1>
   <dl class="item">
-    <a href="signals.html#SignalCallback"><span class="Identifier">SignalCallback</span></a>, <a href="signals.html#watchOsSignals,openArray[OsSignal]"><span class="Identifier">watchOsSignals</span></a>, <a href="signals.html#signalNumber,OsSignal"><span class="Identifier">signalNumber</span></a>, <a href="signals.html#SignalError"><span class="Identifier">SignalError</span></a>, <a href="signals.html#listenRawSignal,int,SignalCallback"><span class="Identifier">listenRawSignal</span></a>, <a href="signals.html#SigRtMax"><span class="Identifier">SigRtMax</span></a>, <a href="signals.html#emitSignal,int"><span class="Identifier">emitSignal</span></a>, <a href="signals.html#ListenerHandle"><span class="Identifier">ListenerHandle</span></a>, <a href="signals.html#rtSignal,int"><span class="Identifier">rtSignal</span></a>, <a href="signals.html#listenCustomOnce,int,SignalCallback"><span class="Identifier">listenCustomOnce</span></a>, <a href="signals.html#watchedSignals"><span class="Identifier">watchedSignals</span></a>, <a href="signals.html#listenSignalOnce,OsSignal,SignalCallback"><span class="Identifier">listenSignalOnce</span></a>, <a href="signals.html#unlisten,ListenerHandle"><span class="Identifier">unlisten</span></a>, <a href="signals.html#listenSignal,OsSignal,SignalCallback"><span class="Identifier">listenSignal</span></a>, <a href="signals.html#OsSignal"><span class="Identifier">OsSignal</span></a>, <a href="signals.html#SigRtMin"><span class="Identifier">SigRtMin</span></a>, <a href="signals.html#installFatalHandler,openArray[OsSignal],SignalCallback"><span class="Identifier">installFatalHandler</span></a>, <a href="signals.html#listenRawSignalOnce,int,SignalCallback"><span class="Identifier">listenRawSignalOnce</span></a>, <a href="signals.html#listenCustom,int,SignalCallback"><span class="Identifier">listenCustom</span></a>
+    <a href="signals.html#SignalCallback"><span class="Identifier">SignalCallback</span></a>, <a href="signals.html#watchOsSignals,openArray[OsSignal]"><span class="Identifier">watchOsSignals</span></a>, <a href="signals.html#signalNumber,OsSignal"><span class="Identifier">signalNumber</span></a>, <a href="signals.html#SignalError"><span class="Identifier">SignalError</span></a>, <a href="signals.html#listenRawSignal,int,SignalCallback"><span class="Identifier">listenRawSignal</span></a>, <a href="signals.html#SigRtMax"><span class="Identifier">SigRtMax</span></a>, <a href="signals.html#emitSignal,int"><span class="Identifier">emitSignal</span></a>, <a href="signals.html#ListenerHandle"><span class="Identifier">ListenerHandle</span></a>, <a href="signals.html#rtSignal,int"><span class="Identifier">rtSignal</span></a>, <a href="signals.html#listenCustomOnce,int,SignalCallback"><span class="Identifier">listenCustomOnce</span></a>, <a href="signals.html#watchedSignals"><span class="Identifier">watchedSignals</span></a>, <a href="signals.html#listenSignalOnce,OsSignal,SignalCallback"><span class="Identifier">listenSignalOnce</span></a>, <a href="signals.html#unlisten,ListenerHandle"><span class="Identifier">unlisten</span></a>, <a href="signals.html#listenSignal,OsSignal,SignalCallback"><span class="Identifier">listenSignal</span></a>, <a href="signals.html#OsSignal"><span class="Identifier">OsSignal</span></a>, <a href="signals.html#SigRtMin"><span class="Identifier">SigRtMin</span></a>, <a href="signals.html#installFatalHandler,openArray[OsSignal],SignalCallback"><span class="Identifier">installFatalHandler</span></a>, <a href="signals.html#countSignalListeners,OsSignal"><span class="Identifier">countSignalListeners</span></a>, <a href="signals.html#listenRawSignalOnce,int,SignalCallback"><span class="Identifier">listenRawSignalOnce</span></a>, <a href="signals.html#listenCustom,int,SignalCallback"><span class="Identifier">listenCustom</span></a>, <a href="signals.html#countSignalListeners,int"><span class="Identifier">countSignalListeners</span></a>
   </dl>
 </div>
 
@@ -170,7 +186,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-17 12:47:46 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-17 13:27:34 UTC</small>
       </div>
     </div>
   </div>

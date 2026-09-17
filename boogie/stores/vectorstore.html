@@ -68,7 +68,9 @@
   dimension*: int">VectorCollection</a></li>
 <li><a class="reference" href="#VectorStorageMode" title="VectorStorageMode = enum
   smInMemory, smDisk">VectorStorageMode</a></li>
-<li><a class="reference" href="#VectorStore" title="VectorStore = ref object">VectorStore</a></li>
+<li><a class="reference" href="#VectorStore" title="VectorStore = ref object
+  readOnly*: bool ## When true the store holds a shared lock, never writes to the
+                  ## WAL/snapshot, and every mutating proc raises.">VectorStore</a></li>
 <li><a class="reference" href="#VectorStoreError" title="VectorStoreError = object of CatchableError">VectorStoreError</a></li>
 
     </ul>
@@ -148,10 +150,10 @@
   <li><a class="reference" href="#newVectorStore%2Cstring%2CVectorStorageMode%2Cbool%2Cuint32%2Cuint32%2Cstaticbool" title="newVectorStore(path: string; mode: VectorStorageMode = smDisk;
                enableWal: bool = true; checkpointEveryOps: uint32 = 0'u32;
                walFlushEveryOps: uint32 = 1000'u32;
-               enableConcurrency: static bool = false): VectorStore">newVectorStore(path: string; mode: VectorStorageMode = smDisk;
+               enableConcurrency: static bool = false; readOnly = false): VectorStore">newVectorStore(path: string; mode: VectorStorageMode = smDisk;
                enableWal: bool = true; checkpointEveryOps: uint32 = 0'u32;
                walFlushEveryOps: uint32 = 1000'u32;
-               enableConcurrency: static bool = false): VectorStore</a></li>
+               enableConcurrency: static bool = false; readOnly = false): VectorStore</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">partitionSize
@@ -235,7 +237,9 @@
   </dd>
 </div>
 <div id="VectorStore">
-  <dt><pre><a href="#VectorStore"><span class="Identifier">VectorStore</span></a> <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span></pre></dt>
+  <dt><pre><a href="#VectorStore"><span class="Identifier">VectorStore</span></a> <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span>
+  <span class="Identifier">readOnly</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Comment">## When true the store holds a shared lock, never writes to the</span>
+                  <span class="Comment">## WAL/snapshot, and every mutating proc raises.</span></pre></dt>
   <dd>
     
     The main data structure for the vector store, containing multiple collections of vectors
@@ -246,7 +250,7 @@
   <dt><pre><a href="#VectorStoreError"><span class="Identifier">VectorStoreError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <span class="Identifier">CatchableError</span></pre></dt>
   <dd>
     
-    Custom exception type for errors related to the vector store operations, such as invalid input, collection not found, or WAL issues.
+    
     
   </dd>
 </div>
@@ -258,9 +262,9 @@
   <dl class="item">
     <div id="checkpoint-procs-all">
   <div id="checkpoint,VectorStore">
-  <dt><pre><span class="Keyword">proc</span> <a href="#checkpoint%2CVectorStore"><span class="Identifier">checkpoint</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span>
-    <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span>
-                                <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#checkpoint%2CVectorStore"><span class="Identifier">checkpoint</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">VectorStoreError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span>
+    <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span>
+    <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Manually triggers a checkpoint by flushing the WAL and saving a snapshot to disk, ensuring that all committed operations are persisted and the WAL is truncated up to the checkpoint LSN. This can be used to reduce recovery time after a crash by minimizing the number of WAL entries that need to be replayed.
@@ -284,9 +288,9 @@
 <div id="createCollection-procs-all">
   <div id="createCollection,VectorStore,VectorCollection">
   <dt><pre><span class="Keyword">proc</span> <a href="#createCollection%2CVectorStore%2CVectorCollection"><span class="Identifier">createCollection</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a><span class="Other">;</span> <span class="Identifier">c</span><span class="Other">:</span> <a href="#VectorCollection"><span class="Identifier">VectorCollection</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span>
-    <span class="Identifier">VectorStoreError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
-    <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span class="Identifier">VectorStoreError</span><span class="Other">,</span> <span class="Identifier">VectorStoreError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span>
+    <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span>
+                                <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Creates a new collection in the vector store with the specified name and dimension, logging the operation in the WAL if enabled
@@ -297,10 +301,10 @@
 </div>
 <div id="delete-procs-all">
   <div id="delete,VectorStore,string,string">
-  <dt><pre><span class="Keyword">proc</span> <a href="#delete%2CVectorStore%2Cstring%2Cstring"><span class="Identifier">delete</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a><span class="Other">;</span> <span class="Identifier">collection</span><span class="Other">,</span> <span class="Identifier">pk</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
-    <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#delete%2CVectorStore%2Cstring%2Cstring"><span class="Identifier">delete</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a><span class="Other">;</span> <span class="Identifier">collection</span><span class="Other">,</span> <span class="Identifier">pk</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span>
+    <span class="Identifier">VectorStoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span>
+    <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span>
+                       <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Delete a vector from the specified collection by primary key (pk). The operation is logged in the WAL if enabled. Returns true if successfully deleted, false if the pk was not found.
@@ -312,8 +316,9 @@
 <div id="dropCollection-procs-all">
   <div id="dropCollection,VectorStore,string">
   <dt><pre><span class="Keyword">proc</span> <a href="#dropCollection%2CVectorStore%2Cstring"><span class="Identifier">dropCollection</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a><span class="Other">;</span> <span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">VectorStoreError</span><span class="Other">,</span>
-    <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">TimeEffect</span><span class="Other">,</span>
-    <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span class="Identifier">VectorStoreError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
+    <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Drops the specified collection from the vector store, logging the operation in the WAL if enabled
@@ -383,10 +388,11 @@
 <div id="insert-procs-all">
   <div id="insert,VectorStore,string,string,seq[float32],string">
   <dt><pre><span class="Keyword">proc</span> <a href="#insert%2CVectorStore%2Cstring%2Cstring%2Cseq%5Bfloat32%5D%2Cstring"><span class="Identifier">insert</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a><span class="Other">;</span> <span class="Identifier">collection</span><span class="Other">,</span> <span class="Identifier">pk</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">vec</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">float32</span><span class="Other">]</span><span class="Other">;</span>
-            <span class="Identifier">partition</span> <span class="Other">=</span> <span class="StringLit">&quot;&quot;</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">VectorStoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span>
-                                       <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span>
-                                       <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">TimeEffect</span><span class="Other">,</span>
-    <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+            <span class="Identifier">partition</span> <span class="Other">=</span> <span class="StringLit">&quot;&quot;</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">VectorStoreError</span><span class="Other">,</span> <span class="Identifier">VectorStoreError</span><span class="Other">,</span>
+                                       <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span>
+                                       <span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
+    <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span>
+                              <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Inserts a vector into the specified collection with the given primary key (pk). The vector is validated against the collection's dimension, and the operation is logged in the WAL if enabled. An optional <tt class="docutils literal"><span class="pre"><span class="Identifier">partition</span></span></tt> groups the vector into a named locality scope that <tt class="docutils literal"><span class="pre"><span class="Identifier">nearest</span></span></tt> can restrict a search to (like a KoutenDB ring), bounding the scanned candidate set.
@@ -447,9 +453,10 @@
 <div id="newInMemoryVectorStore-procs-all">
   <div id="newInMemoryVectorStore">
   <dt><pre><span class="Keyword">proc</span> <a href="#newInMemoryVectorStore"><span class="Identifier">newInMemoryVectorStore</span></a><span class="Other">(</span><span class="Other">)</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">VectorStoreError</span><span class="Other">,</span>
-    <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">FileLockError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span>
-    <span class="Identifier">SignalError</span><span class="Other">,</span> <span class="Identifier">ResourceExhaustedError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span>
-    <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">FileLockError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">FileLockBusyError</span><span class="Other">,</span>
+    <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">SignalError</span><span class="Other">,</span> <span class="Identifier">ResourceExhaustedError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span>
+    <span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">,</span>
+    <span class="Identifier">WriteDirEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Convenience procedure to create a new in-memory vector store without persistence or WAL, useful for testing or ephemeral use cases
@@ -463,10 +470,12 @@
   <dt><pre><span class="Keyword">proc</span> <a href="#newVectorStore%2Cstring%2CVectorStorageMode%2Cbool%2Cuint32%2Cuint32%2Cstaticbool"><span class="Identifier">newVectorStore</span></a><span class="Other">(</span><span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">mode</span><span class="Other">:</span> <a href="#VectorStorageMode"><span class="Identifier">VectorStorageMode</span></a> <span class="Other">=</span> <span class="Identifier">smDisk</span><span class="Other">;</span>
                     <span class="Identifier">enableWal</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">;</span> <span class="Identifier">checkpointEveryOps</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span class="Other">=</span> <span class="DecNumber">0'u32</span><span class="Other">;</span>
                     <span class="Identifier">walFlushEveryOps</span><span class="Other">:</span> <span class="Identifier">uint32</span> <span class="Other">=</span> <span class="DecNumber">1000'u32</span><span class="Other">;</span>
-                    <span class="Identifier">enableConcurrency</span><span class="Other">:</span> <span class="Keyword">static</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a></pre></dt>
+                    <span class="Identifier">enableConcurrency</span><span class="Other">:</span> <span class="Keyword">static</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">;</span> <span class="Identifier">readOnly</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span><span class="Other">:</span> <a href="#VectorStore"><span class="Identifier">VectorStore</span></a></pre></dt>
   <dd>
     
-    Creates a new <tt class="docutils literal"><span class="pre"><span class="Identifier">VectorStore</span></span></tt> instance with the specified storage mode, WAL settings, and checkpointing configuration. With <tt class="docutils literal"><span class="pre"><span class="Identifier">enableConcurrency</span> <span class="Operator">=</span> <span class="Identifier">true</span></span></tt> reads are concurrent per collection and writes are serialized per collection through a bounded worker pool.
+    <p>Creates a new <tt class="docutils literal"><span class="pre"><span class="Identifier">VectorStore</span></span></tt> instance with the specified storage mode, WAL settings, and checkpointing configuration. With <tt class="docutils literal"><span class="pre"><span class="Identifier">enableConcurrency</span> <span class="Operator">=</span> <span class="Identifier">true</span></span></tt> reads are concurrent per collection and writes are serialized per collection through a bounded worker pool.</p>
+<p>With <tt class="docutils literal"><span class="pre"><span class="Identifier">readOnly</span> <span class="Operator">=</span> <span class="Identifier">true</span></span></tt> (disk mode only) the store holds a shared cross-process lock so concurrent reader processes can open the same path without hanging. The open never writes to the WAL or snapshot, and every mutating proc raises.</p>
+
     
   </dd>
 </div>
@@ -527,7 +536,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-17 12:47:46 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-17 13:27:34 UTC</small>
       </div>
     </div>
   </div>

@@ -59,7 +59,10 @@
     <summary><a class="reference reference-toplevel" href="#7" id="57">Types</a></summary>
     <ul class="simple simple-toc-section">
       <li><a class="reference" href="#FileLock" title="FileLock = object">FileLock</a></li>
+<li><a class="reference" href="#FileLockBusyError" title="FileLockBusyError = object of FileLockError">FileLockBusyError</a></li>
 <li><a class="reference" href="#FileLockError" title="FileLockError = object of CatchableError">FileLockError</a></li>
+<li><a class="reference" href="#LockMode" title="LockMode = enum
+  lmShared, lmExclusive">LockMode</a></li>
 
     </ul>
   </details>
@@ -73,7 +76,13 @@
 
 </ul>
 <ul class="simple nested-toc-section">acquireFileLock
-  <li><a class="reference" href="#acquireFileLock%2Cstring" title="acquireFileLock(lockPath: string): FileLock">acquireFileLock(lockPath: string): FileLock</a></li>
+  <li><a class="reference" href="#acquireFileLock%2Cstring%2CLockMode%2Cint" title="acquireFileLock(lockPath: string; mode: LockMode = lmExclusive; blocking = true;
+                timeoutMs = -1): FileLock">acquireFileLock(lockPath: string; mode: LockMode = lmExclusive; blocking = true;
+                timeoutMs = -1): FileLock</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">tryAcquireFileLock
+  <li><a class="reference" href="#tryAcquireFileLock%2Cstring%2CLockMode" title="tryAcquireFileLock(lockPath: string; mode: LockMode = lmExclusive): FileLock">tryAcquireFileLock(lockPath: string; mode: LockMode = lmExclusive): FileLock</a></li>
 
 </ul>
 
@@ -89,8 +98,9 @@
     <div id="tocRoot"></div>
     
     <p class="module-desc"><p>Cross-process file locking for Boogie disk stores.</p>
-<p>Every disk-backed store holds a <tt class="docutils literal"><span class="pre"><span class="Identifier">FileLock</span></span></tt> for its whole lifetime, acquired BEFORE the WAL/snapshot is opened and released on <tt class="docutils literal"><span class="pre"><span class="Identifier">close</span></span></tt> (or when the last handle dies). The lock is an OS-level <tt class="docutils literal"><span class="pre"><span class="Identifier">flock</span><span class="Punctuation">(</span><span class="Identifier">LOCK_EX</span><span class="Punctuation">)</span></span></tt> on a sidecar lockfile next to the database files, so:</p>
-<ul class="simple"><li>two processes opening the SAME path never interleave WAL appends, snapshots, or LSN allocation; the second one blocks (waits) until the first closes instead of failing or corrupting data;</li>
+<p>Every disk-backed store holds a <tt class="docutils literal"><span class="pre"><span class="Identifier">FileLock</span></span></tt> for its whole lifetime, acquired BEFORE the WAL/snapshot is opened and released on <tt class="docutils literal"><span class="pre"><span class="Identifier">close</span></span></tt> (or when the last handle dies). The lock is an OS-level <tt class="docutils literal"><span class="pre"><span class="Identifier">flock</span></span></tt> on a sidecar lockfile next to the database files:</p>
+<ul class="simple"><li>writers hold <tt class="docutils literal"><span class="pre"><span class="Identifier">LOCK_EX</span></span></tt>; readers opened with <tt class="docutils literal"><span class="pre"><span class="Identifier">readOnly</span> <span class="Operator">=</span> <span class="Identifier">true</span></span></tt> hold <tt class="docutils literal"><span class="pre"><span class="Identifier">LOCK_SH</span></span></tt>, so any number of concurrent reader processes can open the SAME path at once while a writer still excludes everyone;</li>
+<li>two writers opening the SAME path never interleave WAL appends, snapshots, or LSN allocation; the second one blocks (waits) until the first closes instead of failing or corrupting data (or raises <tt class="docutils literal"><span class="pre"><span class="Identifier">FileLockBusyError</span></span></tt> when opened non-blocking / with a timeout);</li>
 <li>a crashing holder releases the lock automatically (the OS drops <tt class="docutils literal"><span class="pre"><span class="Identifier">flock</span></span></tt> with the file description), so there are no stale locks to break;</li>
 <li>nested opens of the same path inside ONE process share the lock via a process-local refcount (a second <tt class="docutils literal"><span class="pre"><span class="Identifier">flock</span></span></tt> from the same process on another fd could otherwise refuse/ deadlock), preserving the old single-process behavior (e.g. reopen-without-close in tests).</li>
 </ul>
@@ -107,11 +117,28 @@
     
   </dd>
 </div>
+<div id="FileLockBusyError">
+  <dt><pre><a href="#FileLockBusyError"><span class="Identifier">FileLockBusyError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <a href="#FileLockError"><span class="Identifier">FileLockError</span></a></pre></dt>
+  <dd>
+    
+    Raised when a lock cannot be acquired without blocking (non-blocking mode) or within the given timeout. Callers can retry or surface a &quot;database is locked&quot; error instead of hanging forever.
+    
+  </dd>
+</div>
 <div id="FileLockError">
   <dt><pre><a href="#FileLockError"><span class="Identifier">FileLockError</span></a> <span class="Other">=</span> <span class="Keyword">object</span> <span class="Keyword">of</span> <span class="Identifier">CatchableError</span></pre></dt>
   <dd>
     
     
+    
+  </dd>
+</div>
+<div id="LockMode">
+  <dt><pre><a href="#LockMode"><span class="Identifier">LockMode</span></a> <span class="Other">=</span> <span class="Keyword">enum</span>
+  <span class="Identifier">lmShared</span><span class="Other">,</span> <span class="Identifier">lmExclusive</span></pre></dt>
+  <dd>
+    
+    <tt class="docutils literal"><span class="pre"><span class="Identifier">lmShared</span></span></tt> allows concurrent holders (read-only opens). <tt class="docutils literal"><span class="pre"><span class="Identifier">lmExclusive</span></span></tt> excludes every other holder (read-write opens).
     
   </dd>
 </div>
@@ -133,13 +160,33 @@
 
 </div>
 <div id="acquireFileLock-procs-all">
-  <div id="acquireFileLock,string">
-  <dt><pre><span class="Keyword">proc</span> <a href="#acquireFileLock%2Cstring"><span class="Identifier">acquireFileLock</span></a><span class="Other">(</span><span class="Identifier">lockPath</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <a href="#FileLock"><span class="Identifier">FileLock</span></a> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">FileLockError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <div id="acquireFileLock,string,LockMode,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#acquireFileLock%2Cstring%2CLockMode%2Cint"><span class="Identifier">acquireFileLock</span></a><span class="Other">(</span><span class="Identifier">lockPath</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">mode</span><span class="Other">:</span> <a href="#LockMode"><span class="Identifier">LockMode</span></a> <span class="Other">=</span> <span class="Identifier">lmExclusive</span><span class="Other">;</span>
+                     <span class="Identifier">blocking</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">;</span> <span class="Identifier">timeoutMs</span> <span class="Other">=</span> <span class="DecNumber">-1</span><span class="Other">)</span><span class="Other">:</span> <a href="#FileLock"><span class="Identifier">FileLock</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span>
+    <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">FileLockError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">FileLockBusyError</span><span class="Other">,</span>
+    <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">FileLockError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    Blocks until the exclusive lock for <tt class="docutils literal"><span class="pre"><span class="Identifier">lockPath</span></span></tt> is held, then returns a handle. Same-process re-entry shares the held lock (refcounted). <tt class="docutils literal"><span class="pre"><span class="Identifier">lockPath</span></span></tt> itself is created if missing (its parent dir must exist). Returns a zero (nil-entry) handle on non-POSIX platforms.
+    Acquires the lock for <tt class="docutils literal"><span class="pre"><span class="Identifier">lockPath</span></span></tt> and returns a handle.<ul class="simple"><li><tt class="docutils literal"><span class="pre"><span class="Identifier">mode</span></span></tt>: <tt class="docutils literal"><span class="pre"><span class="Identifier">lmExclusive</span></span></tt> (default, writers) excludes everyone; <tt class="docutils literal"><span class="pre"><span class="Identifier">lmShared</span></span></tt> (read-only opens) allows concurrent shared holders but is excluded by a writer. Many processes may hold <tt class="docutils literal"><span class="pre"><span class="Identifier">lmShared</span></span></tt> at once, which is what lets concurrent readers open the same <tt class="docutils literal"><span class="pre"><span class="Operator">.</span><span class="Identifier">db</span></span></tt> path without hanging.</li>
+<li><tt class="docutils literal"><span class="pre"><span class="Identifier">blocking</span> <span class="Operator">=</span> <span class="Identifier">true</span></span></tt> (default) waits until the lock is held, preserving the historical behavior. <tt class="docutils literal"><span class="pre"><span class="Identifier">blocking</span> <span class="Operator">=</span> <span class="Identifier">false</span></span></tt> tries once and raises <tt class="docutils literal"><span class="pre"><span class="Identifier">FileLockBusyError</span></span></tt> instead of waiting.</li>
+<li><tt class="docutils literal"><span class="pre"><span class="Identifier">timeoutMs</span> <span class="Operator">&gt;=</span> <span class="DecNumber">0</span></span></tt> bounds a blocking wait: polls with <tt class="docutils literal"><span class="pre"><span class="Identifier">LOCK_NB</span></span></tt> and raises <tt class="docutils literal"><span class="pre"><span class="Identifier">FileLockBusyError</span></span></tt> after the timeout expires. <tt class="docutils literal"><span class="pre"><span class="Operator">-</span><span class="DecNumber">1</span></span></tt> waits indefinitely.</li>
+</ul>
+<p>Same-process re-entry shares the held lock (refcounted). An exclusive holder already implies shared access, so requesting <tt class="docutils literal"><span class="pre"><span class="Identifier">lmShared</span></span></tt> while this process holds <tt class="docutils literal"><span class="pre"><span class="Identifier">lmExclusive</span></span></tt> just shares the handle. Requesting <tt class="docutils literal"><span class="pre"><span class="Identifier">lmExclusive</span></span></tt> while this process only holds <tt class="docutils literal"><span class="pre"><span class="Identifier">lmShared</span></span></tt> raises <tt class="docutils literal"><span class="pre"><span class="Identifier">FileLockError</span></span></tt> (a shared-to-exclusive upgrade cannot be done safely; close the read-only handle and reopen read-write instead). <tt class="docutils literal"><span class="pre"><span class="Identifier">lockPath</span></span></tt> itself is created if missing (its parent dir must exist). Returns a zero (nil-entry) handle on non-POSIX platforms.</p>
+
+    
+  </dd>
+</div>
+
+</div>
+<div id="tryAcquireFileLock-procs-all">
+  <div id="tryAcquireFileLock,string,LockMode">
+  <dt><pre><span class="Keyword">proc</span> <a href="#tryAcquireFileLock%2Cstring%2CLockMode"><span class="Identifier">tryAcquireFileLock</span></a><span class="Other">(</span><span class="Identifier">lockPath</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">mode</span><span class="Other">:</span> <a href="#LockMode"><span class="Identifier">LockMode</span></a> <span class="Other">=</span> <span class="Identifier">lmExclusive</span><span class="Other">)</span><span class="Other">:</span> <a href="#FileLock"><span class="Identifier">FileLock</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span>
+    <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">FileLockError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">FileLockBusyError</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ReadDirEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Non-blocking variant of <tt class="docutils literal"><span class="pre"><span class="Identifier">acquireFileLock</span></span></tt>: tries once and raises <tt class="docutils literal"><span class="pre"><span class="Identifier">FileLockBusyError</span></span></tt> when another process holds a conflicting lock.
     
   </dd>
 </div>
@@ -155,7 +202,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-17 12:47:46 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-17 13:27:34 UTC</small>
       </div>
     </div>
   </div>

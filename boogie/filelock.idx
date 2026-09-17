@@ -1,5 +1,10 @@
 nimTitle	filelock	boogie/filelock.html	module boogie/filelock		0
-nim	FileLockError	boogie/filelock.html#FileLockError	object FileLockError		40
-nim	FileLock	boogie/filelock.html#FileLock	object FileLock		49
-nim	`=destroy`	boogie/filelock.html#=destroy,FileLock	proc `=destroy`(l: var FileLock)		66
-nim	acquireFileLock	boogie/filelock.html#acquireFileLock,string	proc acquireFileLock(lockPath: string): FileLock		90
+nim	FileLockError	boogie/filelock.html#FileLockError	object FileLockError		46
+nim	FileLockBusyError	boogie/filelock.html#FileLockBusyError	object FileLockBusyError		47
+nim	lmShared	boogie/filelock.html#lmShared	LockMode.lmShared		52
+nim	lmExclusive	boogie/filelock.html#lmExclusive	LockMode.lmExclusive		52
+nim	LockMode	boogie/filelock.html#LockMode	enum LockMode		52
+nim	FileLock	boogie/filelock.html#FileLock	object FileLock		65
+nim	`=destroy`	boogie/filelock.html#=destroy,FileLock	proc `=destroy`(l: var FileLock)		82
+nim	acquireFileLock	boogie/filelock.html#acquireFileLock,string,LockMode,int	proc acquireFileLock(lockPath: string; mode: LockMode = lmExclusive; blocking = true;\n                timeoutMs = -1): FileLock		119
+nim	tryAcquireFileLock	boogie/filelock.html#tryAcquireFileLock,string,LockMode	proc tryAcquireFileLock(lockPath: string; mode: LockMode = lmExclusive): FileLock		217

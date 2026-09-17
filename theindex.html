@@ -55,7 +55,9 @@
           </ul></dd>
 <dt><a name="acquireFileLock" href="#acquireFileLock"><span>acquireFileLock:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="filelock: proc acquireFileLock(lockPath: string): FileLock" href="boogie/filelock.html#acquireFileLock%2Cstring">filelock: proc acquireFileLock(lockPath: string): FileLock</a></li>
+          data-doc-search-tag="filelock: proc acquireFileLock(lockPath: string; mode: LockMode = lmExclusive; blocking = true;
+                timeoutMs = -1): FileLock" href="boogie/filelock.html#acquireFileLock%2Cstring%2CLockMode%2Cint">filelock: proc acquireFileLock(lockPath: string; mode: LockMode = lmExclusive; blocking = true;
+                timeoutMs = -1): FileLock</a></li>
           </ul></dd>
 <dt><a name="AggKind" href="#AggKind"><span>AggKind:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -208,6 +210,12 @@
 <dt><a name="consume" href="#consume"><span>consume:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="concurrency: proc consume[T](r: WriteRing[T]; onTask: proc (x: T) {.closure, gcsafe.})" href="boogie/concurrency.html#consume%2CWriteRing%5BT%5D%2Cproc%28T%29">concurrency: proc consume[T](r: WriteRing[T]; onTask: proc (x: T) {.closure, gcsafe.})</a></li>
+          </ul></dd>
+<dt><a name="countSignalListeners" href="#countSignalListeners"><span>countSignalListeners:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="signals: proc countSignalListeners(signo: int): int" href="boogie/signals.html#countSignalListeners%2Cint">signals: proc countSignalListeners(signo: int): int</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="signals: proc countSignalListeners(s: OsSignal): int" href="boogie/signals.html#countSignalListeners%2COsSignal">signals: proc countSignalListeners(s: OsSignal): int</a></li>
           </ul></dd>
 <dt><a name="createCollection" href="#createCollection"><span>createCollection:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -466,6 +474,10 @@
 <dt><a name="FileLock" href="#FileLock"><span>FileLock:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="filelock: object FileLock" href="boogie/filelock.html#FileLock">filelock: object FileLock</a></li>
+          </ul></dd>
+<dt><a name="FileLockBusyError" href="#FileLockBusyError"><span>FileLockBusyError:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="filelock: object FileLockBusyError" href="boogie/filelock.html#FileLockBusyError">filelock: object FileLockBusyError</a></li>
           </ul></dd>
 <dt><a name="FileLockError" href="#FileLockError"><span>FileLockError:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -755,6 +767,18 @@
 <li><a class="reference external"
           data-doc-search-tag="signals: proc listenSignalOnce(s: OsSignal; cb: SignalCallback): ListenerHandle" href="boogie/signals.html#listenSignalOnce%2COsSignal%2CSignalCallback">signals: proc listenSignalOnce(s: OsSignal; cb: SignalCallback): ListenerHandle</a></li>
           </ul></dd>
+<dt><a name="lmExclusive" href="#lmExclusive"><span>lmExclusive:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="filelock: LockMode.lmExclusive" href="boogie/filelock.html#lmExclusive">filelock: LockMode.lmExclusive</a></li>
+          </ul></dd>
+<dt><a name="lmShared" href="#lmShared"><span>lmShared:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="filelock: LockMode.lmShared" href="boogie/filelock.html#lmShared">filelock: LockMode.lmShared</a></li>
+          </ul></dd>
+<dt><a name="LockMode" href="#LockMode"><span>LockMode:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="filelock: enum LockMode" href="boogie/filelock.html#LockMode">filelock: enum LockMode</a></li>
+          </ul></dd>
 <dt><a name="logPos" href="#logPos"><span>logPos:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: proc logPos(w: Wal): int64" href="boogie/wal.html#logPos%2CWal">wal: proc logPos(w: Wal): int64</a></li>
@@ -834,10 +858,10 @@
           data-doc-search-tag="kv: proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;
            checkpointEveryOps: uint32 = 0'u32;
            walFlushEveryOps: uint32 = 1000'u32; lazyReads = false;
-           enableConcurrency: static bool = false): KvStore" href="boogie/stores/kv.html#newKvStore%2Cstring%2CKvStorageMode%2Cbool%2Cuint32%2Cuint32%2Cstaticbool">kv: proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;
+           enableConcurrency: static bool = false; readOnly = false): KvStore" href="boogie/stores/kv.html#newKvStore%2Cstring%2CKvStorageMode%2Cbool%2Cuint32%2Cuint32%2Cstaticbool">kv: proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;
            checkpointEveryOps: uint32 = 0'u32;
            walFlushEveryOps: uint32 = 1000'u32; lazyReads = false;
-           enableConcurrency: static bool = false): KvStore</a></li>
+           enableConcurrency: static bool = false; readOnly = false): KvStore</a></li>
           </ul></dd>
 <dt><a name="newNullValue" href="#newNullValue"><span>newNullValue:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -849,11 +873,11 @@
          checkpointEveryOps: uint32 = 0'u32;
          walFlushEveryOps: uint32 = 1000'u32;
          walMaxBytes: uint32 = 65536'u32 * 1024;
-         enableConcurrency: static bool = false): Store" href="boogie/stores/rdbms.html#newStore%2Cstring%2CStorageMode%2Cbool%2Cuint32%2Cuint32%2Cuint32%2Cstaticbool">rdbms: proc newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
+         enableConcurrency: static bool = false; readOnly = false): Store" href="boogie/stores/rdbms.html#newStore%2Cstring%2CStorageMode%2Cbool%2Cuint32%2Cuint32%2Cuint32%2Cstaticbool">rdbms: proc newStore(path: string; mode: StorageMode = smDisk; enableWal: bool = true;
          checkpointEveryOps: uint32 = 0'u32;
          walFlushEveryOps: uint32 = 1000'u32;
          walMaxBytes: uint32 = 65536'u32 * 1024;
-         enableConcurrency: static bool = false): Store</a></li>
+         enableConcurrency: static bool = false; readOnly = false): Store</a></li>
           </ul></dd>
 <dt><a name="newTable" href="#newTable"><span>newTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -876,10 +900,10 @@
           data-doc-search-tag="vectorstore: proc newVectorStore(path: string; mode: VectorStorageMode = smDisk;
                enableWal: bool = true; checkpointEveryOps: uint32 = 0'u32;
                walFlushEveryOps: uint32 = 1000'u32;
-               enableConcurrency: static bool = false): VectorStore" href="boogie/stores/vectorstore.html#newVectorStore%2Cstring%2CVectorStorageMode%2Cbool%2Cuint32%2Cuint32%2Cstaticbool">vectorstore: proc newVectorStore(path: string; mode: VectorStorageMode = smDisk;
+               enableConcurrency: static bool = false; readOnly = false): VectorStore" href="boogie/stores/vectorstore.html#newVectorStore%2Cstring%2CVectorStorageMode%2Cbool%2Cuint32%2Cuint32%2Cstaticbool">vectorstore: proc newVectorStore(path: string; mode: VectorStorageMode = smDisk;
                enableWal: bool = true; checkpointEveryOps: uint32 = 0'u32;
                walFlushEveryOps: uint32 = 1000'u32;
-               enableConcurrency: static bool = false): VectorStore</a></li>
+               enableConcurrency: static bool = false; readOnly = false): VectorStore</a></li>
           </ul></dd>
 <dt><a name="newWriteRing" href="#newWriteRing"><span>newWriteRing:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -892,20 +916,20 @@
 <dt><a name="openColumnarStore" href="#openColumnarStore"><span>openColumnarStore:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="columnar: proc openColumnarStore(rootDir: string; walPath: string = &quot;&quot;;
-                  walFlushEveryOps: int = 100): ColumnarStore" href="boogie/stores/columnar.html#openColumnarStore%2Cstring%2Cstring%2Cint">columnar: proc openColumnarStore(rootDir: string; walPath: string = &quot;&quot;;
-                  walFlushEveryOps: int = 100): ColumnarStore</a></li>
+                  walFlushEveryOps: int = 100; readOnly = false): ColumnarStore" href="boogie/stores/columnar.html#openColumnarStore%2Cstring%2Cstring%2Cint">columnar: proc openColumnarStore(rootDir: string; walPath: string = &quot;&quot;;
+                  walFlushEveryOps: int = 100; readOnly = false): ColumnarStore</a></li>
           </ul></dd>
 <dt><a name="openDocumentStore" href="#openDocumentStore"><span>openDocumentStore:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="docstore: proc openDocumentStore(path: string; name = &quot;documents&quot;; defaultEncoding = deJson;
                   enableSnapshots = true; checkpointEveryOps: uint32 = 1000'u32;
-                  walFlushEveryOps: uint32 = 1000'u32): DocumentStore" href="boogie/stores/docstore.html#openDocumentStore%2Cstring%2Cstring%2Cuint32%2Cuint32">docstore: proc openDocumentStore(path: string; name = &quot;documents&quot;; defaultEncoding = deJson;
+                  walFlushEveryOps: uint32 = 1000'u32; readOnly = false): DocumentStore" href="boogie/stores/docstore.html#openDocumentStore%2Cstring%2Cstring%2Cuint32%2Cuint32">docstore: proc openDocumentStore(path: string; name = &quot;documents&quot;; defaultEncoding = deJson;
                   enableSnapshots = true; checkpointEveryOps: uint32 = 1000'u32;
-                  walFlushEveryOps: uint32 = 1000'u32): DocumentStore</a></li>
+                  walFlushEveryOps: uint32 = 1000'u32; readOnly = false): DocumentStore</a></li>
           </ul></dd>
 <dt><a name="openGraphStore" href="#openGraphStore"><span>openGraphStore:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="graphstore: proc openGraphStore(rootDir: string): GraphStore" href="boogie/stores/graphstore.html#openGraphStore%2Cstring">graphstore: proc openGraphStore(rootDir: string): GraphStore</a></li>
+          data-doc-search-tag="graphstore: proc openGraphStore(rootDir: string; readOnly = false): GraphStore" href="boogie/stores/graphstore.html#openGraphStore%2Cstring">graphstore: proc openGraphStore(rootDir: string; readOnly = false): GraphStore</a></li>
           </ul></dd>
 <dt><a name="openLog" href="#openLog"><span>openLog:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -1048,6 +1072,10 @@
           data-doc-search-tag="columnar: proc scan(s: ColumnarStore; table: string; projectedColumns: seq[string];
      filters: seq[Filter] = @[]; limit: int = 0): seq[JsonNode]" href="boogie/stores/columnar.html#scan%2CColumnarStore%2Cstring%2Cseq%5Bstring%5D%2Cseq%5BFilter%5D%2Cint">columnar: proc scan(s: ColumnarStore; table: string; projectedColumns: seq[string];
      filters: seq[Filter] = @[]; limit: int = 0): seq[JsonNode]</a></li>
+          </ul></dd>
+<dt><a name="setTerminateSignals" href="#setTerminateSignals"><span>setTerminateSignals:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="crashsafe: proc setTerminateSignals(s: set[OsSignal])" href="boogie/crashsafe.html#setTerminateSignals%2Cset%5BOsSignal%5D">crashsafe: proc setTerminateSignals(s: set[OsSignal])</a></li>
           </ul></dd>
 <dt><a name="SignalAbrt" href="#SignalAbrt"><span>SignalAbrt:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -1257,6 +1285,10 @@
 <li><a class="reference external"
           data-doc-search-tag="wal: proc truncate(w: var Wal)" href="boogie/wal.html#truncate%2CWal">wal: proc truncate(w: var Wal)</a></li>
           </ul></dd>
+<dt><a name="tryAcquireFileLock" href="#tryAcquireFileLock"><span>tryAcquireFileLock:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="filelock: proc tryAcquireFileLock(lockPath: string; mode: LockMode = lmExclusive): FileLock" href="boogie/filelock.html#tryAcquireFileLock%2Cstring%2CLockMode">filelock: proc tryAcquireFileLock(lockPath: string; mode: LockMode = lmExclusive): FileLock</a></li>
+          </ul></dd>
 <dt><a name="unlisten" href="#unlisten"><span>unlisten:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="signals: proc unlisten(h: ListenerHandle)" href="boogie/signals.html#unlisten%2CListenerHandle">signals: proc unlisten(h: ListenerHandle)</a></li>
@@ -1405,7 +1437,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-17 12:47:46 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-17 13:27:35 UTC</small>
       </div>
     </div>
   </div>
