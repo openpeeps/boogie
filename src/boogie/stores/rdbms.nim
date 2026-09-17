@@ -110,9 +110,9 @@ type
       # `walFlushEveryOps`
     walMaxBytes: uint32
       # when the WAL file reaches this size, the next checkpoint also
-      # compacts it (`0` disables). Non-concurrent stores truncate the log
-      # after every snapshot checkpoint; concurrent (WAL-only) stores rewrite
-      # the log from live in-memory state.
+      # compacts it (`0` disables). Snapshot stores truncate the log after
+      # every snapshot checkpoint; WAL-only concurrent stores rewrite the log
+      # from live in-memory state.
     cc: ConcurrentState[RdbWriteTask]
       ## Store-level concurrency state; nil unless `enableConcurrency = true`.
     lock: FileLock
@@ -183,13 +183,15 @@ proc newStore*(path: string, mode: StorageMode = smDisk,
   ##   - 0    => flush only on checkpoint/close/recovery-end
   ##
   ## walMaxBytes (default 64MB):
-  ##   - non-concurrent stores truncate the WAL after every snapshot
-  ##     checkpoint regardless of size;
-  ##   - concurrent stores rewrite the WAL from live state on checkpoint
-  ##     once the file reaches this size (`0` disables compaction).
+  ##   - snapshot stores truncate the WAL after every snapshot checkpoint
+  ##     regardless of size;
+  ##   - WAL-only concurrent stores (in-memory) rewrite the WAL from live
+  ##     state on checkpoint once the file reaches this size (`0` disables
+  ##     compaction).
   ##
   ## With `enableConcurrency = true` reads are concurrent per table and writes
-  ## are serialized per table through a bounded worker pool (WAL-only durability).
+  ## are serialized per table through a bounded worker pool. Disk stores keep
+  ## snapshot (`.db`) durability with a concurrency-safe checkpoint.
   ##
   ## With `readOnly = true` (disk mode only) the store holds a shared
   ## cross-process lock so concurrent reader processes can open the same path
@@ -227,7 +229,6 @@ proc newStore*(path: string, mode: StorageMode = smDisk,
 
   when enableConcurrency:
     static: doAssert compileOption("threads"), "concurrency requires --threads:on"
-    hasDb = false
 
   result = Store(
     storageMode: mode,
@@ -957,18 +958,84 @@ proc compactWalFromMemory(s: Store) =
         if sl != nil:
           endRead(sl.mu)
 
+proc checkpoint*(s: Store)
+
+proc snapshotConcurrent(s: Store) =
+  ## Snapshot checkpoint for concurrent stores. Stalls the consumer worker for
+  ## the whole operation by holding every table read lock (lock order:
+  ## meta-read, slot-reads sorted by table name, then the WAL lock — the same
+  ## order as `compactWalFromMemory`, so no deadlock), flushes the WAL, writes
+  ## the `.db` snapshot, then truncates the WAL. `checkpointLsn` is advanced to
+  ## the max durable LSN so recovery skips the truncated prefix.
+  if not s.hasDbFile:
+    return
+  if s.cc == nil:
+    s.saveSnapshotIfEnabled()
+    return
+  withMetaRead(s.cc):
+    var names = newSeq[string]()
+    for k in s.tables.keys:
+      names.add(k)
+    names.sort()
+    var slots = newSeq[TableSlot[RdbWriteTask]](names.len)
+    for i, n in names:
+      slots[i] = s.tables[n].slot
+    for sl in slots:
+      if sl != nil:
+        beginRead(sl.mu)
+    try:
+      withWalLock(s.cc):
+        if s.hasWal:
+          s.cc.flushWalLocked(s.wal)
+          if s.wal.nextLsn > 1'u64:
+            let maxLsn = s.wal.nextLsn - 1'u64
+            if maxLsn > s.checkpointLsn:
+              s.checkpointLsn = maxLsn
+        let blob = encodeRdbmsSnapshotToString(buildSnapshot(s))
+        writeTextAtomic(s.dbPath, blob)
+        if s.hasWal:
+          s.wal.truncate()
+        s.pendingOps = 0'u32
+    finally:
+      for sl in slots:
+        if sl != nil:
+          endRead(sl.mu)
+
+proc maybeAutoCheckpointConcurrent(s: Store) =
+  ## Thread-safe `checkpointEveryOps` accounting for concurrent writes. The
+  ## consumer never calls `markCommitted`, so the submitting thread counts the
+  ## op under the WAL lock and triggers an explicit checkpoint outside the lock.
+  if s.cc == nil:
+    return
+  if not s.hasDbFile:
+    return
+  if s.checkpointEveryOps == 0'u32:
+    return
+  var shouldCheckpoint = false
+  withWalLock(s.cc):
+    inc s.pendingOps
+    if s.pendingOps >= s.checkpointEveryOps:
+      shouldCheckpoint = true
+  if shouldCheckpoint:
+    s.checkpoint()
+
 proc checkpoint*(s: Store) =
   ## Force a checkpoint now.
   ##
   ## Non-concurrent stores flush the WAL, write a snapshot, then truncate the
   ## WAL (entries at or below the snapshot LSN are redundant). Concurrent
-  ## (WAL-only) stores flush the WAL and rewrite it from live state once it
-  ## reaches `walMaxBytes`.
+  ## disk stores flush the WAL, write a snapshot, then truncate the WAL in the
+  ## same way (stalling writers briefly); WAL-only stores (in-memory or
+  ## `lazyReads`) flush the WAL and rewrite it from live state once it reaches
+  ## `walMaxBytes`.
   s.ensureWritable()
   if s.cc != nil:
-    s.cc.flushWal(s.wal)
-    if s.needsWalCompact():
-      s.compactWalFromMemory()
+    if s.hasDbFile:
+      s.snapshotConcurrent()
+    else:
+      s.cc.flushWal(s.wal)
+      if s.needsWalCompact():
+        s.compactWalFromMemory()
     return
   if not s.hasDbFile: return
   s.flushWalIfNeeded(force = true)
@@ -1012,6 +1079,7 @@ proc createTable*(s: Store, t: DbTable) =
       s.cc.appendWal(s.wal,
         WalEntry(op: woCreateTable, table: t.name, pk: "", payload: schemaToPayload(t)),
         int(s.walFlushEveryOps))
+    s.maybeAutoCheckpointConcurrent()
     return
   s.validateTableForeignKeys(t)
   t.ensureForeignKeyIndexes()
@@ -1043,6 +1111,7 @@ proc dropTable*(s: Store, name: string) =
       s.cc.appendWal(s.wal,
         WalEntry(op: woDropTable, table: name, pk: "", payload: ""),
         int(s.walFlushEveryOps))
+    s.maybeAutoCheckpointConcurrent()
     return
   for childName, child in s.tables.pairs:
     if childName == name:
@@ -1138,6 +1207,7 @@ proc insertRow*(s: Store, tableName: string, pk: string, data: RowData) =
       s.validateForeignKeysOnInsert(t, d)
     let mySeq = s.cc.submit(cast[TableSlot[RdbWriteTask]](slot), RdbWriteTask(kind: roInsert, pk: effectivePk, data: data))
     cast[TableSlot[RdbWriteTask]](slot).waitApplied(mySeq)
+    s.maybeAutoCheckpointConcurrent()
     return
   if unlikely(not s.tables.hasKey(tableName)):
     raise newException(StoreError, fmt"table not found: {tableName}")
@@ -1184,6 +1254,7 @@ proc insertRow*(s: Store, tableName: string, data: RowData): string {.discardabl
       s.validateForeignKeysOnInsert(t, d)
     let mySeq = s.cc.submit(cast[TableSlot[RdbWriteTask]](slot), RdbWriteTask(kind: roInsert, pk: effectivePk, data: data))
     cast[TableSlot[RdbWriteTask]](slot).waitApplied(mySeq)
+    s.maybeAutoCheckpointConcurrent()
     return effectivePk
   if unlikely(not s.tables.hasKey(tableName)):
     raise newException(StoreError, fmt"table not found: {tableName}")
@@ -1218,6 +1289,7 @@ proc deleteRow*(s: Store, tableName: string, pk: string): bool {.discardable.} =
       slot = cast[ptr TableSlot[RdbWriteTask]](s.tables[tableName].slot)
     let mySeq = s.cc.submit(cast[TableSlot[RdbWriteTask]](slot), RdbWriteTask(kind: roDelete, pk: pk))
     cast[TableSlot[RdbWriteTask]](slot).waitApplied(mySeq)
+    s.maybeAutoCheckpointConcurrent()
     return true
   if unlikely(not s.tables.hasKey(tableName)):
     return false

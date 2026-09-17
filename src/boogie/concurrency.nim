@@ -337,6 +337,13 @@ proc flushWal*[T](cc: ConcurrentState[T], wal: var Wal, clear = true) =
   finally:
     release cc.walLock
 
+proc flushWalLocked*[T](cc: ConcurrentState[T], wal: var Wal) =
+  ## Flush assuming `walLock` is already held (e.g. inside `withWalLock` during
+  ## a snapshot checkpoint or WAL compaction). Resets the group-commit counter
+  ## without re-acquiring the lock (which would self-deadlock).
+  wal.flush()
+  cc.walPending.store(0, moRelaxed)
+
 proc close*[T](cc: ConcurrentState[T], wal: var Wal) =
   ## Stops the consumer thread and performs a final WAL flush.
   cc.ring.stop()

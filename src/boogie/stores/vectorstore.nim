@@ -350,13 +350,74 @@ proc markCommitted(s: VectorStore, lsn: uint64) =
       s.saveSnapshotIfEnabled()
       s.pendingOps = 0'u32
 
+proc checkpoint*(s: VectorStore)
+
+proc snapshotConcurrent(s: VectorStore) =
+  ## Snapshot checkpoint for concurrent stores. Stalls the consumer worker by
+  ## holding every collection read lock (lock order: meta-read, slot-reads
+  ## sorted by collection name, then the WAL lock), flushes the WAL, writes the
+  ## `.vdb` snapshot, then truncates the WAL.
+  if not s.hasDbFile:
+    return
+  if s.cc == nil:
+    s.saveSnapshotIfEnabled()
+    return
+  withMetaRead(s.cc):
+    var names = newSeq[string]()
+    for k in s.collections.keys:
+      names.add(k)
+    names.sort()
+    var slots = newSeq[TableSlot[VecWriteTask]](names.len)
+    for i, n in names:
+      slots[i] = s.collections[n].slot
+    for sl in slots:
+      if sl != nil:
+        beginRead(sl.mu)
+    try:
+      withWalLock(s.cc):
+        if s.hasWal:
+          s.cc.flushWalLocked(s.wal)
+          if s.wal.nextLsn > 1'u64:
+            let maxLsn = s.wal.nextLsn - 1'u64
+            if maxLsn > s.checkpointLsn:
+              s.checkpointLsn = maxLsn
+        let blob = encodeVectorSnapshotToString(buildSnapshot(s))
+        writeTextAtomic(s.dbPath, blob)
+        if s.hasWal:
+          s.wal.truncate()
+        s.pendingOps = 0'u32
+    finally:
+      for sl in slots:
+        if sl != nil:
+          endRead(sl.mu)
+
+proc maybeAutoCheckpointConcurrent(s: VectorStore) =
+  ## Thread-safe `checkpointEveryOps` accounting for concurrent writes.
+  if s.cc == nil:
+    return
+  if not s.hasDbFile:
+    return
+  if s.checkpointEveryOps == 0'u32:
+    return
+  var shouldCheckpoint = false
+  withWalLock(s.cc):
+    inc s.pendingOps
+    if s.pendingOps >= s.checkpointEveryOps:
+      shouldCheckpoint = true
+  if shouldCheckpoint:
+    s.checkpoint()
+
 proc checkpoint*(s: VectorStore) =
   ## Manually triggers a checkpoint by flushing the WAL and saving a snapshot to disk, ensuring that all
   ## committed operations are persisted and the WAL is truncated up to the checkpoint LSN. This can be used
   ## to reduce recovery time after a crash by minimizing the number of WAL entries that need to be replayed.
+  ## Concurrent disk stores write a snapshot too (stalling writers briefly).
   s.ensureWritable()
   if s.cc != nil:
-    s.cc.flushWal(s.wal)
+    if s.hasDbFile:
+      s.snapshotConcurrent()
+    else:
+      s.cc.flushWal(s.wal)
     return
   if not s.hasDbFile:
     return
@@ -427,6 +488,7 @@ proc newVectorStore*(path: string, mode: VectorStorageMode = smDisk, enableWal: 
   ## Creates a new `VectorStore` instance with the specified storage mode, WAL settings,
   ## and checkpointing configuration. With `enableConcurrency = true` reads are concurrent
   ## per collection and writes are serialized per collection through a bounded worker pool.
+  ## Disk stores keep snapshot (`.vdb`) durability with a concurrency-safe checkpoint.
   ##
   ## With `readOnly = true` (disk mode only) the store holds a shared
   ## cross-process lock so concurrent reader processes can open the same path
@@ -459,7 +521,6 @@ proc newVectorStore*(path: string, mode: VectorStorageMode = smDisk, enableWal: 
 
   when enableConcurrency:
     static: doAssert compileOption("threads"), "concurrency requires --threads:on"
-    hasDb = false
 
   if mode == smDisk:
     dbPath = path.changeFileExt(".vdb")
@@ -543,6 +604,7 @@ proc createCollection*(s: VectorStore, c: VectorCollection) =
       s.cc.appendWal(s.wal,
         WalEntry(op: woCreateTable, table: c.name, pk: "", payload: schemaToPayload(c)),
         int(s.walFlushEveryOps))
+    s.maybeAutoCheckpointConcurrent()
     return
   let lsn = s.appendWalIfEnabled(woCreateTable, c.name, "", schemaToPayload(c))
   s.createCollectionNoWal(c)
@@ -559,6 +621,7 @@ proc dropCollection*(s: VectorStore, name: string) =
       s.cc.appendWal(s.wal,
         WalEntry(op: woDropTable, table: name, pk: "", payload: ""),
         int(s.walFlushEveryOps))
+    s.maybeAutoCheckpointConcurrent()
     return
   let lsn = s.appendWalIfEnabled(woDropTable, name, "", "")
   s.dropCollectionNoWal(name)
@@ -579,6 +642,7 @@ proc insert*(s: VectorStore, collection, pk: string, vec: seq[float32], partitio
     let mySeq = s.cc.submit(cast[TableSlot[VecWriteTask]](slot),
       VecWriteTask(kind: voInsert, pk: pk, vec: vec, partition: partition))
     cast[TableSlot[VecWriteTask]](slot).waitApplied(mySeq)
+    s.maybeAutoCheckpointConcurrent()
     return
   if not s.collections.hasKey(collection):
     raise newException(VectorStoreError, fmt"collection not found: {collection}")
@@ -601,6 +665,7 @@ proc delete*(s: VectorStore, collection, pk: string): bool =
       slot = cast[ptr TableSlot[VecWriteTask]](s.collections[collection].slot)
     let mySeq = s.cc.submit(cast[TableSlot[VecWriteTask]](slot), VecWriteTask(kind: voDelete, pk: pk))
     cast[TableSlot[VecWriteTask]](slot).waitApplied(mySeq)
+    s.maybeAutoCheckpointConcurrent()
     return true
   if not s.collections.hasKey(collection):
     return false

@@ -214,8 +214,9 @@ proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = 
   ## With `enableConcurrency = true` the store supports unlimited simultaneous
   ## reader and writer threads: reads are served concurrently under a read lock,
   ## and writes are serialized through a bounded worker pool (synchronous
-  ## visibility, async batched WAL durability). Concurrent mode is WAL-only
-  ## (no snapshots).
+  ## visibility, async batched WAL durability). Disk stores keep snapshot
+  ## (`.db`) durability with a concurrency-safe checkpoint; only `lazyReads`
+  ## stays WAL-only (no snapshots).
   ##
   ## With `readOnly = true` (disk mode only) the store holds a shared
   ## cross-process lock instead of an exclusive one, so any number of reader
@@ -255,7 +256,6 @@ proc newKvStore*(path: string, mode: KvStorageMode = ksmDisk, enableWal: bool = 
 
   when enableConcurrency:
     static: doAssert compileOption("threads"), "concurrency requires --threads:on"
-    hasDb = false
 
   result = KvStore(
     dataByKey: initTable[string, string](),
@@ -324,14 +324,69 @@ proc newInMemoryKvStore*(): KvStore =
   ## This is useful for testing or scenarios where durability is not required.
   newKvStore("", ksmInMemory, false)
 
+proc checkpoint*(s: KvStore)
+
+proc snapshotConcurrent(s: KvStore) =
+  ## Snapshot checkpoint for concurrent stores. Holds the single-table read
+  ## lock (stalling the consumer worker), flushes the WAL, writes the `.db`
+  ## snapshot, then truncates the WAL. `checkpointLsn` advances to the max
+  ## durable LSN so recovery skips the truncated prefix. No-op for WAL-only
+  ## stores (`lazyReads` or no `.db` file).
+  if not s.hasDbFile:
+    return
+  if s.lazyReads:
+    return
+  if s.cc == nil:
+    s.saveSnapshotIfEnabled()
+    return
+  if s.slot != nil:
+    beginRead(s.slot.mu)
+  try:
+    withWalLock(s.cc):
+      if s.hasWal:
+        s.cc.flushWalLocked(s.wal)
+        if s.wal.nextLsn > 1'u64:
+          let maxLsn = s.wal.nextLsn - 1'u64
+          if maxLsn > s.checkpointLsn:
+            s.checkpointLsn = maxLsn
+      let blob = encodeKvSnapshotToString(buildSnapshot(s))
+      writeTextAtomic(s.dbPath, blob)
+      if s.hasWal:
+        s.wal.truncate()
+      s.pendingOps = 0'u32
+  finally:
+    if s.slot != nil:
+      endRead(s.slot.mu)
+
+proc maybeAutoCheckpointConcurrent(s: KvStore) =
+  ## Thread-safe `checkpointEveryOps` accounting for concurrent writes.
+  if s.cc == nil:
+    return
+  if not s.hasDbFile or s.lazyReads:
+    return
+  if s.checkpointEveryOps == 0'u32:
+    return
+  var shouldCheckpoint = false
+  withWalLock(s.cc):
+    inc s.pendingOps
+    if s.pendingOps >= s.checkpointEveryOps:
+      shouldCheckpoint = true
+  if shouldCheckpoint:
+    s.checkpoint()
+
 proc checkpoint*(s: KvStore) =
   ## Forces a checkpoint (snapshot) to be taken immediately. This can be used to
   ## ensure that all operations up to the current LSN are persisted to disk,
   ## which can speed up recovery time in case of a crash. If WAL is enabled,
   ## the WAL is flushed before taking the snapshot to ensure durability.
+  ## Concurrent disk stores write a snapshot too (stalling writers briefly);
+  ## WAL-only stores (`lazyReads`) only flush the WAL.
   s.ensureWritable()
   if s.cc != nil:
-    s.cc.flushWal(s.wal)
+    if s.hasDbFile and not s.lazyReads:
+      s.snapshotConcurrent()
+    else:
+      s.cc.flushWal(s.wal)
     return
   if not s.hasDbFile:
     return
@@ -357,6 +412,7 @@ proc put*(s: KvStore, key, value: string) =
   if s.cc != nil:
     let mySeq = s.cc.submit(s.slot, KvWriteTask(kind: woPut, key: key, value: value))
     s.slot.waitApplied(mySeq)
+    s.maybeAutoCheckpointConcurrent()
     return
   let lsn = s.appendWalIfEnabled(woInsertRow, key, value)
   s.putNoWal(key, value)
@@ -408,6 +464,7 @@ proc delete*(s: KvStore, key: string): bool {.discardable.} =
   if s.cc != nil:
     let mySeq = s.cc.submit(s.slot, KvWriteTask(kind: woDelete, key: key))
     s.slot.waitApplied(mySeq)
+    s.maybeAutoCheckpointConcurrent()
     return true
   let lsn = s.appendWalIfEnabled(woDeleteRow, key, "")
   let removed = s.deleteNoWal(key)
