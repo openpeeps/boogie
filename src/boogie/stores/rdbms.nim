@@ -244,7 +244,23 @@ proc newStore*(path: string, mode: StorageMode = smDisk,
     )
 
   # If WAL is enabled, we need to recover the store state by replaying the WAL entries.
-  recoverFromWal(result)
+  # A failed open must release the lock deterministically: unwinding past a
+  # raise this deep does not reliably run the FileLock destructors for
+  # `fLock`/`result.lock`, which would leave a stale entry in the process
+  # lock table (and a wedged mutex), hanging the next open of this path.
+  # Catch-all: the lock must be released no matter what (even a Defect from
+  # corrupt input); the original exception is re-raised untouched.
+  try:
+    recoverFromWal(result)
+  except:
+    # NB: detach via result.lock, NOT fLock: `fLock` was moved into the
+    # Store constructor (it is nil here); the live handle is result.lock.
+    # The compiler also skips result's destruction on this unwind path (the
+    # raise originates several frames deep), so this explicit detach is the
+    # only thing releasing the lock — otherwise a stale entry wedges the
+    # next open of this path.
+    result.lock = FileLock()
+    raise
 
   let s = result
   registerStoreFlush(cast[pointer](s), proc() {.gcsafe.} =

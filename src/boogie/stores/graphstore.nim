@@ -518,25 +518,34 @@ proc openGraphStore*(rootDir: string): GraphStore =
   # Serialize whole-lifetime against other processes on this root BEFORE
   # touching the snapshot or WAL (blocks until the holder closes).
   result.lock = acquireFileLock(rootDir / "boogie.lock")
-  result.nodes = initTable[uint64, GraphNode]()
-  result.rels = initTable[uint64, Relationship]()
-  result.outAdj = initTable[uint64, seq[uint64]]()
-  result.inAdj = initTable[uint64, seq[uint64]]()
-  result.checkpointEvery = 1024
-  result.pendingWalOps = 0
-  
-  # initialize WAL and load existing state
-  result.wal = openWal(joinPath(rootDir, "graph"))
+  # A failed open must release the lock deterministically: unwinding past a
+  # raise this deep does not reliably run the FileLock destructors, which
+  # would leave a stale entry in the process lock table (and a wedged
+  # mutex), hanging the next open of this path. Catch-all: the lock must be
+  # released no matter what; the original exception is re-raised untouched.
+  try:
+    result.nodes = initTable[uint64, GraphNode]()
+    result.rels = initTable[uint64, Relationship]()
+    result.outAdj = initTable[uint64, seq[uint64]]()
+    result.inAdj = initTable[uint64, seq[uint64]]()
+    result.checkpointEvery = 1024
+    result.pendingWalOps = 0
 
-  let s = result
-  writeWith graphStoreRwLock:
-    loadSnapshotNoLock(s)
-    var replayed = false
-    for e in s.wal.entries:
-      applyWalEntryNoLock(s, e)
-      replayed = true
-    if replayed:
-      checkpointNoLock(s)
+    # initialize WAL and load existing state
+    result.wal = openWal(joinPath(rootDir, "graph"))
+
+    let s = result
+    writeWith graphStoreRwLock:
+      loadSnapshotNoLock(s)
+      var replayed = false
+      for e in s.wal.entries:
+        applyWalEntryNoLock(s, e)
+        replayed = true
+      if replayed:
+        checkpointNoLock(s)
+  except:
+    result.lock = FileLock()
+    raise
 
 proc closeGraphStore*(s: GraphStore) =
   writeWith graphStoreRwLock:

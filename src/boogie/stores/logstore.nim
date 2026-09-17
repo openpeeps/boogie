@@ -325,9 +325,21 @@ proc openLogStore*(path: string, name = "logs",
     cache: newLruCache(cacheCapacity),
     lock: fLock,
   )
-  openLog(result.wal)
-  result.reader = openLogReader(result.wal)
-  result.recoverFromWal()
+  # A failed open must release the lock deterministically: unwinding past a
+  # raise this deep does not reliably run the FileLock destructors for
+  # `fLock`/`result.lock`, which would leave a stale entry in the process
+  # lock table (and a wedged mutex), hanging the next open of this path.
+  # Catch-all: the lock must be released no matter what (even a Defect from
+  # corrupt input); the original exception is re-raised untouched.
+  try:
+    openLog(result.wal)
+    result.reader = openLogReader(result.wal)
+    result.recoverFromWal()
+  except:
+    # NB: detach via result.lock, NOT fLock (moved-from nil by construction).
+    # See rdbms.nim for why the explicit detach is required.
+    result.lock = FileLock()
+    raise
 
   let store = result
   registerStoreFlush(cast[pointer](store), proc() {.gcsafe.} =

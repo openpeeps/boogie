@@ -431,22 +431,31 @@ proc openColumnarStore*(rootDir: string, walPath: string = "", walFlushEveryOps:
   # (blocks until the holder closes).
   result.lock = acquireFileLock(rootDir / "boogie.lock")
 
-  let wpath = if walPath.len > 0: walPath else: rootDir / "boogie"
-  result.wal = openWal(wpath)
+  # A failed open must release the lock deterministically: unwinding past a
+  # raise this deep does not reliably run the FileLock destructors, which
+  # would leave a stale entry in the process lock table (and a wedged
+  # mutex), hanging the next open of this path. Catch-all: the lock must be
+  # released no matter what; the original exception is re-raised untouched.
+  try:
+    let wpath = if walPath.len > 0: walPath else: rootDir / "boogie"
+    result.wal = openWal(wpath)
 
-  for kind, p in walkDir(result.tablesRoot):
-    if kind == pcDir:
-      let meta = p / "table.json"
-      if fileExists(meta):
-        let schema = loadSchema(meta)
-        var t = makeTable(schema)
-        if schema.primaryKey.len > 0:
-          let pkPath = p / "columns" / (schema.primaryKey & ".col")
-          for v in loadColumnValues(pkPath):
-            t.pkValues.incl($v)
-        result.tables[schema.name] = t
+    for kind, p in walkDir(result.tablesRoot):
+      if kind == pcDir:
+        let meta = p / "table.json"
+        if fileExists(meta):
+          let schema = loadSchema(meta)
+          var t = makeTable(schema)
+          if schema.primaryKey.len > 0:
+            let pkPath = p / "columns" / (schema.primaryKey & ".col")
+            for v in loadColumnValues(pkPath):
+              t.pkValues.incl($v)
+          result.tables[schema.name] = t
 
-  result.recoverFromWal()
+    result.recoverFromWal()
+  except:
+    result.lock = FileLock()
+    raise
 
 proc createTable*(s: var ColumnarStore, schema: TableSchema, sync: bool = true) =
   s.createTableInternal(schema, emitWal = true, sync = sync)

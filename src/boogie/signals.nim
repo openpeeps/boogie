@@ -194,8 +194,18 @@ when defined(posix):
   proc watcherLoop(r: SigRegistry) {.thread.} =
     var buf: array[32, byte]
     while true:
+      # Blocking read: the thread sleeps here until a signal byte arrives
+      # (zero CPU while idle). Never hot-loop on failure: an O_NONBLOCK fd
+      # plus `continue` on EAGAIN pins a core at 100%.
       let n = read(gPipeRd, addr buf[0], buf.len)
-      if n <= 0:
+      if n < 0:
+        # EINTR (blocking read interrupted): retry, the next read blocks again.
+        continue
+      if n == 0:
+        # EOF: every write end closed. The process holds its own write end
+        # open for its lifetime so this should not happen; sleep defensively
+        # instead of spinning in case it ever does.
+        sleep(50)
         continue
       for i in 0 ..< n:
         r.dispatch(int(buf[i]))
@@ -232,12 +242,15 @@ when defined(posix):
         raise newException(SignalError, "pipe() failed for signal delivery")
       gPipeRd = fds[0]
       gPipeWr = fds[1]
-      var fl = fcntl(fds[0], F_GETFL, 0)
-      if fl >= 0:
-        discard fcntl(fds[0], F_SETFL, fl or O_NONBLOCK)
-      fl = fcntl(fds[1], F_GETFL, 0)
+      # The read end stays BLOCKING so the watcher thread sleeps in read()
+      # instead of spinning. The write end stays non-blocking: it is used
+      # inside the async-signal-safe forwarder, which must never block.
+      var fl = fcntl(fds[1], F_GETFL, 0)
       if fl >= 0:
         discard fcntl(fds[1], F_SETFL, fl or O_NONBLOCK)
+      # Do not leak the pipe into spawned children.
+      discard fcntl(fds[0], F_SETFD, FD_CLOEXEC)
+      discard fcntl(fds[1], F_SETFD, FD_CLOEXEC)
       # Both ends stay open for process lifetime.
     var act: Sigaction
     act.sa_handler = signalForwarder

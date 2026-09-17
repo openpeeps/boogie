@@ -75,13 +75,15 @@ proc `=destroy`*(l: var FileLock) =
     var fh: File
     var done = false
     acquire(flMu)
-    if flHolds.hasKey(path) and cast[pointer](flHolds[path]) == self:
-      dec flHolds[path].refs
-      if flHolds[path].refs <= 0:
-        fh = flHolds[path].fh
-        flHolds.del(path)
-        done = true
-    release(flMu)
+    try:
+      if flHolds.hasKey(path) and cast[pointer](flHolds[path]) == self:
+        dec flHolds[path].refs
+        if flHolds[path].refs <= 0:
+          fh = flHolds[path].fh
+          flHolds.del(path)
+          done = true
+    finally:
+      release(flMu)
     if done:
       fh.close()
 
@@ -96,12 +98,13 @@ proc acquireFileLock*(lockPath: string): FileLock =
   else:
     let canon = canonical(lockPath)
     acquire(flMu)
-    if flHolds.hasKey(canon):
-      let e = flHolds[canon]
-      inc e.refs
+    try:
+      if flHolds.hasKey(canon):
+        let e = flHolds[canon]
+        inc e.refs
+        return FileLock(entry: e)
+    finally:
       release(flMu)
-      return FileLock(entry: e)
-    release(flMu)
     # Slow path: create/open the lockfile, then block in flock.
     # The content is irrelevant (presence is the lock); pre-creating keeps us
     # independent of the exact create-semantics of fmReadWrite.
@@ -121,14 +124,15 @@ proc acquireFileLock*(lockPath: string): FileLock =
       raise newException(FileLockError, "cannot lock: " & canon)
     let e = LockEntry(path: canon, fh: fh, refs: 1)
     acquire(flMu)
-    # A concurrent same-process acquire may have won while we blocked: fold
-    # into it instead of holding two descriptions.
-    if flHolds.hasKey(canon):
-      let prev = flHolds[canon]
-      inc prev.refs
+    try:
+      # A concurrent same-process acquire may have won while we blocked: fold
+      # into it instead of holding two descriptions.
+      if flHolds.hasKey(canon):
+        let prev = flHolds[canon]
+        inc prev.refs
+        fh.close()
+        return FileLock(entry: prev)
+      flHolds[canon] = e
+    finally:
       release(flMu)
-      fh.close()
-      return FileLock(entry: prev)
-    flHolds[canon] = e
-    release(flMu)
     FileLock(entry: e)
