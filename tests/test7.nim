@@ -15,13 +15,14 @@ type
     n: int
 
 proc kvWriter(a: KvWriter) {.thread.} =
-  for i in 0..<a.n:
-    a.kv.put("w" & $a.id & "_" & $i, "v" & $i)
-  var ok = true
-  for i in 0..<a.n:
-    let g = a.kv.get("w" & $a.id & "_" & $i)
-    if g.isNone or g.get != "v" & $i: ok = false
-  echo "  kv writer ", a.id, " visible=", ok
+  {.gcsafe.}:
+    for i in 0..<a.n:
+      a.kv.put("w" & $a.id & "_" & $i, "v" & $i)
+    var ok = true
+    for i in 0..<a.n:
+      let g = a.kv.get("w" & $a.id & "_" & $i)
+      if g.isNone or g.get != "v" & $i: ok = false
+    echo "  kv writer ", a.id, " visible=", ok
 
 suite "concurrency (enableConcurrency = true)":
   test "kv store: concurrent put/get across 4 writers":

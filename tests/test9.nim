@@ -15,15 +15,16 @@ type
     n: int
 
 proc rdbWriter(a: RdbWriter) {.thread.} =
-  for i in 0..<a.n:
-    let pk = fmt"w{a.id}_{i}"
-    a.st.insertRow("users", pk, row({
-      "name": newTextValue(fmt"user{a.id}_{i}"),
-      "age": newIntValue(i mod 60)
-    }))
-  # deletes must stay in sync with the writer's own inserts
-  for i in 0..<a.n:
-    discard a.st.deleteRow("users", fmt"w{a.id}_{i}")
+  {.gcsafe.}:
+    for i in 0..<a.n:
+      let pk = fmt"w{a.id}_{i}"
+      a.st.insertRow("users", pk, row({
+        "name": newTextValue(fmt"user{a.id}_{i}"),
+        "age": newIntValue(i mod 60)
+      }))
+    # deletes must stay in sync with the writer's own inserts
+    for i in 0..<a.n:
+      discard a.st.deleteRow("users", fmt"w{a.id}_{i}")
 
 proc rdbReader(a: RdbReader) {.thread.} =
   let t = a.st.getTable("users").get

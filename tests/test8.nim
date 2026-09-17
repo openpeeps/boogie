@@ -17,8 +17,9 @@ type
     collection: string
 
 proc vecWriter(a: VecWriter) {.thread.} =
-  for i in 0..<a.n:
-    a.vs.insert(a.collection, fmt"w{a.id}_{i}", @[float32(i), float32(a.id)], "p" & $a.id)
+  {.gcsafe.}:
+    for i in 0..<a.n:
+      a.vs.insert(a.collection, fmt"w{a.id}_{i}", @[float32(i), float32(a.id)], "p" & $a.id)
 
 proc vecReader(a: VecReader) {.thread.} =
   # Reads against a live collection while other threads keep writing to it.
