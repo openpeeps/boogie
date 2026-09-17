@@ -126,6 +126,10 @@
   <li><a class="reference" href="#flushWal%2CConcurrentState%5BT%5D%2CWal" title="flushWal[T](cc: ConcurrentState[T]; wal: var Wal; clear = true)">flushWal[T](cc: ConcurrentState[T]; wal: var Wal; clear = true)</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">flushWalLocked
+  <li><a class="reference" href="#flushWalLocked%2CConcurrentState%5BT%5D%2CWal" title="flushWalLocked[T](cc: ConcurrentState[T]; wal: var Wal)">flushWalLocked[T](cc: ConcurrentState[T]; wal: var Wal)</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">initRwLock
   <li><a class="reference" href="#initRwLock%2CRwLock" title="initRwLock(rw: var RwLock)">initRwLock(rw: var RwLock)</a></li>
 
@@ -405,6 +409,17 @@
 </div>
 
 </div>
+<div id="flushWalLocked-procs-all">
+  <div id="flushWalLocked,ConcurrentState[T],Wal">
+  <dt><pre><span class="Keyword">proc</span> <a href="#flushWalLocked%2CConcurrentState%5BT%5D%2CWal"><span class="Identifier">flushWalLocked</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">(</span><span class="Identifier">cc</span><span class="Other">:</span> <a href="#ConcurrentState"><span class="Identifier">ConcurrentState</span></a><span class="Other">[</span><span class="Identifier">T</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">wal</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="wal.html#Wal"><span class="Identifier">Wal</span></a><span class="Other">)</span></pre></dt>
+  <dd>
+    
+    Flush assuming <tt class="docutils literal"><span class="pre"><span class="Identifier">walLock</span></span></tt> is already held (e.g. inside <tt class="docutils literal"><span class="pre"><span class="Identifier">withWalLock</span></span></tt> during a snapshot checkpoint or WAL compaction). Resets the group-commit counter without re-acquiring the lock (which would self-deadlock).
+    
+  </dd>
+</div>
+
+</div>
 <div id="initRwLock-procs-all">
   <div id="initRwLock,RwLock">
   <dt><pre><span class="Keyword">proc</span> <a href="#initRwLock%2CRwLock"><span class="Identifier">initRwLock</span></a><span class="Other">(</span><span class="Identifier">rw</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#RwLock"><span class="Identifier">RwLock</span></a><span class="Other">)</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
@@ -584,7 +599,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-17 14:47:17 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-17 20:43:29 UTC</small>
       </div>
     </div>
   </div>

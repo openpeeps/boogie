@@ -8,12 +8,12 @@ nim	recoverFromWal	boogie/stores/kv.html#recoverFromWal,KvStore	proc recoverFrom
 nim	newKvStore	boogie/stores/kv.html#newKvStore,string,KvStorageMode,bool,uint32,uint32,staticbool	proc newKvStore(path: string; mode: KvStorageMode = ksmDisk; enableWal: bool = true;\n           checkpointEveryOps: uint32 = 0'u32;\n           walFlushEveryOps: uint32 = 1000'u32; lazyReads = false;\n           enableConcurrency: static bool = false; readOnly = false): KvStore		200
 nim	newInMemoryKvStore	boogie/stores/kv.html#newInMemoryKvStore	proc newInMemoryKvStore(): KvStore		322
 nim	checkpoint	boogie/stores/kv.html#checkpoint,KvStore	proc checkpoint(s: KvStore)		327
-nim	close	boogie/stores/kv.html#close,KvStore	proc close(s: KvStore)		342
-nim	put	boogie/stores/kv.html#put,KvStore,string,string	proc put(s: KvStore; key, value: string)		352
-nim	get	boogie/stores/kv.html#get,KvStore,string	proc get(s: KvStore; key: string): Option[string]		365
-nim	hasKey	boogie/stores/kv.html#hasKey,KvStore,string	proc hasKey(s: KvStore; key: string): bool		393
-nim	delete	boogie/stores/kv.html#delete,KvStore,string	proc delete(s: KvStore; key: string): bool		402
-nim	len	boogie/stores/kv.html#len,KvStore	proc len(s: KvStore): int		419
-nim	isEmpty	boogie/stores/kv.html#isEmpty,KvStore	proc isEmpty(s: KvStore): bool		428
-nim	retainedValueBytes	boogie/stores/kv.html#retainedValueBytes,KvStore	proc retainedValueBytes(s: KvStore): int64		437
-nim	pairsUnordered	boogie/stores/kv.html#pairsUnordered.i,KvStore	iterator pairsUnordered(s: KvStore): (string, string)		445
+nim	close	boogie/stores/kv.html#close,KvStore	proc close(s: KvStore)		397
+nim	put	boogie/stores/kv.html#put,KvStore,string,string	proc put(s: KvStore; key, value: string)		407
+nim	get	boogie/stores/kv.html#get,KvStore,string	proc get(s: KvStore; key: string): Option[string]		421
+nim	hasKey	boogie/stores/kv.html#hasKey,KvStore,string	proc hasKey(s: KvStore; key: string): bool		449
+nim	delete	boogie/stores/kv.html#delete,KvStore,string	proc delete(s: KvStore; key: string): bool		458
+nim	len	boogie/stores/kv.html#len,KvStore	proc len(s: KvStore): int		476
+nim	isEmpty	boogie/stores/kv.html#isEmpty,KvStore	proc isEmpty(s: KvStore): bool		485
+nim	retainedValueBytes	boogie/stores/kv.html#retainedValueBytes,KvStore	proc retainedValueBytes(s: KvStore): int64		494
+nim	pairsUnordered	boogie/stores/kv.html#pairsUnordered.i,KvStore	iterator pairsUnordered(s: KvStore): (string, string)		502
