@@ -18,6 +18,9 @@ when defined(posix):
 #   flushes but survives; SIGTERM exits gracefully via a custom listener
 #   (which suppresses termination); and custom signals (raw SIGUSR1 + enum
 #   SIGUSR2) reach user callbacks.
+# The crashsafe-dependent half of the suite is compiled out under
+# `-d:disableCrashSafe` (boogie owns no signal in that build); the relay and
+# generic-signal tests still run, plus the "arms nothing" check.
 # Run with: clue test
 # ---------------------------------------------------------------------------
 
@@ -133,6 +136,49 @@ when defined(posix):
     check selfUsr1.load == 1
     h.unlisten()
 
+when defined(disableCrashSafe):
+  # Only meaningful in the flagged build; the default build's counterpart is
+  # the SIGHUP/SIGSEGV multi-process tests below.
+  suite "crashsafe: -d:disableCrashSafe":
+    const watch = [SignalSegv, SignalAbrt, SignalBus, SignalIll, SignalFpe,
+                   SignalInt, SignalTerm, SignalHup, SignalQuit]
+
+    when defined(posix):
+      proc querySigaction(sig: cint, act, old: ptr ops.Sigaction): cint
+        {.importc: "sigaction", header: "<signal.h>", sideEffect.}
+        ## Disposition query. `std/posix`'s `sigaction` has no NULL-`act`
+        ## overload, and passing a dummy action *installs* it — which would
+        ## clobber exactly the handlers this test is trying to observe.
+
+    proc dispositions(): seq[uint] =
+      ## The OS's current `sa_handler` for `watch`, sampled before and after a
+      ## store open. The flag promises boogie changes NOTHING, which is
+      ## stronger than "everything is SIG_DFL": the Nim runtime already owns
+      ## the fatal signals, and a host crash reporter owns more.
+      when defined(posix):
+        var old: ops.Sigaction
+        for s in watch:
+          discard querySigaction(cint(s.signalNumber), nil, addr old)
+          result.add cast[uint](old.sa_handler)
+      else:
+        for s in watch:
+          result.add 0'u
+
+    test "a store open leaves every signal disposition untouched":
+      # The GUI-app contract, asserted at the OS level: boogie arms no signal
+      # and replaces no handler, so crash reporters keep their own fatal
+      # handlers and SIGHUP/SIGTERM keep the host's own semantics.
+      let armedBefore = watchedSignals()
+      let dispBefore = dispositions()
+      let root = testRoot()
+      var kv = newKvStore(root / "nosig", ksmDisk, enableWal = true)
+      kv.put("k", "v")
+      kv.close()
+      check watchedSignals() == armedBefore
+      check dispositions() == dispBefore
+      for s in watch:
+        check countSignalListeners(s) == 0
+
 when defined(posix):
   suite "signals: multi-process":
     ensureSignalWorker()
@@ -162,44 +208,73 @@ when defined(posix):
           raise newException(CatchableError, "worker did not exit in time")
       p.peekExitCode
 
-    test "SIGHUP flushes unflushed WAL then terminates the process":
-      let root = testRoot()
-      var p = spawnWorker("hupkill", root)
-      waitReady(p)
-      sleep(300) # let all puts land in the group-commit buffer
-      discard ops.kill(Pid(p.processID), ops.SIGHUP)
-      # Nobody else listens for SIGHUP, so crashsafe terminates after
-      # flushing: the worker must exit PROMPTLY on its own (a hang here is
-      # the terminal-tab-close bug — the process must die, not linger).
-      discard waitExitOk(p)
-      check not p.running
-      discard ops.kill(Pid(p.processID), ops.SIGKILL) # no-op once dead
-      p.close()
-      let kv = newKvStore(root / "sig", ksmDisk, enableWal = true)
-      var count = 0
-      for k in ["k0", "k149", "k299"]:
-        if kv.get(k).isSome:
-          inc count
-      check count == 3
-      check kv.len == 300
-      kv.close()
+    when not defined(disableCrashSafe):
+      # The three tests below assert crashsafe's own signal behaviour (flush
+      # on HUP, flush-then-terminate, flush on a fatal signal). With
+      # `-d:disableCrashSafe` boogie installs no handlers at all, so they
+      # would fail by construction — see the "arms nothing" test above.
 
-    test "SIGHUP opt-out via setTerminateSignals({}) flushes but survives":
-      let root = testRoot()
-      var p = spawnWorker("hupsurvive", root)
-      waitReady(p)
-      sleep(300)
-      discard ops.kill(Pid(p.processID), ops.SIGHUP)
-      sleep(1000) # let the watcher-thread flush land on disk
-      check p.running # opt-out: still alive after SIGHUP
-      discard ops.kill(Pid(p.processID), ops.SIGKILL) # no cleanup possible past this point
-      discard waitExitOk(p)
-      p.close()
-      let kv = newKvStore(root / "sig", ksmDisk, enableWal = true)
-      check kv.len == 300
-      check kv.get("k299").isSome
-      kv.close()
+      test "SIGHUP flushes unflushed WAL then terminates the process":
+        let root = testRoot()
+        var p = spawnWorker("hupkill", root)
+        waitReady(p)
+        sleep(300) # let all puts land in the group-commit buffer
+        discard ops.kill(Pid(p.processID), ops.SIGHUP)
+        # Nobody else listens for SIGHUP, so crashsafe terminates after
+        # flushing: the worker must exit PROMPTLY on its own (a hang here is
+        # the terminal-tab-close bug — the process must die, not linger).
+        discard waitExitOk(p)
+        check not p.running
+        discard ops.kill(Pid(p.processID), ops.SIGKILL) # no-op once dead
+        p.close()
+        let kv = newKvStore(root / "sig", ksmDisk, enableWal = true)
+        var count = 0
+        for k in ["k0", "k149", "k299"]:
+          if kv.get(k).isSome:
+            inc count
+        check count == 3
+        check kv.len == 300
+        kv.close()
 
+      test "SIGHUP opt-out via setTerminateSignals({}) flushes but survives":
+        let root = testRoot()
+        var p = spawnWorker("hupsurvive", root)
+        waitReady(p)
+        sleep(300)
+        discard ops.kill(Pid(p.processID), ops.SIGHUP)
+        sleep(1000) # let the watcher-thread flush land on disk
+        check p.running # opt-out: still alive after SIGHUP
+        discard ops.kill(Pid(p.processID), ops.SIGKILL) # no cleanup possible past this point
+        discard waitExitOk(p)
+        p.close()
+        let kv = newKvStore(root / "sig", ksmDisk, enableWal = true)
+        check kv.len == 300
+        check kv.get("k299").isSome
+        kv.close()
+
+      test "SIGSEGV flushes unflushed WAL before dying (fatal path)":
+        let root = testRoot()
+        var p = spawnWorker("segv", root)
+        waitReady(p)
+        # The worker kills itself with SIGSEGV ~500ms after READY; normal exit
+        # (code 0) would mean the crash never happened and the test is void.
+        var waited = 0
+        while p.running:
+          sleep(100)
+          inc waited, 100
+          if waited >= 15000:
+            p.terminate()
+            raise newException(CatchableError, "segv worker did not die")
+        check p.peekExitCode != 0
+        p.close()
+        let kv = newKvStore(root / "sig", ksmDisk, enableWal = true)
+        check kv.len == 300
+        check kv.get("k299").isSome
+        kv.close()
+
+    # Host-owned signals: crashsafe is a bystander here, so these hold with or
+    # without `-d:disableCrashSafe` (the worker closes its store on the way
+    # out, which is what makes the data durable).
     test "SIGTERM runs a custom listener and exits gracefully":
       let root = testRoot()
       var p = spawnWorker("term", root)
@@ -225,23 +300,3 @@ when defined(posix):
       p.close()
       check fileExists(root / "usr1.marker")
       check fileExists(root / "usr2.marker")
-
-    test "SIGSEGV flushes unflushed WAL before dying (fatal path)":
-      let root = testRoot()
-      var p = spawnWorker("segv", root)
-      waitReady(p)
-      # The worker kills itself with SIGSEGV ~500ms after READY; normal exit
-      # (code 0) would mean the crash never happened and the test is void.
-      var waited = 0
-      while p.running:
-        sleep(100)
-        inc waited, 100
-        if waited >= 15000:
-          p.terminate()
-          raise newException(CatchableError, "segv worker did not die")
-      check p.peekExitCode != 0
-      p.close()
-      let kv = newKvStore(root / "sig", ksmDisk, enableWal = true)
-      check kv.len == 300
-      check kv.get("k299").isSome
-      kv.close()
