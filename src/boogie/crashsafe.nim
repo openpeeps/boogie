@@ -24,7 +24,7 @@
 ## `docker stop`, launchd and systemd for every embedder. SIGINT always stays
 ## flush-and-continue (interactive Ctrl+C must not kill a REPL).
 ##
-## Compile with `-d:disableCrashSafe` to opt out of the OS signal layer
+## Compile with `-d:boogieNoCrashHandlers` to opt out of the OS signal layer
 ## entirely: boogie replaces no handler (the fatal signals keep whatever
 ## disposition the host, the crash reporter or the runtime already installed)
 ## and subscribes to no termination signal, so SIGHUP/SIGTERM keep the host's
@@ -76,7 +76,7 @@ var
     ## is process-lifetime anyway, so this is an intentional, tiny leak.
   handlersInstalled = false
 
-when not defined(disableCrashSafe):
+when not defined(boogieNoCrashHandlers):
   var
     termHandles: seq[ListenerHandle]
       ## Our own internal termination-signal subscriptions (one per signal in
@@ -118,7 +118,7 @@ proc flushAllStores*() =
     return
   flushAllStoresInternal(hooks)
 
-when defined(posix) and not defined(disableCrashSafe):
+when defined(posix) and not defined(boogieNoCrashHandlers):
   var fatalActive: Atomic[bool]
 
   proc flushAllStoresNoBlock() =
@@ -159,17 +159,17 @@ proc setTerminateSignals*(s: set[OsSignal]) =
   ## independent of call order with store opens. Pass `{}` to restore pure
   ## flush-and-continue for every signal (e.g. daemons with their own SIGHUP
   ## reload handling — arm yours after the first store open and call
-  ## `flushAllStores()` in it). Inert when built with `-d:disableCrashSafe`:
+  ## `flushAllStores()` in it). Inert when built with `-d:boogieNoCrashHandlers`:
   ## boogie does not own any signal in that build, so there is no terminate
   ## policy to override.
-  when defined(posix) and not defined(disableCrashSafe):
+  when defined(posix) and not defined(boogieNoCrashHandlers):
     acquire(termMu)
     termSignals = s
     release(termMu)
   else:
     discard s
 
-when defined(posix) and not defined(disableCrashSafe):
+when defined(posix) and not defined(boogieNoCrashHandlers):
   var termActive: Atomic[bool]
 
   proc shouldTerminateOn(signo: int): bool {.gcsafe.} =
@@ -212,7 +212,7 @@ when defined(posix) and not defined(disableCrashSafe):
     discard sigaction(cint(signo), def, nil)
     discard kill(getpid(), cint(signo))
 
-when not defined(disableCrashSafe):
+when not defined(boogieNoCrashHandlers):
   proc crashSignalCb(sig: cint) {.gcsafe.} =
     ## Watcher-thread callback for termination signals: flush first, then die
     ## when the lifecycle policy says the signal is ours alone. A top-level
@@ -231,7 +231,7 @@ proc installCrashHandlers*() =
   ## `setTerminateSignals`). Fatal signals (SEGV/ABRT/BUS/ILL/FPE) flush
   ## best-effort in handler context and re-raise. Without `--threads:on` only
   ## the exit hook is installed (signal delivery needs the watcher thread).
-  ## With `-d:disableCrashSafe` only the exit hook is installed, on every
+  ## With `-d:boogieNoCrashHandlers` only the exit hook is installed, on every
   ## platform: boogie touches no signal disposition at all.
   if handlersInstalled:
     return
@@ -239,7 +239,7 @@ proc installCrashHandlers*() =
   when defined(posix):
     addExitProc(proc() {.noconv.} = flushAllStores())
     when compileOption("threads"):
-      when not defined(disableCrashSafe):
+      when not defined(boogieNoCrashHandlers):
         for s in [SignalInt, SignalTerm, SignalHup, SignalQuit]:
           termHandles.add(listenSignal(s, crashSignalCb))
         installFatalHandler([SignalSegv, SignalAbrt, SignalBus, SignalIll,

@@ -19,7 +19,7 @@ when defined(posix):
 #   (which suppresses termination); and custom signals (raw SIGUSR1 + enum
 #   SIGUSR2) reach user callbacks.
 # The crashsafe-dependent half of the suite is compiled out under
-# `-d:disableCrashSafe` (boogie owns no signal in that build); the relay and
+# `-d:boogieNoCrashHandlers` (boogie owns no signal in that build); the relay and
 # generic-signal tests still run, plus the "arms nothing" check.
 # Run with: clue test
 # ---------------------------------------------------------------------------
@@ -136,10 +136,10 @@ when defined(posix):
     check selfUsr1.load == 1
     h.unlisten()
 
-when defined(disableCrashSafe):
+when defined(boogieNoCrashHandlers):
   # Only meaningful in the flagged build; the default build's counterpart is
   # the SIGHUP/SIGSEGV multi-process tests below.
-  suite "crashsafe: -d:disableCrashSafe":
+  suite "crashsafe: -d:boogieNoCrashHandlers":
     const watch = [SignalSegv, SignalAbrt, SignalBus, SignalIll, SignalFpe,
                    SignalInt, SignalTerm, SignalHup, SignalQuit]
 
@@ -208,10 +208,10 @@ when defined(posix):
           raise newException(CatchableError, "worker did not exit in time")
       p.peekExitCode
 
-    when not defined(disableCrashSafe):
+    when not defined(boogieNoCrashHandlers):
       # The three tests below assert crashsafe's own signal behaviour (flush
       # on HUP, flush-then-terminate, flush on a fatal signal). With
-      # `-d:disableCrashSafe` boogie installs no handlers at all, so they
+      # `-d:boogieNoCrashHandlers` boogie installs no handlers at all, so they
       # would fail by construction — see the "arms nothing" test above.
 
       test "SIGHUP flushes unflushed WAL then terminates the process":
@@ -273,7 +273,7 @@ when defined(posix):
         kv.close()
 
     # Host-owned signals: crashsafe is a bystander here, so these hold with or
-    # without `-d:disableCrashSafe` (the worker closes its store on the way
+    # without `-d:boogieNoCrashHandlers` (the worker closes its store on the way
     # out, which is what makes the data durable).
     test "SIGTERM runs a custom listener and exits gracefully":
       let root = testRoot()
