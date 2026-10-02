@@ -315,10 +315,6 @@ placeholders. JOINs, GROUP BY/HAVING and subqueries are not supported yet.
 - 🐛 Found a bug? [Create a new Issue](https://github.com/openpeeps/boogie/issues)
 - 👋 Wanna help? [Fork it!](https://github.com/openpeeps/boogie/fork)
 
-|  |  |
-|---|---|
-| <a href="https://opencode.ai/go?ref=BHMEEK48QX"><img src="https://github.com/openpeeps/pistachio/blob/main/.github/opencode.png" alt="OpenCode"></a> | Switch to **Open-Source LLMs** via OpenCode GO, choosing from a variety of powerful models such as DeepSeek, Qwen, Kimi, GLM-5, MiniMax, MiMo. 🍕 [Use our referral link to get started!](https://opencode.ai/go?ref=BHMEEK48QX)|
-
 ### 🎩 License
 LGPLv3 license. [Made by Humans from OpenPeeps](https://github.com/openpeeps).<br>
 Copyright OpenPeeps & Contributors &mdash; All rights reserved.
