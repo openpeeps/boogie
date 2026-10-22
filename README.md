@@ -195,10 +195,10 @@ over the same columns are much faster than the first (cold) scan.
 
 | Operation | ops/s |
 |---|---|
-| insert (batch) | ~0.37 M |
-| scan (cold, first load) | ~0.43 M |
-| scan (warm, cached) | ~3.01 M |
-| filter (cached) | ~3.92 M |
+| insert (batch) | ~0.36 M |
+| scan (cold, first load) | ~1.10 M |
+| scan (warm, cached) | ~2.68 M |
+| filter (cached) | ~3.75 M |
 
 ### Graph Store
 
