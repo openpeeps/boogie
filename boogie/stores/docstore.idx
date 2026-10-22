@@ -5,7 +5,7 @@ nim	DocumentEncoding	boogie/stores/docstore.html#DocumentEncoding	enum DocumentE
 nim	DocumentStoreError	boogie/stores/docstore.html#DocumentStoreError	object DocumentStoreError		33
 nim	DocumentStore	boogie/stores/docstore.html#DocumentStore	object DocumentStore		37
 nim	recoverFromWal	boogie/stores/docstore.html#recoverFromWal,DocumentStore	proc recoverFromWal(s: var DocumentStore)		182
-nim	openDocumentStore	boogie/stores/docstore.html#openDocumentStore,string,string,uint32,uint32	proc openDocumentStore(path: string; name = "documents"; defaultEncoding = deJson;\n                  enableSnapshots = true; checkpointEveryOps: uint32 = 1000'u32;\n                  walFlushEveryOps: uint32 = 1000'u32; readOnly = false): DocumentStore		204
+nim	openDocumentStore	boogie/stores/docstore.html#openDocumentStore,string,string,uint32,uint32	proc openDocumentStore(path: string; name = "documents"; defaultEncoding = deJson;\n                  enableSnapshots = true; checkpointEveryOps: uint32 = 0'u32;\n                  walFlushEveryOps: uint32 = 1000'u32; readOnly = false): DocumentStore		204
 nim	checkpoint	boogie/stores/docstore.html#checkpoint,DocumentStore	proc checkpoint(store: var DocumentStore)		257
 nim	close	boogie/stores/docstore.html#close,DocumentStore	proc close(store: var DocumentStore)		264
 nim	len	boogie/stores/docstore.html#len,DocumentStore	proc len(store: DocumentStore): int		271
