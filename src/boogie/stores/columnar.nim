@@ -208,32 +208,133 @@ proc normalizeValue(kind: ColumnType, nullable: bool, v: JsonNode): JsonNode =
   of ctJson:
     return v
 
-proc loadColumnValues(path: string): seq[JsonNode] =
+proc readU8File(f: File): uint8 =
+  var b: uint8
+  if f.readBuffer(addr b, 1) != 1:
+    raise newException(ColumnarError, "unexpected EOF in column file")
+  result = b
+
+proc readU32File(f: File): uint32 =
+  var b: array[4, uint8]
+  if f.readBuffer(addr b[0], 4) != 4:
+    raise newException(ColumnarError, "unexpected EOF in column file")
+  result = uint32(b[0]) or (uint32(b[1]) shl 8) or
+           (uint32(b[2]) shl 16) or (uint32(b[3]) shl 24)
+
+proc readI64File(f: File): int64 =
+  var b: array[8, uint8]
+  if f.readBuffer(addr b[0], 8) != 8:
+    raise newException(ColumnarError, "unexpected EOF in column file")
+  var u: uint64 = 0
+  for i in 0..7:
+    u = u or (uint64(b[i]) shl (i * 8))
+  result = cast[int64](u)
+
+proc readF64File(f: File): float64 =
+  var b: array[8, uint8]
+  if f.readBuffer(addr b[0], 8) != 8:
+    raise newException(ColumnarError, "unexpected EOF in column file")
+  var u: uint64 = 0
+  for i in 0..7:
+    u = u or (uint64(b[i]) shl (i * 8))
+  result = cast[float64](u)
+
+proc readStrFile(f: File): string =
+  let n = int(readU32File(f))
+  result = newString(n)
+  if n > 0:
+    if f.readBuffer(addr result[0], n) != n:
+      raise newException(ColumnarError, "unexpected EOF in column file")
+
+proc writeU8File(f: File, v: uint8) =
+  let b = char(v)
+  if f.writeBuffer(unsafeAddr b, 1) != 1:
+    raise newException(ColumnarError, "column file write failed")
+
+proc writeU32File(f: File, v: uint32) =
+  var b: array[4, uint8]
+  for i in 0..3:
+    b[i] = uint8((v shr (i * 8)) and 0xFF'u32)
+  if f.writeBuffer(addr b[0], 4) != 4:
+    raise newException(ColumnarError, "column file write failed")
+
+proc writeI64File(f: File, v: int64) =
+  var b: array[8, uint8]
+  let u = cast[uint64](v)
+  for i in 0..7:
+    b[i] = uint8((u shr (i * 8)) and 0xFF'u64)
+  if f.writeBuffer(addr b[0], 8) != 8:
+    raise newException(ColumnarError, "column file write failed")
+
+proc writeF64File(f: File, v: float64) =
+  var b: array[8, uint8]
+  let u = cast[uint64](v)
+  for i in 0..7:
+    b[i] = uint8((u shr (i * 8)) and 0xFF'u64)
+  if f.writeBuffer(addr b[0], 8) != 8:
+    raise newException(ColumnarError, "column file write failed")
+
+proc writeStrFile(f: File, v: string) =
+  writeU32File(f, uint32(v.len))
+  if v.len > 0:
+    if f.writeBuffer(unsafeAddr v[0], v.len) != v.len:
+      raise newException(ColumnarError, "column file write failed")
+
+proc loadColumnValues(path: string, kind: ColumnType, nullable: bool): seq[JsonNode] =
   result = @[]
   if not fileExists(path): return
-  for line in lines(path):
-    if line.len == 0: continue
-    result.add(parseJson(line))
+  let size = getFileSize(path)
+  if size == 0: return
+  let f = open(path, fmRead)
+  defer: f.close()
+  while f.getFilePos() < size:
+    let isNull = readU8File(f) == 1'u8
+    if isNull:
+      result.add(newJNull())
+      continue
+    case kind
+    of ctInt64:
+      result.add(newJInt(readI64File(f)))
+    of ctFloat64:
+      result.add(newJFloat(readF64File(f)))
+    of ctBool:
+      let b = readU8File(f)
+      result.add(newJBool(b != 0'u8))
+    of ctString:
+      result.add(newJString(readStrFile(f)))
+    of ctJson:
+      result.add(parseJson(readStrFile(f)))
 
 proc columnValues(t: ColumnarTable, s: ColumnarStore, table, col: string): seq[JsonNode] =
   ## Returns the parsed values for a column, loading them from disk on first use
   ## and caching them in the table for subsequent scans/aggregates.
   if t.colCache.hasKey(col):
     return t.colCache[col]
-  let vals = loadColumnValues(s.columnPath(table, col))
+  let cs = t.byName[col]
+  let vals = loadColumnValues(s.columnPath(table, col), cs.kind, cs.nullable)
   t.colCache[col] = vals
   vals
 
-proc appendColumnValues(path: string, values: seq[JsonNode]) =
-  # Note: This simple append logic assumes that each value can be serialized
-  # to a single line of JSON text. In a production system, you would want to
-  # include more robust handling of escaping and newlines within values,
-  # as well as consider more efficient binary formats for large datasets.
+proc appendColumnValues(path: string, kind: ColumnType, nullable: bool, values: seq[JsonNode]) =
   if values.len == 0: return
   let f = open(path, fmAppend)
   defer: f.close()
   for v in values:
-    f.writeLine($v)
+    if v.kind == JNull:
+      writeU8File(f, 1'u8)
+      continue
+    writeU8File(f, 0'u8)
+    case kind
+    of ctInt64:
+      writeI64File(f, v.getInt().int64)
+    of ctFloat64:
+      writeF64File(f, v.getFloat())
+    of ctBool:
+      writeU8File(f, if v.getBool(): 1'u8 else: 0'u8)
+    of ctString:
+      writeStrFile(f, v.getStr())
+    of ctJson:
+      writeStrFile(f, $v)
 
 proc cmpJson(a, b: JsonNode): int =
   if a.kind == JInt and b.kind == JInt:
@@ -279,6 +380,8 @@ proc maybeFlushWal(s: var ColumnarStore) =
 
 proc checkpoint*(s: var ColumnarStore) =
   s.ensureWritable()
+  for name, t in s.tables:
+    s.saveSchema(t.schema)
   s.wal.flush()
   s.wal.reset()
   s.pendingOps = 0
@@ -286,6 +389,8 @@ proc checkpoint*(s: var ColumnarStore) =
 proc close*(s: var ColumnarStore) =
   ## Flushes pending WAL writes and releases the cross-process lock.
   if not s.readOnly:
+    for name, t in s.tables:
+      s.saveSchema(t.schema)
     s.wal.flush()
     s.pendingOps = 0
   s.lock = FileLock()
@@ -360,7 +465,7 @@ proc insertBatchInternal(s: var ColumnarStore, table: string, rows: seq[JsonNode
   var t = s.tables[table]
   var buffer = initTable[string, seq[JsonNode]]()
   for c in t.schema.columns:
-    buffer[c.name] = @[]
+    buffer[c.name] = newSeqOfCap[JsonNode](rows.len)
 
   var newPk = initHashSet[string]()
   for r in rows:
@@ -383,11 +488,11 @@ proc insertBatchInternal(s: var ColumnarStore, table: string, rows: seq[JsonNode
       op: woInsertRow,
       table: table,
       pk: "",
-      payload: $(%*{"rows": rows})
+      payload: $(%*rows)
     ), sync = sync)
 
   for c in t.schema.columns:
-    appendColumnValues(s.columnPath(table, c.name), buffer[c.name])
+    appendColumnValues(s.columnPath(table, c.name), c.kind, c.nullable, buffer[c.name])
     if t.colCache.hasKey(c.name):
       t.colCache[c.name].add(buffer[c.name])
 
@@ -395,7 +500,6 @@ proc insertBatchInternal(s: var ColumnarStore, table: string, rows: seq[JsonNode
     t.pkValues.incl(k)
 
   t.schema.rowCount += rows.len.int64
-  s.saveSchema(t.schema)
   s.tables[table] = t
 
   if emitWal:
@@ -415,7 +519,9 @@ proc recoverFromWal(s: var ColumnarStore) =
     of woInsertRow:
       if s.tables.hasKey(e.table):
         let n = parseJson(e.payload)
-        let rows = n["rows"].getElems()
+        let rows =
+          if n.kind == JArray: n.getElems()
+          else: n["rows"].getElems()
         s.insertBatchInternal(e.table, rows, emitWal = false, sync = true)
     of woDeleteRow, woUpdateRow:
       discard
@@ -470,9 +576,20 @@ proc openColumnarStore*(rootDir: string, walPath: string = "", walFlushEveryOps:
         if fileExists(meta):
           let schema = loadSchema(meta)
           var t = makeTable(schema)
+          if schema.columns.len > 0:
+            let firstCol = schema.columns[0]
+            let colPath = p / "columns" / (firstCol.name & ".col")
+            let cnt = loadColumnValues(colPath, firstCol.kind, firstCol.nullable).len
+            t.schema.rowCount = cnt.int64
           if schema.primaryKey.len > 0:
+            var pkKind = ctJson
+            var pkNullable = false
+            for c in schema.columns:
+              if c.name == schema.primaryKey:
+                pkKind = c.kind
+                pkNullable = c.nullable
             let pkPath = p / "columns" / (schema.primaryKey & ".col")
-            for v in loadColumnValues(pkPath):
+            for v in loadColumnValues(pkPath, pkKind, pkNullable):
               t.pkValues.incl($v)
           result.tables[schema.name] = t
 
@@ -522,7 +639,7 @@ proc scan*(s: ColumnarStore, table: string,
     projCols.add((c, t.columnValues(s, table, c)))
 
   let n = int(t.schema.rowCount)
-  result = @[]
+  result = newSeqOfCap[JsonNode](n)
   for i in 0..<n:
     var ok = true
     for (flt, col) in fCols:
