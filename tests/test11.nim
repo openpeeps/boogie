@@ -245,7 +245,7 @@ suite "db_boogie benchmarks":
     let t0 = getMonoTime()
     for i in 1 .. N:
       db.exec(sql"INSERT INTO b (v, n) VALUES (?, ?)", "v" & $i, $i)
-    let insertSecs = float((getMonoTime() - t0).inMilliSeconds) / 1000.0
+    let insertSecs = float((getMonoTime() - t0).inMicroseconds) / 1_000_000.0
 
     let t1 = getMonoTime()
     var found = 0
@@ -253,20 +253,20 @@ suite "db_boogie benchmarks":
       let v = db.getValue(sql"SELECT id FROM b WHERE v = ?", "v" & $i)
       if v.len > 0:
         inc found
-    let pointSecs = float((getMonoTime() - t1).inMilliSeconds) / 1000.0
+    let pointSecs = float((getMonoTime() - t1).inMicroseconds) / 1_000_000.0
     check found == 50
 
     let t2 = getMonoTime()
     var scanned = 0
     for row in db.fastRows(sql"SELECT id, v FROM b ORDER BY id"):
       inc scanned
-    let scanSecs = float((getMonoTime() - t2).inMilliSeconds) / 1000.0
+    let scanSecs = float((getMonoTime() - t2).inMicroseconds) / 1_000_000.0
     check scanned == N
 
     let t3 = getMonoTime()
     for i in 1 .. 50:
       db.exec(sql"UPDATE b SET n = n + 1 WHERE v = ?", "v" & $i)
-    let updateSecs = float((getMonoTime() - t3).inMilliSeconds) / 1000.0
+    let updateSecs = float((getMonoTime() - t3).inMicroseconds) / 1_000_000.0
 
     echo fmt"[bench][dboogie][disk+wal] insert={float(N) / insertSecs:>10.0f} ops/s pointQuery={50.0 / pointSecs:>9.0f} q/s orderedScan={float(N) / scanSecs:>10.0f} rows/s update={50.0 / updateSecs:>9.0f} ops/s"
     db.close()

@@ -133,12 +133,23 @@ proc runSql(db: DbConn, queryText: string,
   when defined(boogieSqlDebug):
     echo "[runSql] ", queryText
   try:
-    let finalSql =
-      if params.len > 0: dbFormat(SqlQuery(queryText), params)
-      else: queryText
-    when defined(boogieSqlDebug):
-      echo "[runSql->] ", finalSql
-    db.eng.execSql(finalSql, [])
+    if params.len > 0 and queryText.contains("??"):
+      # escaped placeholder: keep the legacy interpolation path
+      let finalSql = dbFormat(SqlQuery(queryText), params)
+      when defined(boogieSqlDebug):
+        echo "[runSql->] ", finalSql
+      db.eng.execSql(finalSql, [])
+    else:
+      # bind verbatim: the SQL text stays stable so the plan cache hits,
+      # values travel typed to the engine instead of being re-parsed
+      var bound = newSeqOfCap[SqlValue](params.len)
+      for p in params:
+        bound.add(initValue(p))
+      let want = db.eng.placeholderCount(queryText)
+      if params.len < want:
+        dbError("missing query parameter: got " & $params.len &
+                " for " & $want & " placeholders")
+      db.eng.execSql(queryText, bound)
   except CatchableError as e:
     dbError(e.msg)
 

@@ -5,7 +5,7 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/boogie
 
-import std/[strutils, tables, options, json, algorithm, sequtils]
+import std/[strutils, tables, options, json, algorithm, sequtils, math]
 
 from pkg/openparser/json import toJson
 import pkg/openparser/sql
@@ -73,9 +73,15 @@ type
   ScanState = object
     tableName: string
     pks: seq[string]
-      ## primary key snapshot in table order, taken when the scan opened
+      ## primary key snapshot in hash order, taken when the scan opened.
+      ## Order is unspecified without ORDER BY (postProcessSelect sorts when
+      ## needed), which avoids rebuilding the ordered index per statement.
     pos: int
     closed: bool
+    curRow: RowData
+      ## row at `pks[pos]`, fetched once per step so per-column reads
+      ## (`sql_col`) don't repeat table+row lookups
+    hasRow: bool
 
   SqlExecCtx = ref object
     store: Store
@@ -85,6 +91,9 @@ type
     cells: seq[Value]
       ## staging buffer filled by `sql_cell_push`, consumed by project/insert/update
     affected: int64
+    colListCache: Table[string, seq[string]]
+      ## parsed `colsJson` payloads keyed by the raw JSON text, so INSERT /
+      ## UPDATE statements don't re-parse the same column list per row
 
   CompiledStmt = object
     kind: StmtKind
@@ -112,6 +121,9 @@ type
     ctx: SqlExecCtx
     vm: Vm
     cache: Table[string, seq[CompiledStmt]]
+    roots: Table[string, seq[SqlNode]]
+      ## parsed statement roots per SQL text, shared by the fast path
+      ## (no re-parse per execution) and the VM compile path
 
 proc fail(msg: string) {.noreturn.} =
   raise newException(SqlEngineError, msg)
@@ -261,7 +273,9 @@ proc makeForeignProcs(ctx: SqlExecCtx): seq[(string, int, bool, ForeignProc)] =
       fail("no such table: " & name)
     let t = ctx.store.getTable(name).get()
     var pks: seq[string]
-    for pk, _ in t.allRows:
+    # unordered hash snapshot: O(N) with no order-index rebuild. Ordering is
+    # applied later by postProcessSelect when ORDER BY is present.
+    for pk, _ in t.allRowsByPk:
       pks.add(pk)
     ctx.scans.add(ScanState(tableName: name, pks: pks, pos: -1))
     initValue(int64(ctx.scans.len - 1))
@@ -274,21 +288,22 @@ proc makeForeignProcs(ctx: SqlExecCtx): seq[(string, int, bool, ForeignProc)] =
     inc sc.pos
     while sc.pos < sc.pks.len:
       # rows may have been deleted since the snapshot was taken
-      if t.getRow(sc.pks[sc.pos]).isSome:
+      let prow = t.getRow(sc.pks[sc.pos])
+      if prow.isSome:
+        sc.curRow = prow.get
+        sc.hasRow = true
         return initValue(true)
       inc sc.pos
+    sc.hasRow = false
     initValue(false)
 
   proc fCol(args: StackView, argc: int): Value =
     let sc = ctx.scanPtr(args[0].intVal)
     let colName = args[1].stringVal[]
-    if sc.closed or sc.pos < 0:
+    if sc.closed or sc.pos < 0 or not sc.hasRow:
       fail("no current row")
-    let row = ctx.store.getTable(sc.tableName).get().getRow(sc.pks[sc.pos])
-    if row.isNone:
-      return nil
-    if row.get.hasKey(colName):
-      return toVmValue(row.get[colName])
+    if sc.curRow.hasKey(colName):
+      return toVmValue(sc.curRow[colName])
     nil
 
   proc fCellPush(args: StackView, argc: int): Value =
@@ -305,17 +320,28 @@ proc makeForeignProcs(ctx: SqlExecCtx): seq[(string, int, bool, ForeignProc)] =
     ctx.cells.setLen(ctx.cells.len - int(n))
     nil
 
+  proc colNamesCached(key: string): seq[string] =
+    ## Parsed INSERT/UPDATE column lists, cached by raw JSON text. The JSON is
+    ## identical for every row of a statement, so parsing once saves a
+    ## parse per affected row.
+    if ctx.colListCache.hasKey(key):
+      return ctx.colListCache[key]
+    let colsJson = key.parseJson()
+    for c in colsJson:
+      result.add(c.getStr())
+    ctx.colListCache[key] = result
+
   proc fInsert(args: StackView, argc: int): Value =
     let tableName = args[0].stringVal[]
     if not ctx.store.hasTable(tableName):
       fail("no such table: " & tableName)
     let t = ctx.store.getTable(tableName).get()
     var data: RowData
-    let colsJson = args[1].stringVal[].parseJson()
-    if colsJson.len != ctx.cells.len:
+    let colNames = colNamesCached(args[1].stringVal[])
+    if colNames.len != ctx.cells.len:
       fail("insert column/value count mismatch")
-    for idx in 0 ..< colsJson.len:
-      let colName = colsJson[idx].getStr()
+    for idx in 0 ..< colNames.len:
+      let colName = colNames[idx]
       let colDef = t.findColumn(colName)
       if colDef.isNone:
         fail("unknown column '" & colName & "' in table '" & tableName & "'")
@@ -351,11 +377,11 @@ proc makeForeignProcs(ctx: SqlExecCtx): seq[(string, int, bool, ForeignProc)] =
     let t = ctx.store.getTable(tableName).get()
     let pk = sc.pks[sc.pos]
     var row = ctx.store.getRow(tableName, pk).get()
-    let colsJson = args[1].stringVal[].parseJson()
-    if colsJson.len != ctx.cells.len:
+    let colNames = colNamesCached(args[1].stringVal[])
+    if colNames.len != ctx.cells.len:
       fail("update column/value count mismatch")
-    for idx in 0 ..< colsJson.len:
-      let colName = colsJson[idx].getStr()
+    for idx in 0 ..< colNames.len:
+      let colName = colNames[idx]
       let colDef = t.findColumn(colName)
       if colDef.isNone:
         fail("unknown column '" & colName & "' in table '" & tableName & "'")
@@ -509,16 +535,20 @@ proc pushS(l: var Lowerer, s: string): uint16 =
   l.ch.emit(sid)
   sid
 
-proc placeholderName(l: var Lowerer, raw: string): string =
-  ## Maps a placeholder token (`?`, `$n`, `:name`) to its global variable
-  ## name. Anonymous `?` markers get numbered by first appearance; numbered
-  ## or named ones share a slot when repeated.
+proc phNameFast(raw: string, phs: var seq[string]): string =
+  ## Shared placeholder naming used by both the bytecode lowerer and the
+  ## native fast paths, so both map bindings identically. Anonymous `?`
+  ## markers get numbered by first appearance; numbered (`$n`) or named
+  ## (`:name`) ones share a slot when repeated.
   var name = raw
   while name.len > 0 and name[0] in {'?', '$', ':'}:
     name = name[1 ..^ 1]
   if name.len == 0:
-    return "?" & $(l.placeholders.len + 1)
-  "?" & name
+    result = "?" & $(phs.len + 1)
+  else:
+    result = "?" & name
+  if result notin phs:
+    phs.add(result)
 
 proc inferTy(l: Lowerer, n: SqlNode): STy =
   case n.kind
@@ -579,11 +609,6 @@ proc genAndOr(l: var Lowerer, n: SqlNode) =
   l.ch.emit(labelOpc)
   l.patchFwd(holeEnd, l.here())
 
-proc internPlaceholder(l: var Lowerer, g: string): string =
-  if g notin l.placeholders:
-    l.placeholders.add(g)
-  g
-
 proc genExpr(l: var Lowerer, n: SqlNode) =
   ## Lowers an expression, leaving its value on the stack
   case n.kind
@@ -625,7 +650,7 @@ proc genExpr(l: var Lowerer, n: SqlNode) =
   of nkPrGroup:
     l.genExpr(n[0])
   of nkPlaceholder:
-    let g = l.internPlaceholder(l.placeholderName(n.strVal))
+    let g = phNameFast(n.strVal, l.placeholders)
     let sid = l.ch.getString(g)
     l.ch.emit(opcPushG)
     l.ch.emit(sid)
@@ -1281,6 +1306,894 @@ proc compileDdl(l: var Lowerer, root: SqlNode): CompiledStmt =
     fail("unsupported DDL statement")
 
 #
+# native fast paths
+#
+# The VM loop costs several foreign calls per row (scan_next, one col lookup
+# per column, cell_push, ...). Common OLTP shapes bypass it and hit the store
+# directly with identical semantics: NULL propagation, numeric
+# column-affinity and error messages are mirrored from vmext/lowering.
+# Anything outside the supported shapes raises FastUnsupported and falls
+# back to the VM path (which also reproduces the original error).
+
+type FastUnsupported = object of CatchableError
+
+template declineFast() =
+  when defined(boogieSqlDebug):
+    echo "[fast] decline at ", instantiationInfo().filename, ":",
+      instantiationInfo().line
+  raise newException(FastUnsupported, "fast path unsupported")
+
+proc postProcessSelect(eng: SqlEngine, stmt: CompiledStmt): ExecResult
+  ## Forward declaration: the native SELECT path reuses the VM result
+  ## post-processing (sort/distinct/limit/stringify).
+
+type FastCx = object
+  tbl: DbTable
+  phIdx: Table[pointer, int]
+    ## placeholder node -> position in `phs` (Lowerer appearance order)
+  phs: seq[string]
+  params: seq[Value]
+
+proc takePh(cx: FastCx, n: SqlNode): Value =
+  let idx = cx.phIdx.getOrDefault(cast[pointer](n), -1)
+  if idx >= 0 and idx < cx.params.len: cx.params[idx]
+  else: nil
+
+proc walkPhFast(n: SqlNode, cx: var FastCx) =
+  ## Records placeholder bindings in Lowerer visit order so native
+  ## evaluation maps `?`/`$n`/`:name` exactly like compiled bytecode.
+  if n.isNil: return
+  case n.kind
+  of nkPlaceholder:
+    let g = phNameFast(n.strVal, cx.phs)
+    cx.phIdx[cast[pointer](n)] = cx.phs.find(g)
+  of nkInfix:
+    if n.len >= 3:
+      walkPhFast(n[1], cx)
+      walkPhFast(n[2], cx)
+  of nkPrefix:
+    if n.len >= 2: walkPhFast(n[1], cx)
+  of nkDot, nkSelectPair, nkPrGroup:
+    if n.len >= 1: walkPhFast(n[0], cx)
+  of nkCall:
+    for i in 1 ..< n.len: walkPhFast(n[i], cx)
+  of nkCase, nkWhen, nkElse, nkCast:
+    for c in n.sons: walkPhFast(c, cx)
+  else: discard
+
+proc staticTyFast(n: SqlNode, tbl: DbTable): char =
+  ## Mirrors Lowerer.inferTy closely enough for the NOT-operand check.
+  case n.kind
+  of nkIntegerLit, nkNumericLit: 'n'
+  of nkStringLit: 's'
+  of nkPlaceholder: 'u'
+  of nkIdent:
+    case n.strVal.toLowerAscii()
+    of "null": '0'
+    of "true", "false": 'b'
+    else:
+      let def = tbl.findColumn(n.strVal)
+      if def.isNone: 'u'
+      else:
+        case def.get().kind
+        of dtInt, dtFloat: 'n'
+        of dtBool: 'b'
+        of dtText: 's'
+        else: 'u'
+  of nkDot:
+    if n.len >= 2: staticTyFast(n[1], tbl) else: 'u'
+  of nkSelectPair, nkPrGroup:
+    if n.len >= 1: staticTyFast(n[0], tbl) else: 'u'
+  of nkPrefix:
+    if n.len >= 2 and n[0].strVal.toLowerAscii() == "not": 'b'
+    elif n.len >= 2: staticTyFast(n[1], tbl)
+    else: 'u'
+  of nkInfix:
+    if n.len >= 3:
+      let op = n[0].strVal.toLowerAscii()
+      case op
+      of "=", "!=", "<>", "<", "<=", ">", ">=", "is", "is not",
+         "and", "or": 'b'
+      of "+", "-", "*", "/":
+        let a = staticTyFast(n[1], tbl)
+        let b = staticTyFast(n[2], tbl)
+        if a == 'n' or b == 'n': 'n' else: 'u'
+      else: 'u'
+    else: 'u'
+  else: 'u'
+
+proc checkExprFast(n: SqlNode, tbl: DbTable, allowStar = false) =
+  ## Raises FastUnsupported for shapes the VM must handle, and SqlEngineError
+  ## with the lowering error message for invalid references.
+  if n.isNil: return
+  case n.kind
+  of nkIntegerLit, nkNumericLit, nkStringLit, nkPlaceholder: discard
+  of nkIdent:
+    case n.strVal.toLowerAscii()
+    of "null", "true", "false": discard
+    else:
+      if allowStar and n.strVal == "*": return
+      if tbl.findColumn(n.strVal).isNone:
+        fail("no such column: '" & n.strVal & "' in table '" &
+             tbl.name & "'")
+  of nkDot:
+    if n.len < 2: declineFast()
+    checkExprFast(n[1], tbl)
+  of nkSelectPair, nkPrGroup:
+    if n.len < 1: declineFast()
+    checkExprFast(n[0], tbl, allowStar)
+  of nkPrefix:
+    if n.len < 2: declineFast()
+    case n[0].strVal.toLowerAscii()
+    of "-", "+": checkExprFast(n[1], tbl)
+    of "not":
+      checkExprFast(n[1], tbl)
+      if staticTyFast(n[1], tbl) != 'b':
+        fail("NOT requires a boolean expression")
+    else: declineFast()
+  of nkInfix:
+    if n.len < 3: declineFast()
+    case n[0].strVal.toLowerAscii()
+    of "=", "!=", "<>", "<", "<=", ">", ">=":
+      # lowering hoists `not` prefixes on either operand into the
+      # comparison mode, so the stripped operands carry no bool check
+      var lhs = n[1]
+      var rhs = n[2]
+      while lhs.kind == nkPrefix and lhs.len >= 2 and
+            lhs[0].strVal.toLowerAscii() == "not":
+        lhs = lhs[1]
+      while rhs.kind == nkPrefix and rhs.len >= 2 and
+            rhs[0].strVal.toLowerAscii() == "not":
+        rhs = rhs[1]
+      checkExprFast(lhs, tbl)
+      checkExprFast(rhs, tbl)
+    of "and", "or", "+", "-", "*", "/":
+      checkExprFast(n[1], tbl)
+      checkExprFast(n[2], tbl)
+    of "is", "is not":
+      if nodeIdent(n[2]).toUpperAscii() != "NULL":
+        declineFast()
+      checkExprFast(n[1], tbl)
+    else: declineFast()
+  else: declineFast()
+
+proc sqlCmpFast(mode: int, a, b: Value): bool =
+  ## Mirrors opcSqlCmp: NULL yields false, mixed int/float compare
+  ## numerically, text operands coerce when they parse (column affinity).
+  if a == nil or b == nil: return false
+  template numOf(x: Value): float64 =
+    if x.typeId == tyInt: x.intVal.float64 else: x.floatVal
+  template apply(av: float64, bv: float64) =
+    case mode
+    of 0: result = av == bv
+    of 1: result = av != bv
+    of 2: result = av < bv
+    of 3: result = av <= bv
+    of 4: result = av > bv
+    else: result = av >= bv
+  template applyStr(av: string, bv: string) =
+    case mode
+    of 0: result = av == bv
+    of 1: result = av != bv
+    of 2: result = av < bv
+    of 3: result = av <= bv
+    of 4: result = av > bv
+    else: result = av >= bv
+  let aNum = a.typeId in {tyInt, tyFloat}
+  let bNum = b.typeId in {tyInt, tyFloat}
+  if aNum and bNum:
+    apply(numOf(a), numOf(b))
+  elif a.typeId == tyString and b.typeId == tyString:
+    applyStr(a.stringVal[], b.stringVal[])
+  elif a.typeId == tyBool and b.typeId == tyBool:
+    let ai = int(a.boolVal)
+    let bi = int(b.boolVal)
+    case mode
+    of 0: result = ai == bi
+    of 1: result = ai != bi
+    of 2: result = ai < bi
+    of 3: result = ai <= bi
+    of 4: result = ai > bi
+    else: result = ai >= bi
+  elif aNum and b.typeId == tyString:
+    try: apply(numOf(a), parseFloat(b.stringVal[]))
+    except ValueError: result = false
+  elif a.typeId == tyString and bNum:
+    try: apply(parseFloat(a.stringVal[]), numOf(b))
+    except ValueError: result = false
+
+proc sqlArithFast(mode: int, a, b: Value): Value =
+  ## Mirrors opcSqlArith: NULL propagates, division by zero yields NULL.
+  if a == nil or b == nil: return nil
+  let aNum = a.typeId in {tyInt, tyFloat}
+  let bNum = b.typeId in {tyInt, tyFloat}
+  if not (aNum and bNum): return nil
+  if a.typeId == tyInt and b.typeId == tyInt and mode != 3:
+    let av = a.intVal
+    let bv = b.intVal
+    case mode
+    of 0: return initValue(av + bv)
+    of 1: return initValue(av - bv)
+    else: return initValue(av * bv)
+  let av = if a.typeId == tyInt: a.intVal.float64 else: a.floatVal
+  let bv = if b.typeId == tyInt: b.intVal.float64 else: b.floatVal
+  case mode
+  of 0: initValue(av + bv)
+  of 1: initValue(av - bv)
+  of 2: initValue(av * bv)
+  else:
+    if bv == 0.0: nil
+    else: initValue(av / bv)
+
+proc vmTruthFast(v: Value): bool =
+  ## Mirrors the jump conditions: only a bool true counts as true.
+  v != nil and v.typeId == tyBool and v.boolVal
+
+proc evalCellFast(cx: FastCx, n: SqlNode, row: RowData,
+                  hasRow: bool): tuple[ok: bool, v: Value] =
+  ## Native expression evaluator over one row. Shapes were pre-validated by
+  ## checkExprFast, so `ok == false` only happens for literal overflows
+  ## (decline and let the VM raise the identical error).
+  case n.kind
+  of nkIntegerLit:
+    try: (true, initValue(n.strVal.parseBiggestInt.int64))
+    except ValueError: (false, nil)
+  of nkNumericLit:
+    if '.' in n.strVal or 'e' in n.strVal.toLowerAscii():
+      try: (true, initValue(parseFloat(n.strVal)))
+      except ValueError: (false, nil)
+    else:
+      try: (true, initValue(n.strVal.parseBiggestInt.int64))
+      except ValueError: (false, nil)
+  of nkStringLit: (true, initValue(n.strVal))
+  of nkIdent:
+    case n.strVal.toLowerAscii()
+    of "null": (true, nil)
+    of "true": (true, initValue(true))
+    of "false": (true, initValue(false))
+    else:
+      if not hasRow: return (false, nil)
+      if row.hasKey(n.strVal): (true, toVmValue(row[n.strVal]))
+      else: (true, nil)
+  of nkDot:
+    if n.len >= 2: evalCellFast(cx, n[1], row, hasRow)
+    else: (false, nil)
+  of nkSelectPair, nkPrGroup:
+    if n.len >= 1: evalCellFast(cx, n[0], row, hasRow)
+    else: (false, nil)
+  of nkPlaceholder: (true, takePh(cx, n))
+  of nkPrefix:
+    if n.len < 2: return (false, nil)
+    case n[0].strVal.toLowerAscii()
+    of "-":
+      let (ok, x) = evalCellFast(cx, n[1], row, hasRow)
+      if not ok: return (false, nil)
+      (true, sqlArithFast(SqlArithSub.int, initValue(0'i64), x))
+    of "+": evalCellFast(cx, n[1], row, hasRow)
+    of "not":
+      let (ok, x) = evalCellFast(cx, n[1], row, hasRow)
+      if not ok or x == nil or x.typeId != tyBool: return (false, nil)
+      (true, initValue(not x.boolVal))
+    else: (false, nil)
+  of nkInfix:
+    if n.len < 3: return (false, nil)
+    let op = n[0].strVal.toLowerAscii()
+    case op
+    of "=", "!=", "<>", "<", "<=", ">", ">=":
+      var lhs = n[1]
+      var rhs = n[2]
+      var negate = false
+      while lhs.kind == nkPrefix and lhs.len >= 2 and
+            lhs[0].strVal.toLowerAscii() == "not":
+        negate = not negate
+        lhs = lhs[1]
+      while rhs.kind == nkPrefix and rhs.len >= 2 and
+            rhs[0].strVal.toLowerAscii() == "not":
+        negate = not negate
+        rhs = rhs[1]
+      let (okL, a) = evalCellFast(cx, lhs, row, hasRow)
+      let (okR, b) = evalCellFast(cx, rhs, row, hasRow)
+      if not okL or not okR: return (false, nil)
+      let baseMode =
+        case op
+        of "=": SqlCmpEq.int
+        of "<": SqlCmpLt.int
+        of "<=": SqlCmpLe.int
+        of ">": SqlCmpGt.int
+        of ">=": SqlCmpGe.int
+        else: SqlCmpNe.int
+      let mode =
+        if negate:
+          case baseMode
+          of SqlCmpEq.int: SqlCmpNe.int
+          of SqlCmpNe.int: SqlCmpEq.int
+          of SqlCmpLt.int: SqlCmpGe.int
+          of SqlCmpLe.int: SqlCmpGt.int
+          of SqlCmpGt.int: SqlCmpLe.int
+          else: SqlCmpLt.int
+        else: baseMode
+      (true, initValue(sqlCmpFast(mode, a, b)))
+    of "is":
+      let (ok, x) = evalCellFast(cx, n[1], row, hasRow)
+      if not ok: return (false, nil)
+      (true, initValue(x == nil))
+    of "is not":
+      let (ok, x) = evalCellFast(cx, n[1], row, hasRow)
+      if not ok: return (false, nil)
+      (true, initValue(x != nil))
+    of "and":
+      let (okL, a) = evalCellFast(cx, n[1], row, hasRow)
+      if not okL: return (false, nil)
+      if not vmTruthFast(a): return (true, initValue(false))
+      let (okR, b) = evalCellFast(cx, n[2], row, hasRow)
+      if not okR: return (false, nil)
+      (true, initValue(vmTruthFast(b)))
+    of "or":
+      let (okL, a) = evalCellFast(cx, n[1], row, hasRow)
+      if not okL: return (false, nil)
+      if vmTruthFast(a): return (true, initValue(true))
+      let (okR, b) = evalCellFast(cx, n[2], row, hasRow)
+      if not okR: return (false, nil)
+      (true, initValue(vmTruthFast(b)))
+    of "+", "-", "*", "/":
+      let (okL, a) = evalCellFast(cx, n[1], row, hasRow)
+      let (okR, b) = evalCellFast(cx, n[2], row, hasRow)
+      if not okL or not okR: return (false, nil)
+      let mode = case op
+        of "+": SqlArithAdd.int
+        of "-": SqlArithSub.int
+        of "*": SqlArithMul.int
+        else: SqlArithDiv.int
+      (true, sqlArithFast(mode, a, b))
+    else: (false, nil)
+  else: (false, nil)
+
+proc isLitOrPh(n: SqlNode): bool =
+  case n.kind
+  of nkIntegerLit, nkNumericLit, nkStringLit, nkPlaceholder: true
+  of nkIdent:
+    n.strVal.toLowerAscii() in ["null", "true", "false"]
+  of nkPrGroup:
+    n.len >= 1 and isLitOrPh(n[0])
+  of nkPrefix:
+    n.len >= 2 and n[0].strVal.toLowerAscii() in ["-", "+"] and
+      isLitOrPh(n[1])
+  else: false
+
+proc pkEqNode(whereNode: SqlNode, pkName: string): SqlNode =
+  ## Returns the literal side of `pk = <lit>` when WHERE has that shape.
+  if whereNode.isNil or whereNode.kind != nkInfix or whereNode.len < 3:
+    return nil
+  if whereNode[0].strVal.toLowerAscii() != "=": return nil
+  let l = whereNode[1]
+  let r = whereNode[2]
+  if l.kind == nkIdent and l.strVal == pkName and isLitOrPh(r): return r
+  if r.kind == nkIdent and r.strVal == pkName and isLitOrPh(l): return l
+  nil
+
+proc pkLookupKey(tbl: DbTable, v: Value): tuple[found: bool, key: string] =
+  ## Derives the storage key for a PK equality lookup, mirroring the VM's
+  ## numeric-affinity comparison. `found == false` means "cannot match".
+  if v == nil: return (false, "")
+  let pkDef = tbl.findColumn(tbl.primaryKey)
+  if pkDef.isNone: return (false, "")
+  case pkDef.get().kind
+  of dtInt:
+    case v.typeId
+    of tyInt: (true, $v.intVal)
+    of tyFloat:
+      if v.floatVal == trunc(v.floatVal): (true, $v.floatVal.int64)
+      else: (false, "")
+    of tyString:
+      try:
+        let f = parseFloat(v.stringVal[])
+        if f == trunc(f): (true, $f.int64)
+        else: (false, "")
+      except ValueError: (false, "")
+    else: (false, "")
+  of dtText:
+    case v.typeId
+    of tyString: (true, v.stringVal[])
+    of tyInt: (true, $v.intVal)
+    of tyFloat:
+      if v.floatVal == trunc(v.floatVal): (true, $v.floatVal.int64)
+      else: (true, $v.floatVal)
+    else: (false, "")
+  else: (false, "")
+
+type WhereRes = object
+  ## Resolved row source: explicit pks, or a full scan with an optional
+  ## native filter (nil filter = every row).
+  pks: seq[string]
+  hasPks: bool
+  filter: SqlNode
+
+proc resolveWhereFast(eng: SqlEngine, cx: FastCx, tbl: DbTable,
+                      whereNode: SqlNode): WhereRes =
+  if whereNode.isNil: return WhereRes(hasPks: false)
+  let pkSide = pkEqNode(whereNode, tbl.primaryKey)
+  if not pkSide.isNil:
+    var noRow: RowData
+    let (ok, lv) = evalCellFast(cx, pkSide, noRow, false)
+    if not ok: declineFast()
+    let (found, key) = pkLookupKey(tbl, lv)
+    if not found: return WhereRes(hasPks: true)
+    return WhereRes(hasPks: true, pks: @[key])
+  # single `col = lit`: index-assisted when an index exists (t.where falls
+  # back to a Nim-level hash scan otherwise, still far cheaper than the VM)
+  if whereNode.kind == nkInfix and whereNode.len >= 3 and
+     whereNode[0].strVal.toLowerAscii() == "=":
+    for (colNode, litNode) in [(whereNode[1], whereNode[2]),
+                               (whereNode[2], whereNode[1])]:
+      if colNode.kind == nkIdent and isLitOrPh(litNode):
+        let colName = colNode.strVal
+        if colName.toLowerAscii() in ["null", "true", "false"]:
+          continue # keyword literal, not a column: use the filter path
+        let cdef = tbl.findColumn(colName)
+        if cdef.isNone:
+          fail("no such column: '" & colName & "' in table '" &
+               tbl.name & "'")
+        var noRow: RowData
+        let (ok, lv) = evalCellFast(cx, litNode, noRow, false)
+        if not ok: declineFast()
+        if lv == nil: return WhereRes(hasPks: true) # `= NULL` never matches
+        var rv: rdbms.Value
+        try:
+          rv = coerceCell(lv, cdef.get, tbl.name)
+        except SqlEngineError:
+          return WhereRes(hasPks: true) # unconvertible never matches
+        var pks: seq[string]
+        for (pk, _) in tbl.where(colName, rv): pks.add(pk)
+        return WhereRes(hasPks: true, pks: pks)
+  WhereRes(hasPks: false, filter: whereNode)
+
+proc fastTable(eng: SqlEngine, name: string): DbTable =
+  if not eng.ctx.store.hasTable(name):
+    fail("no such table: '" & name & "'")
+  eng.ctx.store.getTable(name).get()
+
+proc fastInsert(eng: SqlEngine, root: SqlNode, cx: FastCx): ExecResult =
+  let tableName = nodeIdent(root[0])
+  let tbl = eng.fastTable(tableName)
+  var colsNode, valuesNode: SqlNode = nil
+  for child in root.sons:
+    case child.kind
+    of nkColumnList: colsNode = child
+    of nkValueList: valuesNode = child
+    else: discard
+  if valuesNode.isNil:
+    fail("INSERT requires a VALUES clause")
+  var colNames: seq[string]
+  if not colsNode.isNil:
+    for c in colsNode.sons:
+      let nm = c.nodeIdent()
+      if tbl.findColumn(nm).isNone:
+        fail("unknown column '" & nm & "' in table '" & tableName & "'")
+      colNames.add(nm)
+  else:
+    for c in tbl.columns:
+      if not (tbl.pkMode == pkmSerial and c.name == tbl.primaryKey):
+        colNames.add(c.name)
+  var noRow: RowData
+  var affected = 0'i64
+  var lastPk = ""
+  for row in valuesNode.sons:
+    if row.len != colNames.len:
+      fail("insert has " & $row.len & " values but " & $colNames.len &
+           " columns were expected")
+    var data: RowData
+    for i, valNode in row.sons:
+      checkExprFast(valNode, tbl)
+      let (ok, v) = evalCellFast(cx, valNode, noRow, false)
+      if not ok: declineFast()
+      data[colNames[i]] = coerceCell(v, tbl.findColumn(colNames[i]).get,
+                                     tableName)
+    var explicitPk = ""
+    if data.hasKey(tbl.primaryKey):
+      let pv = data[tbl.primaryKey]
+      explicitPk = case pv.kind
+        of dtInt: $pv.intVal
+        of dtText: pv.strVal
+        else: fail("primary key must be int or text")
+      data.del(tbl.primaryKey)
+    if explicitPk.len > 0:
+      eng.ctx.store.insertRow(tableName, explicitPk, data)
+      lastPk = explicitPk
+    elif tbl.pkMode == pkmSerial:
+      lastPk = eng.ctx.store.insertRow(tableName, data)
+    else:
+      fail("primary key required for table '" & tableName & "'")
+    inc affected
+  eng.ctx.affected = affected
+  ExecResult(kind: skInsert, affected: affected, lastPk: lastPk)
+
+proc fastSelectProj(eng: SqlEngine, root: SqlNode, tbl: DbTable,
+                    cx: FastCx): tuple[proj: seq[(string, SqlNode)],
+                                       orderKeys: seq[(int, bool)],
+                                       hidden: int, limitVal: int64,
+                                       offsetVal: int64, aggs: seq[(string, SqlNode, string)]] =
+  ## Shared projection/aggregate/order/limit resolution mirroring
+  ## compileSelect (same names, same error messages).
+  const AggNames = ["count", "sum", "avg", "min", "max"]
+  var colsNode, orderNode, limitNode, offsetNode: SqlNode = nil
+  for child in root.sons:
+    case child.kind
+    of nkSelectColumns:
+      if colsNode.isNil: colsNode = child
+    of nkOrder: orderNode = child
+    of nkLimit: limitNode = child[0]
+    of nkOffset: offsetNode = child[0]
+    else: discard
+  if colsNode.isNil:
+    fail("SELECT requires a column list")
+  type AggSpec = tuple[fn: string, arg: SqlNode, outName: string]
+  var aggs: seq[AggSpec]
+  for rawEntry in colsNode.sons:
+    var aliasName = ""
+    var entry = rawEntry
+    if entry.kind == nkSelectPair and entry.len >= 1:
+      if entry.len >= 2:
+        aliasName = entry[1].nodeIdent()
+      entry = entry[0]
+    if entry.kind == nkCall and entry.len >= 1 and entry[0].kind == nkIdent:
+      let fn = entry[0].strVal.toLowerAscii()
+      if fn in AggNames:
+        if fn == "count" and entry.len >= 2 and entry[1].kind == nkIdent and
+           entry[1].strVal == "*":
+          aggs.add((fn, nil, if aliasName.len > 0: aliasName else: "COUNT(*)"))
+        elif entry.len >= 2:
+          let argName = nodeIdent(entry[1])
+          aggs.add((fn, entry[1],
+            if aliasName.len > 0: aliasName
+            else: fn.toUpperAscii & "(" & argName & ")"))
+        else:
+          fail(fn.toUpperAscii & " requires an argument")
+        continue
+    if aggs.len > 0:
+      fail("mixing aggregates with plain columns is not supported")
+  var proj: seq[(string, SqlNode)]
+  if aggs.len == 0:
+    for entry in colsNode.sons:
+      if entry.kind == nkIdent and entry.strVal == "*":
+        for c in tbl.columns:
+          proj.add((c.name, newNode(nkIdent, c.name)))
+      elif entry.kind == nkSelectPair and entry.len >= 1:
+        let expr = entry[0]
+        var name = ""
+        if entry.len >= 2:
+          name = entry[1].nodeIdent()
+        if name.len == 0:
+          case expr.kind
+          of nkIdent, nkQuotedIdent: name = expr.strVal
+          of nkDot: name = expr[1].strVal
+          else: name = "col" & $proj.len
+        proj.add((name, expr))
+      else:
+        proj.add((entry.nodeIdent(), entry))
+  var orderKeys: seq[(int, bool)]
+  var hidden = 0
+  if not orderNode.isNil:
+    for key in orderNode.sons:
+      var desc = false
+      var colNode = key
+      if key.kind == nkDesc:
+        desc = true
+        colNode = key[0]
+      let colName = colNode.nodeIdent()
+      if colName.len == 0:
+        fail("unsupported ORDER BY expression")
+      var idx = -1
+      for i, p in proj:
+        if p[0].toLowerAscii() == colName.toLowerAscii():
+          idx = i
+          break
+      if idx < 0:
+        idx = proj.len
+        proj.add((colName, newNode(nkIdent, colName)))
+        inc hidden
+      orderKeys.add((idx, desc))
+  var limitVal = -1'i64
+  var offsetVal = 0'i64
+  try:
+    if not limitNode.isNil: limitVal = limitNode.strVal.parseBiggestInt.int64
+    if not offsetNode.isNil: offsetVal = offsetNode.strVal.parseBiggestInt.int64
+  except ValueError:
+    declineFast()
+  (proj, orderKeys, hidden, limitVal, offsetVal, aggs)
+
+proc fastSelect(eng: SqlEngine, root: SqlNode, cx: FastCx): ExecResult =
+  let isDistinct = root.kind == nkSelectDistinct
+  var tableName = ""
+  var whereNode: SqlNode = nil
+  for child in root.sons:
+    case child.kind
+    of nkFrom: tableName = nodeIdent(child[0][0])
+    of nkWhere: whereNode = child[0]
+    else: discard
+  if tableName.len == 0:
+    fail("SELECT requires a FROM clause")
+  let tbl = eng.fastTable(tableName)
+  let (proj, orderKeys, hidden, limitVal, offsetVal, aggs) =
+    eng.fastSelectProj(root, tbl, cx)
+  if aggs.len > 0:
+    for child in root.sons:
+      if child.kind == nkOrder:
+        fail("ORDER BY is not supported together with aggregates")
+  for (_, expr) in proj:
+    if not (expr.kind == nkIdent and expr.strVal == "*"):
+      checkExprFast(expr, tbl, allowStar = true)
+  if not whereNode.isNil:
+    checkExprFast(whereNode, tbl)
+  for a in aggs:
+    if not a[1].isNil:
+      checkExprFast(a[1], tbl)
+  let wr = eng.resolveWhereFast(cx, tbl, whereNode)
+  eng.ctx.results.setLen(0)
+  if aggs.len > 0:
+    var countStar = 0'i64
+    var countNonNull = 0'i64
+    var sumAcc: Value = initValue(0'i64)
+    var avgCnt = 0'i64
+    var minAcc: Value = nil
+    var maxAcc: Value = nil
+    template visitRow(row: RowData) =
+      inc countStar
+      for a in aggs:
+        if a[0] == "count" and a[1].isNil: continue
+        var noRow2: RowData
+        let (ok, v) = evalCellFast(cx, a[1], row, true)
+        if not ok: declineFast()
+        case a[0]
+        of "count":
+          if v != nil: inc countNonNull
+        of "sum", "avg":
+          if v != nil and v.typeId in {tyInt, tyFloat}:
+            let nv = if v.typeId == tyInt: v.intVal.float64 else: v.floatVal
+            if sumAcc == nil or sumAcc.typeId notin {tyInt, tyFloat}:
+              sumAcc = initValue(nv)
+            elif sumAcc.typeId == tyInt and v.typeId == tyInt:
+              sumAcc = initValue(sumAcc.intVal + v.intVal)
+            else:
+              let sv = if sumAcc.typeId == tyInt: sumAcc.intVal.float64
+                       else: sumAcc.floatVal
+              sumAcc = initValue(sv + nv)
+            if a[0] == "avg": inc avgCnt
+        of "min", "max":
+          if v != nil:
+            if minAcc == nil and maxAcc == nil:
+              minAcc = v
+              maxAcc = v
+            else:
+              template lessThan(x, y: Value): bool =
+                if x.typeId in {tyInt, tyFloat} and
+                   y.typeId in {tyInt, tyFloat}:
+                  let xn = if x.typeId == tyInt: x.intVal.float64 else: x.floatVal
+                  let yn = if y.typeId == tyInt: y.intVal.float64 else: y.floatVal
+                  xn < yn
+                elif x.typeId == tyString and y.typeId == tyString:
+                  x.stringVal[] < y.stringVal[]
+                else: false
+              if a[0] == "min":
+                if lessThan(v, minAcc): minAcc = v
+              else:
+                if lessThan(maxAcc, v): maxAcc = v
+        else: discard
+    if wr.hasPks:
+      for pk in wr.pks:
+        let r = eng.ctx.store.getRow(tbl.name, pk)
+        if r.isSome: visitRow(r.get)
+    else:
+      for _, rec in tbl.allRowsByPk:
+        if not wr.filter.isNil:
+          let (ok, fv) = evalCellFast(cx, wr.filter, rec, true)
+          if not ok: declineFast()
+          if not vmTruthFast(fv): continue
+        visitRow(rec)
+    var cells: seq[Value]
+    for a in aggs:
+      case a[0]
+      of "count":
+        cells.add(initValue(if a[1].isNil: countStar else: countNonNull))
+      of "sum": cells.add(sumAcc)
+      of "avg":
+        cells.add(sqlArithFast(SqlArithDiv.int, sumAcc, initValue(avgCnt)))
+      of "min": cells.add(minAcc)
+      else: cells.add(maxAcc)
+    eng.ctx.results.add(cells)
+    let projCols = aggs.mapIt(it[2])
+    return eng.postProcessSelect(CompiledStmt(
+      kind: skSelect, projCols: projCols, placeholders: cx.phs,
+      deferLimit: -1'i64))
+  # plain projection
+  let limited = orderKeys.len == 0
+  var scanned = 0'i64
+  template emitRow(row: RowData) =
+    var cells = newSeqOfCap[Value](proj.len)
+    for (_, expr) in proj:
+      let (ok, v) = evalCellFast(cx, expr, row, true)
+      if not ok: declineFast()
+      cells.add(v)
+    eng.ctx.results.add(cells)
+    inc scanned
+  if wr.hasPks:
+    for pk in wr.pks:
+      if limited and limitVal >= 0 and scanned >= limitVal: break
+      let r = eng.ctx.store.getRow(tbl.name, pk)
+      if r.isSome: emitRow(r.get)
+  else:
+    for _, rec in tbl.allRowsByPk:
+      if limited and limitVal >= 0 and scanned >= limitVal: break
+      if not wr.filter.isNil:
+        let (ok, fv) = evalCellFast(cx, wr.filter, rec, true)
+        if not ok: declineFast()
+        if not vmTruthFast(fv): continue
+      emitRow(rec)
+  let stmt = CompiledStmt(
+    kind: skSelect,
+    projCols: proj[0 ..< proj.len - hidden].mapIt(it[0]),
+    hiddenCols: hidden,
+    orderKeys: orderKeys,
+    isDistinct: isDistinct,
+    deferredRange: orderKeys.len > 0,
+    deferLimit: if orderKeys.len > 0: limitVal else: -1'i64,
+    deferOffset: if orderKeys.len > 0: offsetVal else: 0'i64,
+    placeholders: cx.phs)
+  if limited:
+    # unordered LIMIT/OFFSET apply pre-sort (postProcessSelect only handles
+    # the deferred/ordered case)
+    var rows = eng.ctx.results
+    if offsetVal > 0:
+      if offsetVal < rows.len.int64: rows = rows[int(offsetVal) .. ^1]
+      else: rows = @[]
+    if limitVal >= 0 and limitVal < rows.len.int64:
+      rows = rows[0 ..< int(limitVal)]
+    eng.ctx.results = rows
+  eng.postProcessSelect(stmt)
+
+proc fastUpdate(eng: SqlEngine, root: SqlNode, cx: FastCx): ExecResult =
+  let tableName = nodeIdent(root[0])
+  let tbl = eng.fastTable(tableName)
+  var setPairs: seq[(string, SqlNode)]
+  var whereNode: SqlNode = nil
+  for child in root.sons:
+    case child.kind
+    of nkSelectColumns:
+      for asgn in child.sons:
+        if asgn.kind != nkAsgn or asgn.len < 2:
+          fail("UPDATE SET expects column = value pairs")
+        let colName = asgn[0].nodeIdent()
+        if colName.len == 0:
+          fail("invalid SET target")
+        if tbl.findColumn(colName).isNone:
+          fail("no such column: '" & colName & "' in table '" & tableName & "'")
+        setPairs.add((colName, asgn[1]))
+    of nkWhere: whereNode = child[0]
+    else: discard
+  for (colName, rhs) in setPairs:
+    if colName == tbl.primaryKey:
+      fail("updating primary key column '" & colName & "' is not supported")
+    checkExprFast(rhs, tbl)
+  if not whereNode.isNil:
+    checkExprFast(whereNode, tbl)
+  let wr = eng.resolveWhereFast(cx, tbl, whereNode)
+  var affected = 0'i64
+  template applyRow(pk: string) =
+    let cur = eng.ctx.store.getRow(tableName, pk)
+    if cur.isSome:
+      var row = cur.get
+      for (colName, rhs) in setPairs:
+        let (ok, v) = evalCellFast(cx, rhs, row, true)
+        if not ok: declineFast()
+        row[colName] = coerceCell(v, tbl.findColumn(colName).get, tableName)
+      eng.ctx.store.updateRow(tableName, pk, row)
+      inc affected
+  if wr.hasPks:
+    for pk in wr.pks: applyRow(pk)
+  else:
+    # snapshot first: applyRow mutates rowsByPk, which cannot be iterated
+    # live
+    var snap: seq[string]
+    for (pk, _) in tbl.allRowsByPk: snap.add(pk)
+    for pk in snap:
+      if not wr.filter.isNil:
+        let cur = eng.ctx.store.getRow(tableName, pk)
+        if cur.isNone: continue
+        let (ok, fv) = evalCellFast(cx, wr.filter, cur.get, true)
+        if not ok: declineFast()
+        if not vmTruthFast(fv): continue
+      applyRow(pk)
+  eng.ctx.affected = affected
+  ExecResult(kind: skUpdate, affected: affected)
+
+proc fastDelete(eng: SqlEngine, root: SqlNode, cx: FastCx): ExecResult =
+  let tableName = nodeIdent(root[0])
+  let tbl = eng.fastTable(tableName)
+  var whereNode: SqlNode = nil
+  for child in root.sons:
+    if child.kind == nkWhere:
+      whereNode = child[0]
+  if not whereNode.isNil:
+    checkExprFast(whereNode, tbl)
+  let wr = eng.resolveWhereFast(cx, tbl, whereNode)
+  var affected = 0'i64
+  if wr.hasPks:
+    for pk in wr.pks:
+      if eng.ctx.store.deleteRow(tableName, pk):
+        inc affected
+  else:
+    # snapshot first: deleteRow mutates rowsByPk, which cannot be iterated
+    # live
+    var snap: seq[string]
+    for (pk, _) in tbl.allRowsByPk: snap.add(pk)
+    for pk in snap:
+      var matches = true
+      if not wr.filter.isNil:
+        let cur = eng.ctx.store.getRow(tableName, pk)
+        if cur.isNone: continue
+        let (ok, fv) = evalCellFast(cx, wr.filter, cur.get, true)
+        if not ok: declineFast()
+        matches = vmTruthFast(fv)
+      if matches and eng.ctx.store.deleteRow(tableName, pk):
+        inc affected
+  eng.ctx.affected = affected
+  ExecResult(kind: skDelete, affected: affected)
+
+proc tryFastExec(eng: SqlEngine, root: SqlNode,
+                 params: openArray[Value]): ExecResult =
+  ## Native execution for common shapes. Raises FastUnsupported when the
+  ## statement needs the VM; real errors propagate as SqlEngineError.
+  var cx = FastCx(params: @params)
+  case root.kind
+  of nkInsert:
+    var valuesNode: SqlNode = nil
+    for child in root.sons:
+      if child.kind == nkValueList: valuesNode = child
+    if not valuesNode.isNil:
+      for row in valuesNode.sons:
+        for v in row.sons: walkPhFast(v, cx)
+    let tbl = eng.fastTable(nodeIdent(root[0]))
+    cx.tbl = tbl
+    eng.fastInsert(root, cx)
+  of nkUpdate:
+    var whereNode: SqlNode = nil
+    for child in root.sons:
+      if child.kind == nkWhere: whereNode = child[0]
+    if not whereNode.isNil: walkPhFast(whereNode, cx)
+    for child in root.sons:
+      if child.kind == nkSelectColumns:
+        for asgn in child.sons:
+          if asgn.kind == nkAsgn and asgn.len >= 2:
+            walkPhFast(asgn[1], cx)
+    let tbl = eng.fastTable(nodeIdent(root[0]))
+    cx.tbl = tbl
+    eng.fastUpdate(root, cx)
+  of nkDelete:
+    for child in root.sons:
+      if child.kind == nkWhere: walkPhFast(child[0], cx)
+    let tbl = eng.fastTable(nodeIdent(root[0]))
+    cx.tbl = tbl
+    eng.fastDelete(root, cx)
+  of nkSelect, nkSelectDistinct:
+    var whereNode: SqlNode = nil
+    var colsNode: SqlNode = nil
+    for child in root.sons:
+      case child.kind
+      of nkWhere: whereNode = child[0]
+      of nkSelectColumns: colsNode = child
+      else: discard
+    if not whereNode.isNil: walkPhFast(whereNode, cx)
+    if not colsNode.isNil:
+      for entry in colsNode.sons: walkPhFast(entry, cx)
+    var tableName = ""
+    for child in root.sons:
+      if child.kind == nkFrom: tableName = nodeIdent(child[0][0])
+    if tableName.len == 0:
+      fail("SELECT requires a FROM clause")
+    cx.tbl = eng.fastTable(tableName)
+    eng.fastSelect(root, cx)
+  else: declineFast()
+
+#
 # engine / execution
 #
 proc newSqlEngine*(store: Store): SqlEngine =
@@ -1368,22 +2281,24 @@ proc postProcessSelect(eng: SqlEngine, stmt: CompiledStmt): ExecResult =
 proc compileStmts(eng: SqlEngine, sqlText: string): seq[CompiledStmt]
   ## Parses and lowers one SQL string into executable statements
 
-proc placeholderCount*(eng: SqlEngine, sqlText: string): int =
-  ## Compiles (or fetches from cache) a statement and returns how many
-  ## positional placeholders it contains.
-  if not eng.cache.hasKey(sqlText):
-    eng.cache[sqlText] = eng.compileStmts(sqlText)
-  eng.cache[sqlText][^1].placeholders.len
+const MaxCachedStatements = 256
+  ## Plan and root caches need a ceiling: interpolated queries and one-off
+  ## statements would otherwise grow them without bound; on overflow they
+  ## reset wholesale (plans are cheap to rebuild relative to unbounded
+  ## memory growth).
 
-proc compileStmts(eng: SqlEngine, sqlText: string): seq[CompiledStmt] =
-  ## Parses and lowers one SQL string into executable statements
-  var compiled: seq[CompiledStmt]
+proc splitRoots(sqlText: string): seq[SqlNode] =
+  ## Parses one SQL string into per-statement roots.
   let root = parseSql(sqlText)
   when defined(boogieSqlDebug):
     echo "[compile] root kind=", $root.kind, " sons=", root.sons.len
-  let roots =
-    if root.kind == nkStmtList: root.sons
-    else: @[root]
+  if root.kind == nkStmtList: root.sons
+  else: @[root]
+
+proc compileRoots(eng: SqlEngine, sqlText: string,
+                  roots: seq[SqlNode]): seq[CompiledStmt] =
+  ## Lowers already-parsed statements into executable bytecode.
+  var compiled: seq[CompiledStmt]
   for r in roots:
     when defined(boogieSqlDebug):
       echo "[compile] stmt kind=", $r.kind
@@ -1401,19 +2316,44 @@ proc compileStmts(eng: SqlEngine, sqlText: string): seq[CompiledStmt] =
     compiled.add(stmt)
   compiled
 
-const MaxCachedStatements = 256
-  ## Interpolated queries produce unique text per execution, so the plan cache
-  ## needs a ceiling; on overflow it resets wholesale (plans are cheap to
-  ## rebuild relative to unbounded memory growth).
+proc compileStmts(eng: SqlEngine, sqlText: string): seq[CompiledStmt] =
+  ## Parses and lowers one SQL string into executable statements
+  eng.compileRoots(sqlText, splitRoots(sqlText))
+
+proc cachedRoots(eng: SqlEngine, sqlText: string): seq[SqlNode] =
+  ## Parsed roots per SQL text, capped like the plan cache. Roots are pure
+  ## syntax (tables resolve fresh per execution), so DDL never stales them.
+  if not eng.roots.hasKey(sqlText):
+    if eng.roots.len >= MaxCachedStatements:
+      eng.roots.clear()
+    eng.roots[sqlText] = splitRoots(sqlText)
+  eng.roots[sqlText]
+
+proc placeholderCount*(eng: SqlEngine, sqlText: string): int =
+  ## Compiles (or fetches from cache) a statement and returns how many
+  ## positional placeholders it contains.
+  if not eng.cache.hasKey(sqlText):
+    eng.cache[sqlText] = eng.compileRoots(sqlText, eng.cachedRoots(sqlText))
+  eng.cache[sqlText][^1].placeholders.len
+
 proc execSql*(eng: SqlEngine, sqlText: string,
               params: openArray[Value] = []): ExecResult =
   ## Parses (or fetches from cache), compiles and executes one SQL string.
   ## Multiple semicolon-separated statements run sequentially; the last
-  ## result is returned.
+  ## result is returned. Common single-statement shapes run through the
+  ## native fast path without touching the VM.
+  const FastKinds = {nkInsert, nkUpdate, nkDelete, nkSelect, nkSelectDistinct}
+  let roots = eng.cachedRoots(sqlText)
+  if roots.len == 1 and roots[0].kind in FastKinds:
+    try:
+      return eng.tryFastExec(roots[0], params)
+    except FastUnsupported:
+      discard
   if not eng.cache.hasKey(sqlText):
     if eng.cache.len >= MaxCachedStatements:
       eng.cache.clear()
-    eng.cache[sqlText] = eng.compileStmts(sqlText)
+      eng.ctx.colListCache.clear()
+    eng.cache[sqlText] = eng.compileRoots(sqlText, roots)
 
   let stmts = eng.cache[sqlText]
   when defined(boogieSqlDebug):
@@ -1441,4 +2381,5 @@ proc execSql*(eng: SqlEngine, sqlText: string,
       result = ExecResult(kind: stmt.kind, affected: eng.ctx.affected)
       # schema changed: cached plans may embed stale projections/column lists
       eng.cache.clear()
+      eng.ctx.colListCache.clear()
 

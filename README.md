@@ -295,17 +295,20 @@ aggregates without GROUP BY (`COUNT`/`SUM`/`AVG`/`MIN`/`MAX`), and expressions
 with comparisons, `AND`/`OR`/`NOT`, arithmetic, `IS [NOT] NULL` and `?`/`$n`
 placeholders. JOINs, GROUP BY/HAVING and subqueries are not supported yet.
 
-> Unlike the SQLite backend, statements here are precompiled bytecode cached
-> per connection; interpolated `exec()` calls recompile when their text
-> changes. Numeric comparisons follow SQLite column-affinity rules (text
+> Statements are parsed once per connection and cached; `exec()` binds its
+> arguments as typed values so repeated calls hit the plan cache.
+> Single-statement `INSERT`/`SELECT`/`UPDATE`/`DELETE` run through native
+> fast paths (point lookups by primary key, indexed equality via the store's
+> equality index, direct row access) and only complex shapes fall back to
+> the VM loop. Numeric comparisons follow SQLite column-affinity rules (text
 > operands coerce when they parse) and NULL propagates per SQL semantics.
 
 | Operation | ops/s |
 |---|---|
-| insert | ~43 K |
-| point query (unindexed scan) | ~281 q/s |
-| ordered scan | ~333 K rows/s |
-| update | ~89 |
+| insert | ~133 K |
+| point query (unindexed scan) | ~3.0 K q/s |
+| ordered scan | ~1.1 M rows/s |
+| update | ~2.7 K |
 
 > [!TIP]
 > Run the full test + benchmark suites with `nimble test -d:release` (the `-d:release`
