@@ -429,47 +429,49 @@ suite "DocumentStore (core + benchmark)":
 
   test "docstore ops/sec benchmark (insert/get/lookup/del)":
     const N = 20000
-    var ds = openDocumentStore(
-      root,
-      "bench_allops",
-      enableSnapshots = false,
-      walFlushEveryOps = 0'u32
-    )
+    for checkpointEveryOps in [0'u32, 1000'u32, 10000'u32]:
+      var ds = openDocumentStore(
+        root,
+        "bench_allops_" & $checkpointEveryOps,
+        enableSnapshots = true,
+        checkpointEveryOps = checkpointEveryOps,
+        walFlushEveryOps = 1000'u32
+      )
 
-    # Insert
-    var t0 = cpuTime()
-    for i in 0 ..< N:
-      ds.insert("k" & $i, %*{"i": i}, sync = false)
-    ds.wal.flush()
-    let insertSecs = cpuTime() - t0
+      # Insert
+      var t0 = cpuTime()
+      for i in 0 ..< N:
+        ds.insert("k" & $i, %*{"i": i}, sync = false)
+      ds.wal.flush()
+      let insertSecs = cpuTime() - t0
 
-    # Get
-    t0 = cpuTime()
-    for i in 0 ..< N:
-      discard ds.get("k" & $i)
-    let getSecs = cpuTime() - t0
+      # Get
+      t0 = cpuTime()
+      for i in 0 ..< N:
+        discard ds.get("k" & $i)
+      let getSecs = cpuTime() - t0
 
-    # Lookup (hasKey)
-    t0 = cpuTime()
-    for i in 0 ..< N:
-      discard ds.hasKey("k" & $i)
-    let lookupSecs = cpuTime() - t0
+      # Lookup (hasKey)
+      t0 = cpuTime()
+      for i in 0 ..< N:
+        discard ds.hasKey("k" & $i)
+      let lookupSecs = cpuTime() - t0
 
-    # Delete
-    t0 = cpuTime()
-    for i in 0 ..< N:
-      discard ds.delete("k" & $i)
-    ds.wal.flush()
-    let delSecs = cpuTime() - t0
+      # Delete
+      t0 = cpuTime()
+      for i in 0 ..< N:
+        discard ds.delete("k" & $i, sync = false)
+      ds.wal.flush()
+      let delSecs = cpuTime() - t0
 
-    let insertOps = float(N) / max(insertSecs, 1e-9)
-    let getOps = float(N) / max(getSecs, 1e-9)
-    let lookupOps = float(N) / max(lookupSecs, 1e-9)
-    let delOps = float(N) / max(delSecs, 1e-9)
+      let insertOps = float(N) / max(insertSecs, 1e-9)
+      let getOps = float(N) / max(getSecs, 1e-9)
+      let lookupOps = float(N) / max(lookupSecs, 1e-9)
+      let delOps = float(N) / max(delSecs, 1e-9)
 
-    echo fmt"[bench] insert={insertOps:>10.0f} ops/s get={getOps:>10.0f} ops/s lookup={lookupOps:>10.0f} ops/s del={delOps:>10.0f} ops/s"
+      echo fmt"[bench] checkpointEveryOps={checkpointEveryOps} insert={insertOps:>10.0f} ops/s get={getOps:>10.0f} ops/s lookup={lookupOps:>10.0f} ops/s del={delOps:>10.0f} ops/s"
 
-    check insertOps > 0
-    check getOps > 0
-    check lookupOps > 0
-    check delOps > 0
+      check insertOps > 0
+      check getOps > 0
+      check lookupOps > 0
+      check delOps > 0
