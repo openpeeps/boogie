@@ -415,31 +415,40 @@ proc interpret*(vm: Vm, script: Script, startChunk: Chunk,
     of opcInvB:
       if stack.len < 1:
         raise newException(IndexDefect, "stack underflow in opcInvB")
-      stack[^1] = initValue(not stack[^1].boolVal)
+      # NOT NULL is NULL (SQL propagation); without this, NOT over a NULL
+      # boolean cell segfaults on the nil dereference.
+      if stack[^1] != nil:
+        stack[^1] = initValue(not stack[^1].boolVal)
     of opcJumpFwd:
       let tgt = co.jumpTargets[pcIdx]
       if tgt >= 0: pcIdx = tgt - 1
     of opcJumpFwdT:
       let val = stack[^1]
+      # NULL counts as false (mirrors vmTruthFast); without the nil guard
+      # a bare NULL condition segfaults on the typeId dereference.
       let cond =
-        case val.typeId
-        of tyBool: val.boolVal
-        of tyJsonStorage:
-          val.jsonVal != nil and val.jsonVal.kind == JBool and
-            val.jsonVal.bVal
-        else: false
+        if val == nil: false
+        else:
+          case val.typeId
+          of tyBool: val.boolVal
+          of tyJsonStorage:
+            val.jsonVal != nil and val.jsonVal.kind == JBool and
+              val.jsonVal.bVal
+          else: false
       if cond:
         let tgt = co.jumpTargets[pcIdx]
         if tgt >= 0: pcIdx = tgt - 1
     of opcJumpFwdF:
       let val = stack[^1]
       let cond =
-        case val.typeId
-        of tyBool: val.boolVal
-        of tyJsonStorage:
-          val.jsonVal != nil and val.jsonVal.kind == JBool and
-            val.jsonVal.bVal
-        else: false
+        if val == nil: false
+        else:
+          case val.typeId
+          of tyBool: val.boolVal
+          of tyJsonStorage:
+            val.jsonVal != nil and val.jsonVal.kind == JBool and
+              val.jsonVal.bVal
+          else: false
       if not cond:
         let tgt = co.jumpTargets[pcIdx]
         if tgt >= 0: pcIdx = tgt - 1

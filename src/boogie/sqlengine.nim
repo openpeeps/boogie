@@ -12,6 +12,7 @@ import pkg/openparser/sql
 
 import ./sqlengine/vm
 export vm
+import ./sqlengine/jit
 
 # rdbms.Value is excluded locally: inside the engine, `Value` refers to the
 # SQL VM value. `export rdbms` below still re-exports everything so the
@@ -90,6 +91,12 @@ type
     colListCache: Table[string, seq[string]]
       ## parsed `colsJson` payloads keyed by the raw JSON text, so INSERT /
       ## UPDATE statements don't re-parse the same column list per row
+    jitPreds: seq[JitPred]
+      ## compiled native predicates; kernels borrow no GC memory and stay
+      ## alive for the engine lifetime (plan cache bounds the count)
+    jitSlots: seq[int64]
+    jitNulls: seq[int64]
+      ## reusable unboxed operand scratch for `sql_jit_pred` calls
 
   CompiledStmt = object
     kind: StmtKind
@@ -740,6 +747,66 @@ proc genExpr(l: var Lowerer, n: SqlNode) =
   else:
     fail("unsupported expression node: " & $n.kind)
 
+proc genWhereJit(l: var Lowerer, tbl: DbTable,
+                 whereNode: SqlNode): bool =
+  ## Tries to lower a WHERE clause as a JIT predicate: the referenced
+  ## columns are fetched with the usual `sql_col` calls and a single
+  ## `sql_jit_pred` foreign call evaluates the whole predicate natively.
+  ## Returns true when emitted; false keeps the interpreter lowering.
+  when defined(boogieSqlNoJit):
+    return false
+  if not jitEnabled:
+    return false
+  let pred = tryCompilePred(whereNode, tbl)
+  if pred == nil:
+    return false
+  let ctx = l.eng.ctx
+  ctx.jitPreds.add(pred)
+  let ncols = pred.cols.len
+  proc fJitPred(args: StackView, argc: int): Value =
+    if argc != ncols:
+      return nil
+    let need = pred.nslots
+    if ctx.jitSlots.len < need:
+      ctx.jitSlots.setLen(need)
+      ctx.jitNulls.setLen(need)
+    for i in 0 ..< ncols:
+      let v = args[i]
+      if v == nil:
+        ctx.jitSlots[i] = 0
+        ctx.jitNulls[i] = 1
+      else:
+        case v.typeId
+        of tyInt:
+          ctx.jitSlots[i] = v.intVal
+          ctx.jitNulls[i] = 0
+        of tyBool:
+          ctx.jitSlots[i] = ord(v.boolVal)
+          ctx.jitNulls[i] = 0
+        else:
+          # Unreachable for statically typed columns; treat as NULL
+          # rather than crashing.
+          ctx.jitSlots[i] = 0
+          ctx.jitNulls[i] = 1
+    for i in 0 ..< pred.constVals.len:
+      ctx.jitSlots[ncols + i] = pred.constVals[i]
+      ctx.jitNulls[ncols + i] = pred.constNulls[i]
+    var err: int64 = 0
+    let r = pred.fn(addr ctx.jitSlots[0], addr ctx.jitNulls[0], addr err)
+    if err != 0:
+      raise newException(OverflowDefect, "over- or underflow")
+    initValue(r != 0)
+  l.pids["sql_jit_pred"] = uint16(l.script.procs.len)
+  l.script.procs.add(Proc(name: "sql_jit_pred", kind: pkForeign,
+    foreign: ForeignProc(fJitPred), paramCount: ncols, hasResult: true))
+  for colName in pred.cols:
+    l.ch.emit(opcPushL)
+    l.ch.emit(CtxSlot)
+    discard l.pushS(colName)
+    l.callF("sql_col")
+  l.callF("sql_jit_pred")
+  true
+
 #
 # statement lowering
 #
@@ -921,7 +988,8 @@ proc compileSelect(l: var Lowerer, root: SqlNode): CompiledStmt =
 
     var holeCont = -1
     if not whereNode.isNil:
-      l.genExpr(whereNode)
+      if not genWhereJit(l, tbl, whereNode):
+        l.genExpr(whereNode)
       holeCont = l.jmpFwd(opcJumpFwdF)
       l.ch.emit(opcDiscard); l.ch.emit(1'u8)
 
@@ -1019,7 +1087,8 @@ proc compileSelect(l: var Lowerer, root: SqlNode): CompiledStmt =
 
   var holeCont = -1
   if not whereNode.isNil:
-    l.genExpr(whereNode)
+    if not genWhereJit(l, tbl, whereNode):
+      l.genExpr(whereNode)
     holeCont = l.jmpFwd(opcJumpFwdF)
     l.ch.emit(opcDiscard); l.ch.emit(1'u8)
 
@@ -1113,7 +1182,8 @@ proc compileUpdateDelete(l: var Lowerer, root: SqlNode): CompiledStmt =
 
   var holeCont = -1
   if not whereNode.isNil:
-    l.genExpr(whereNode)
+    if not genWhereJit(l, tbl, whereNode):
+      l.genExpr(whereNode)
     holeCont = l.jmpFwd(opcJumpFwdF)
     l.ch.emit(opcDiscard); l.ch.emit(1'u8)
 
@@ -2208,6 +2278,10 @@ proc onHotLoop*(eng: SqlEngine,
   ## count reaches `SqlJitHotLoopThreshold`. This is the seam a future JIT
   ## compiler will use; the interpreter remains the execution path.
   eng.vm.onHotLoop = cb
+
+proc jitPredCount*(eng: SqlEngine): int =
+  ## Number of JIT predicates compiled for this engine (test hook).
+  eng.ctx.jitPreds.len
 
 proc runCompiled(eng: SqlEngine, stmt: CompiledStmt,
                  params: openArray[Value]): Value =
