@@ -11,7 +11,7 @@ from pkg/openparser/json import toJson
 import pkg/openparser/sql
 
 import ./sqlengine/vm
-export vm.initValue
+export vm
 
 # rdbms.Value is excluded locally: inside the engine, `Value` refers to the
 # SQL VM value. `export rdbms` below still re-exports everything so the
@@ -2201,6 +2201,13 @@ proc newSqlEngine*(store: Store): SqlEngine =
     ctx: SqlExecCtx(store: store),
     vm: newVm()
   )
+
+proc onHotLoop*(eng: SqlEngine,
+    cb: proc(chunk: Chunk, pcIdx: int) {.closure.}) =
+  ## Installs the hot-loop hook invoked once per loop site when its back-edge
+  ## count reaches `SqlJitHotLoopThreshold`. This is the seam a future JIT
+  ## compiler will use; the interpreter remains the execution path.
+  eng.vm.onHotLoop = cb
 
 proc runCompiled(eng: SqlEngine, stmt: CompiledStmt,
                  params: openArray[Value]): Value =

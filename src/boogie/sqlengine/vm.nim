@@ -161,10 +161,22 @@ type
     arg1*: seq[int64]
     arg2*: seq[int64]
     jumpTargets*: seq[int]
+    hot*: seq[int]
+      ## Per-op back-edge execution counts (only jump-back sites use them).
+    hotFired*: seq[bool]
+      ## Whether `onHotLoop` already fired for each op index.
 
   Vm* {.acyclic.} = ref object
     globals*: Table[string, Value]
     opCache*: Table[int, CachedOps]
+    onHotLoop*: proc(chunk: Chunk, pcIdx: int) {.closure.}
+      ## Optional hook invoked once per loop site when its back-edge count
+      ## reaches `SqlJitHotLoopThreshold`. Nil by default; a future JIT
+      ## compiler can install it to compile hot loops natively while the
+      ## interpreter remains the fallback.
+
+const SqlJitHotLoopThreshold* = 50
+  ## Back-edge executions after which a loop site is considered hot.
 
 var nextChunkId {.global.}: int = 0
 
@@ -323,7 +335,9 @@ proc parseChunk(chunk: Chunk): CachedOps =
     opcodes: opcodes,
     arg1: arg1,
     arg2: arg2,
-    jumpTargets: jumpTargets
+    jumpTargets: jumpTargets,
+    hot: newSeq[int](opcodes.len),
+    hotFired: newSeq[bool](opcodes.len)
   )
 
 proc getCachedOps*(vm: Vm, chunk: Chunk): CachedOps =
@@ -430,6 +444,13 @@ proc interpret*(vm: Vm, script: Script, startChunk: Chunk,
         let tgt = co.jumpTargets[pcIdx]
         if tgt >= 0: pcIdx = tgt - 1
     of opcJumpBack:
+      inc co.hot[pcIdx]
+      if co.hot[pcIdx] == SqlJitHotLoopThreshold and not co.hotFired[pcIdx]:
+        co.hotFired[pcIdx] = true
+        when defined(boogieSqlJitDebug):
+          echo "[jit] hot loop at pc=", pcIdx, " chunk=", curChunk.file
+        if vm.onHotLoop != nil:
+          vm.onHotLoop(curChunk, pcIdx)
       let tgt = co.jumpTargets[pcIdx]
       if tgt >= 0: pcIdx = tgt - 1
       else: pcIdx = tgt - 1
