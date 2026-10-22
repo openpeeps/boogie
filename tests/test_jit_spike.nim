@@ -103,9 +103,6 @@ suite "dynasm spike (SQL JIT toolchain)":
 
 suite "hot-loop detection seam":
   test "onHotLoop fires once per VM scan-loop site":
-    # NOTE: single statements run through the native fast path without
-    # touching the VM; multi-statement strings bypass it and execute on
-    # the VM, which is what this seam observes.
     var eng = newSqlEngine(newInMemoryStore())
     var fired = 0
     eng.onHotLoop(proc(chunk: Chunk, pcIdx: int) = inc fired)
@@ -118,3 +115,32 @@ suite "hot-loop detection seam":
     # Both sites already fired; reruns stay quiet (hook fires once per site).
     discard eng.execSql("SELECT id FROM t WHERE n > 5; SELECT id FROM t WHERE n > 6")
     check fired == 2
+
+suite "direct kernel calls":
+  test "compiled n>5 kernel answers directly":
+    var eng = newSqlEngine(newInMemoryStore())
+    discard eng.execSql("CREATE TABLE t (id INTEGER PRIMARY KEY, n INT)")
+    discard eng.execSql("INSERT INTO t (n) VALUES (1)")
+    discard eng.execSql("SELECT id FROM t WHERE id < 0; SELECT id FROM t WHERE n > 5")
+    check eng.jitPredCount() == 2
+    let pred = eng.jitPreds[1]
+    check pred.cols == @["n"]
+    check pred.constVals == @[5'i64]
+    echo "[jit-direct] nslots=", pred.nslots, " cols=", pred.cols,
+      " consts=", pred.constVals
+    var slots = newSeq[int64](pred.nslots)
+    var nulls = newSeq[int64](pred.nslots)
+    var err: int64 = 0
+    proc call(v, c: int64, vn, cn: int64): int64 =
+      slots[0] = v
+      nulls[0] = vn
+      slots[1] = c
+      nulls[1] = cn
+      err = 0
+      pred.fn(addr slots[0], addr nulls[0], addr err)
+    check call(7, 5, 0, 0) == 1
+    check err == 0
+    check call(3, 5, 0, 0) == 0
+    check call(5, 5, 0, 0) == 0
+    check call(7, 5, 1, 0) == 0
+    check call(7, 5, 0, 1) == 0

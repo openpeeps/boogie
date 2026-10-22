@@ -57,43 +57,43 @@ type
       ## Owns the machine code; keep alive as long as `fn` is used.
     fn*: JitPredFn
 
-  JitTy = enum jtInt, jtBool
+  JitTy* = enum jtInt, jtBool
 
-  JitNodeKind = enum jCol, jConst, jCmp, jArith, jAnd, jOr, jIsNull
+  JitNodeKind* = enum jCol, jConst, jCmp, jArith, jAnd, jOr, jIsNull
 
-  JitNode = ref object
-    ty: JitTy
-    isNullConst: bool
-    case kind: JitNodeKind
+  JitNode* = ref object
+    ty*: JitTy
+    isNullConst*: bool
+    case kind*: JitNodeKind
     of jCol:
-      colIdx: int
-      colTy: JitTy
+      colIdx*: int
+      colTy*: JitTy
     of jConst:
-      cVal: int64
+      cVal*: int64
         ## Index into the const pool (value lives in a slot).
     of jCmp:
-      cmpMode: int
-      cmpLeft, cmpRight: JitNode
+      cmpMode*: int
+      cmpLeft*, cmpRight*: JitNode
     of jArith:
-      arithMode: int
-      arithLeft, arithRight: JitNode
+      arithMode*: int
+      arithLeft*, arithRight*: JitNode
     of jAnd, jOr:
-      bLeft, bRight: JitNode
+      bLeft*, bRight*: JitNode
     of jIsNull:
-      operand: JitNode
-      negated: bool
+      operand*: JitNode
+      negated*: bool
 
 const
-  JitCmpEq = 0
-  JitCmpNe = 1
-  JitCmpLt = 2
-  JitCmpLe = 3
-  JitCmpGt = 4
-  JitCmpGe = 5
+  JitCmpEq* = 0
+  JitCmpNe* = 1
+  JitCmpLt* = 2
+  JitCmpLe* = 3
+  JitCmpGt* = 4
+  JitCmpGe* = 5
 
-  JitArithAdd = 0
-  JitArithSub = 1
-  JitArithMul = 2
+  JitArithAdd* = 0
+  JitArithSub* = 1
+  JitArithMul* = 2
 
   JitMaxDepth = 48
     ## Deeper expressions stay on the interpreter.
@@ -342,15 +342,15 @@ proc tryBuildPred*(whereNode: SqlNode, tbl: DbTable): tuple[ok: bool,
 # (rcx, rdx) / (x11, x12). Slot `i` lives at [base + i*8].
 # ---------------------------------------------------------------------------
 
-type JitGen = object
-  ncols: int
-  base: int
+type JitGen* = object
+  ncols*: int
+  base*: int
     ## First scratch slot index (cols + consts).
-  sp: int
+  sp*: int
     ## Compile-time eval-stack depth.
-  labels: int
+  labels*: int
 
-proc newLabel(g: var JitGen, tag: string): string =
+proc newLabel*(g: var JitGen, tag: string): string =
   inc g.labels
   "j" & $g.labels & "_" & tag
 
@@ -377,7 +377,7 @@ proc xPopSecond(a: var Assembler, g: var JitGen) =
     arch x64
     mov rcx, [rbx + d]
     mov rdx, [r12 + d]
-proc lab(a: var Assembler, name: string) =
+proc lab*(a: var Assembler, name: string) =
   ## Binds a dynamically generated label at the current position.
   a.localLabel(name)
 
@@ -561,7 +561,7 @@ proc genNodeX64(a: var Assembler, g: var JitGen, n: JitNode) =
         movzx r10d, al
         `xor` r11d, r11d
 
-proc rPush(a: var Assembler, g: var JitGen) =
+proc rPush*(a: var Assembler, g: var JitGen) =
   ## Spill (x9, x10) to the scratch area.
   let d = g.scratchAbs()
   dynasm a:
@@ -570,7 +570,7 @@ proc rPush(a: var Assembler, g: var JitGen) =
     str x10, [x1, d]
   inc g.sp
 
-proc rPopSecond(a: var Assembler, g: var JitGen) =
+proc rPopSecond*(a: var Assembler, g: var JitGen) =
   ## Pop into (x11, x12).
   dec g.sp
   let d = g.scratchAbs()
@@ -579,7 +579,7 @@ proc rPopSecond(a: var Assembler, g: var JitGen) =
     ldr x11, [x0, d]
     ldr x12, [x1, d]
 
-proc genNodeArm(a: var Assembler, g: var JitGen, n: JitNode) =
+proc genNodeArm*(a: var Assembler, g: var JitGen, n: JitNode) =
   case n.kind
   of jCol:
     let d = g.slotAbs(n.colIdx)

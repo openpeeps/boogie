@@ -2283,6 +2283,10 @@ proc jitPredCount*(eng: SqlEngine): int =
   ## Number of JIT predicates compiled for this engine (test hook).
   eng.ctx.jitPreds.len
 
+proc jitPreds*(eng: SqlEngine): seq[JitPred] =
+  ## Compiled JIT predicates (test hook for direct kernel calls).
+  eng.ctx.jitPreds
+
 proc runCompiled(eng: SqlEngine, stmt: CompiledStmt,
                  params: openArray[Value]): Value =
   # seed placeholder globals; unbound ones become NULL
