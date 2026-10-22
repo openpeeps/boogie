@@ -1,4 +1,4 @@
-# Multi-process signal worker for tests/test15.nim.
+# Multi-process signal worker for tests/test_signals.nim.
 # Modes:
 #   hupkill <dir>  - put N keys with a huge flush interval (nothing durable),
 #                    print READY, then sleep until killed. Used with SIGHUP

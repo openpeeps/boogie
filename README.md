@@ -42,7 +42,7 @@ inserting it into Boogie database.
 
 Every store supports an in-memory mode and a disk-backed mode with WAL, group
 commits, and periodic checkpoints. Benchmark numbers come from the bundled test
-suites (`nim r -d:release tests/testX.nim`) on the author's development machine.
+suites (`nim r -d:release tests/test_<module>.nim`) on the author's development machine.
 
 ### Key/Value Store
 

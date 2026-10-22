@@ -7,7 +7,7 @@ import ../src/boogie/db_boogie
 # ORDER BY, and DISTINCT.
 #
 # Each benchmark is self-contained (creates its own tables) so results are
-# independent. Results are printed in the same [bench] format as test11.
+# independent. Results are printed in the same [bench] format as test_db_boogie.
 # ---------------------------------------------------------------------------
 
 const

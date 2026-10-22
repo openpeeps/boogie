@@ -11,7 +11,7 @@ import ../src/boogie/filelock
 #
 # Writers still take `LOCK_EX`; `readOnly = true` opens take `LOCK_SH`, so
 # any number of reader processes can share a path while no writer holds it.
-# Run with: nim r --threads:on --mm:arc tests/test17.nim
+# Run with: nim r --threads:on --mm:arc tests/test_filelock.nim
 # ---------------------------------------------------------------------------
 
 proc testRoot(): string =
