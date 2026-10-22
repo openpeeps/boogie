@@ -10,28 +10,24 @@ import std/[strutils, tables, options, json, algorithm, sequtils, math]
 from pkg/openparser/json import toJson
 import pkg/openparser/sql
 
-# The vmext import MUST precede the vancode VM imports: it registers the SQL
-# opcodes that get spliced into the VM at compile time.
-import ./sqlengine/vmext
-
-import pkg/vancode/interpreter/[chunk, value, vm, sym]
+import ./sqlengine/vm
+export vm.initValue
 
 # rdbms.Value is excluded locally: inside the engine, `Value` refers to the
-# vancode VM value. `export rdbms` below still re-exports everything so the
+# SQL VM value. `export rdbms` below still re-exports everything so the
 # driver layer sees the store API (including rdbms.Value) unqualified.
 import ./stores/rdbms except Value
 export rdbms
 
 # Re-exported for drivers that need to construct placeholder bindings;
-# note that `value.Value` is deliberately NOT exported (it would be
-# ambiguous with `rdbms.Value`). Inside this module and for qualified
+# note that the VM `Value` is deliberately NOT exported under that name (it
+# would be ambiguous with `rdbms.Value`). Inside this module and for qualified
 # access as `sqlengine.Value`, `Value` refers to the VM value type.
-from pkg/vancode/interpreter/value import nil
-export value.initValue
+export vm.initValue
 
 ## This module implements a SQL engine on top of the RDBMS store. Statements
-## are parsed with `openparser/sql`, lowered to vancode bytecode and evaluated
-## by the vancode VM:
+## are parsed with `openparser/sql`, lowered to SQL bytecode and evaluated
+## by the built-in SQL VM:
 ##
 ## - WHERE predicates compile into real VM code: comparisons and arithmetic
 ##   use the extended NULL-aware `opcSqlCmp`/`opcSqlArith` opcodes and control
@@ -129,8 +125,8 @@ proc fail(msg: string) {.noreturn.} =
   raise newException(SqlEngineError, msg)
 
 type
-  SqlValue* = value.Value
-    ## Alias for the vancode VM value used for placeholder bindings.
+  SqlValue* = vm.Value
+    ## Alias for the SQL VM value used for placeholder bindings.
     ## (`Value` inside this module refers to this same type; drivers should
     ## use `SqlValue` since `Value` is ambiguous through re-exports.)
 
@@ -1311,7 +1307,7 @@ proc compileDdl(l: var Lowerer, root: SqlNode): CompiledStmt =
 # The VM loop costs several foreign calls per row (scan_next, one col lookup
 # per column, cell_push, ...). Common OLTP shapes bypass it and hit the store
 # directly with identical semantics: NULL propagation, numeric
-# column-affinity and error messages are mirrored from vmext/lowering.
+# column-affinity and error messages are mirrored from the VM/lowering.
 # Anything outside the supported shapes raises FastUnsupported and falls
 # back to the VM path (which also reproduces the original error).
 

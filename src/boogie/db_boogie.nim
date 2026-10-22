@@ -30,8 +30,8 @@ import ./sqlengine
 ## in-memory store); `user`, `password` and `database` are accepted for API
 ## compatibility and ignored.
 ##
-## SQL statements are compiled to vancode bytecode and evaluated by the vancode
-## VM; see `boogie/sqlengine` for the supported statement subset. Statements run
+## SQL statements are compiled to SQL bytecode and evaluated by the built-in
+## SQL VM; see `boogie/sqlengine` for the supported statement subset. Statements run
 ## through this driver are logged in the store's WAL and survive restarts.
 
 type

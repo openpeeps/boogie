@@ -29,7 +29,7 @@
 4. **Columnar Store** - Columnar storage engine for analytics workloads with WAL support and in-memory column caching
 5. **Graph Store** - A simple graph database with support for nodes, relationships, and basic graph queries (e.g., neighbors, BFS) with WAL support
 6. **Document Store** - A flexible document store on top of the WAL, storing JSON (or BSON) documents
-7. **SQL Driver** - A `db_connector`-compatible driver (`boogie/db_boogie`) that compiles SQL statements to [vancode](https://github.com/openpeeps/vancode) bytecode and evaluates them against the RDBMS store
+7. **SQL Driver** - A `db_connector`-compatible driver (`boogie/db_boogie`) that compiles SQL statements to SQL bytecode and evaluates them against the RDBMS store with a built-in VM
 
 >[!NOTE]
 > Boogie is an experimental project mostly made with the chatbot for fun and learning. It is still in early stages, so expect data loss and breaking changes. Use at your own risk.
@@ -258,7 +258,7 @@ store.checkpoint()
 
 `boogie/db_boogie` mirrors the `db_connector/db_sqlite` API, so applications can
 switch to Boogie by changing a single import. Statements are parsed with
-[openparser/sql](https://github.com/openpeeps/openparser), lowered to vancode
+[openparser/sql](https://github.com/openpeeps/openparser), lowered to SQL
 bytecode (WHERE predicates run as real VM loops using NULL-aware comparison
 opcodes), and evaluated against the RDBMS store, with WAL durability and
 crash recovery for free.
