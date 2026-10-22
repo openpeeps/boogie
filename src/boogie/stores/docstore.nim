@@ -204,7 +204,7 @@ proc recoverFromWal*(s: var DocumentStore) =
 proc openDocumentStore*(path: string, name = "documents",
                   defaultEncoding = deJson,
                   enableSnapshots = true,
-                  checkpointEveryOps: uint32 = 1000'u32,
+                  checkpointEveryOps: uint32 = 0'u32,
                   walFlushEveryOps: uint32 = 1000'u32,
                   readOnly = false): DocumentStore =
   ## Opens a document store with the given name at the specified path.
