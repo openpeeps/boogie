@@ -87,7 +87,7 @@ proc encodePayload(doc: JsonNode, enc: DocumentEncoding): string =
     fail("Document must be a JSON object")
   case enc
   of deJson:
-    "J" & toJson(doc)
+    "J" & $doc
   of deBson:
     let bdoc = newBSONDocument(doc, 1'i32)
     "B" & base64.encode(bytesToString(toBytes(bdoc)))
@@ -108,7 +108,7 @@ proc buildSnapshot(s: DocumentStore): SnapshotOnDisk =
   result.version = 1'u32
   result.checkpointLsn = s.checkpointLsn
   for k, v in s.docs.pairs:
-    result.docs.add((k, toJson(v)))
+    result.docs.add((k, $v))
 
 proc loadSnapshotIntoStore(s: var DocumentStore, snap: SnapshotOnDisk) =
   if snap.version != 1'u32:
@@ -338,7 +338,7 @@ proc getObj*[T](store: DocumentStore, key: string, _: typedesc[T]): Option[T] =
   ## the intermediate string step, but this works for now.**
   if not store.docs.hasKey(key):
     return none(T)
-  let s = toJson(store.docs[key])
+  let s = $store.docs[key]
   some(fromJson(s, T))
 
 proc getBson*(store: DocumentStore, key: string, version: int32 = 1'i32): Option[BSONDocument] =
