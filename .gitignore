@@ -13,3 +13,6 @@ nimble.develop
 nimble.paths
 /examples/*
 !/examples/*.nim
+
+# Local plans
+/plans/

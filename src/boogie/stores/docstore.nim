@@ -41,7 +41,7 @@ type
     name*: string
     wal*: Wal
     defaultEncoding*: DocumentEncoding
-    docs: SortedTable[string, JsonNode]
+    docs: Table[string, JsonNode]
 
     # snapshot + durability policy (similar to rdbms)
     hasDbFile: bool
@@ -113,7 +113,7 @@ proc buildSnapshot(s: DocumentStore): SnapshotOnDisk =
 proc loadSnapshotIntoStore(s: var DocumentStore, snap: SnapshotOnDisk) =
   if snap.version != 1'u32:
     fail("unsupported document snapshot version")
-  s.docs = initSortedTable[string, JsonNode]()
+  s.docs = initTable[string, JsonNode]()
   s.checkpointLsn = snap.checkpointLsn
   for (k, jsonText) in snap.docs:
     s.docs[k] = fromJson(jsonText)
@@ -182,7 +182,7 @@ proc applyWalEntry(s: var DocumentStore, e: WalEntry) =
 proc recoverFromWal*(s: var DocumentStore) =
   ## Reconstructs the in-memory state of the document store by loading a snapshot (if enabled) and replaying
   ## any WAL entries that have occurred since the last checkpoint.
-  s.docs = initSortedTable[string, JsonNode]()
+  s.docs = initTable[string, JsonNode]()
   s.checkpointLsn = 0'u64
   s.pendingOps = 0'u32
   s.pendingWalOps = 0'u32
@@ -229,7 +229,7 @@ proc openDocumentStore*(path: string, name = "documents",
     name: name,
     wal: openWal(base),
     defaultEncoding: defaultEncoding,
-    docs: initSortedTable[string, JsonNode](),
+    docs: initTable[string, JsonNode](),
     hasDbFile: enableSnapshots,
     dbPath: base.changeFileExt(".ddb"),
     checkpointLsn: 0'u64,
@@ -371,6 +371,6 @@ proc openBSONDocument*(store: var DocumentStore, key, path: string, sync = true)
   true
 
 iterator pairs*(store: DocumentStore): (string, JsonNode) =
-  ## Iterates over all key-document pairs in the store. The order is the same as insertion order.
+  ## Iterates over all key-document pairs in the store. The order is unspecified.
   for k, v in store.docs.pairs:
     yield (k, v)

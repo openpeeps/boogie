@@ -249,10 +249,10 @@ store.checkpoint()
 
 | Operation | ops/s |
 |---|---|
-| insert | ~0.61 M |
-| get | ~1.99 M |
-| lookup | ~4.88 M |
-| delete | ~0.21 M |
+| insert | ~0.86 M |
+| get | ~6.13 M |
+| lookup | ~15.3 M |
+| delete | ~0.25 M |
 
 ### SQL Driver (db_connector compatible)
 
