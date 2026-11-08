@@ -525,6 +525,9 @@ proc recoverFromWal(s: var ColumnarStore) =
         s.insertBatchInternal(e.table, rows, emitWal = false, sync = true)
     of woDeleteRow, woUpdateRow:
       discard
+    of woCreateIndex, woDropIndex:
+      # RDBMS-only ops; never emitted by the columnar store.
+      discard
 
   # Clear replayed log to prevent reapplication on next open.
   # Read-only opens must never reset the shared WAL, so they skip this.

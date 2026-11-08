@@ -288,12 +288,15 @@ db.close()
 ```
 
 Supported subset: `CREATE TABLE [IF NOT EXISTS]` (typed columns, PRIMARY KEY,
-NOT NULL, DEFAULT), `DROP TABLE [IF EXISTS]`, `CREATE INDEX`, multi-row
-`INSERT` with serial primary keys, `SELECT` with `WHERE`/`ORDER BY`/`LIMIT`/
-`OFFSET`/`DISTINCT`, `UPDATE ... SET ... WHERE`, `DELETE FROM ... WHERE`,
-aggregates without GROUP BY (`COUNT`/`SUM`/`AVG`/`MIN`/`MAX`), and expressions
-with comparisons, `AND`/`OR`/`NOT`, arithmetic, `IS [NOT] NULL` and `?`/`$n`
-placeholders. JOINs, GROUP BY/HAVING and subqueries are not supported yet.
+NOT NULL, DEFAULT), `DROP TABLE [IF EXISTS]`, `CREATE [UNIQUE] INDEX
+[IF NOT EXISTS]` / `DROP INDEX [IF EXISTS]` (single-column, persisted,
+UNIQUE enforced), multi-row `INSERT` with serial primary keys, `SELECT` with
+`WHERE`/`ORDER BY`/`LIMIT`/`OFFSET`/`DISTINCT`, `GROUP BY` over plain columns
+with `HAVING` (aggregates `COUNT`/`SUM`/`AVG`/`MIN`/`MAX`, `ORDER BY` over
+SELECT outputs), `UPDATE ... SET ... WHERE`, `DELETE FROM ... WHERE`,
+aggregates without GROUP BY, and expressions with comparisons, `AND`/`OR`/
+`NOT`, arithmetic, `IS [NOT] NULL` and `?`/`$n` placeholders. JOINs and
+subqueries are not supported yet.
 
 > Statements are parsed once per connection and cached; `exec()` binds its
 > arguments as typed values so repeated calls hit the plan cache.

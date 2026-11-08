@@ -254,6 +254,38 @@ proc readForeignKeyDef(b: var Buffer): ForeignKeyDef =
   endReadInnerStruct(b)
   result = ForeignKeyDef(name: name, column: column, refTable: refTable, refColumn: refColumn, onDelete: ForeignKeyAction(onDeleteByte))
 
+proc writeIndexDef*(b: var Buffer, idx: IndexDef) =
+  beginInnerStruct(b, 1)
+  b.writeFieldString(1, idx.name)
+  let p2 = b.beginField(2)
+  b.writeUint32LE(uint32(idx.columns.len))
+  for c in idx.columns: b.writeString(c)
+  b.endField(p2)
+  b.writeFieldBool(3, idx.unique)
+  endInnerStruct(b)
+
+proc readIndexDef*(b: var Buffer): IndexDef =
+  var name = ""
+  var columns: seq[string] = @[]
+  var unique = false
+  discard beginReadInnerStruct(b)
+  while true:
+    var fid: uint16
+    var fsz: int
+    if not readFieldHeader(b, fid, fsz): break
+    case fid
+    of 1: name = readFieldValue[string](b, fsz, proc(bb: var Buffer): string = bb.readString())
+    of 2:
+      let s2 = b.pos
+      let n = int(b.readUint32LE())
+      columns = newSeq[string](n)
+      for i in 0..<n: columns[i] = b.readString()
+      if b.pos < s2 + fsz: b.pos = s2 + fsz
+    of 3: unique = readFieldValue[bool](b, fsz, proc(bb: var Buffer): bool = bb.readBool())
+    else: b.skipBytes(fsz)
+  endReadInnerStruct(b)
+  result = IndexDef(name: name, columns: columns, unique: unique)
+
 # ---------------------------------------------------------------------------
 # KV snapshot (version, checkpointLsn, entries)
 # ---------------------------------------------------------------------------
@@ -466,6 +498,7 @@ type RdbmsSnapshotOnDisk* = tuple
     pkSequence: uint64,
     columns: seq[ColumnDef],
     foreignKeys: seq[ForeignKeyDef],
+    indexes: seq[IndexDef],
     rows: seq[(string, RowData)]
   ]]
 
@@ -496,6 +529,10 @@ proc encodeRdbmsSnapshot*(b: var Buffer, snap: RdbmsSnapshotOnDisk) =
       b.writeString(pk)
       writeRowData(b, rd)
     b.endField(p7)
+    let p8 = b.beginField(8)
+    b.writeUint32LE(uint32(t.indexes.len))
+    for idx in t.indexes: writeIndexDef(b, idx)
+    b.endField(p8)
     endInnerStruct(b)
   b.endField(p3)
   endRootStruct(b)
@@ -503,7 +540,7 @@ proc encodeRdbmsSnapshot*(b: var Buffer, snap: RdbmsSnapshotOnDisk) =
 proc decodeRdbmsSnapshot*(b: var Buffer): RdbmsSnapshotOnDisk =
   var version: uint32 = 0
   var checkpointLsn: uint64 = 0
-  var tables: seq[tuple[name: string, primaryKey: string, pkType: PrimaryKeyMode, pkSequence: uint64, columns: seq[ColumnDef], foreignKeys: seq[ForeignKeyDef], rows: seq[(string, RowData)]]] = @[]
+  var tables: seq[tuple[name: string, primaryKey: string, pkType: PrimaryKeyMode, pkSequence: uint64, columns: seq[ColumnDef], foreignKeys: seq[ForeignKeyDef], indexes: seq[IndexDef], rows: seq[(string, RowData)]]] = @[]
   discard beginReadRootStruct(b)
   while true:
     var fid: uint16
@@ -515,7 +552,7 @@ proc decodeRdbmsSnapshot*(b: var Buffer): RdbmsSnapshotOnDisk =
     of 3:
       let start = b.pos
       let n = int(b.readUint32LE())
-      tables = newSeq[tuple[name: string, primaryKey: string, pkType: PrimaryKeyMode, pkSequence: uint64, columns: seq[ColumnDef], foreignKeys: seq[ForeignKeyDef], rows: seq[(string, RowData)]]](n)
+      tables = newSeq[tuple[name: string, primaryKey: string, pkType: PrimaryKeyMode, pkSequence: uint64, columns: seq[ColumnDef], foreignKeys: seq[ForeignKeyDef], indexes: seq[IndexDef], rows: seq[(string, RowData)]]](n)
       for i in 0..<n:
         discard beginReadInnerStruct(b)
         var name, primaryKey: string
@@ -523,6 +560,7 @@ proc decodeRdbmsSnapshot*(b: var Buffer): RdbmsSnapshotOnDisk =
         var pkSequence: uint64 = 0
         var columns: seq[ColumnDef] = @[]
         var foreignKeys: seq[ForeignKeyDef] = @[]
+        var indexes: seq[IndexDef] = @[]
         var rows: seq[(string, RowData)] = @[]
         while true:
           var fid2: uint16
@@ -554,9 +592,15 @@ proc decodeRdbmsSnapshot*(b: var Buffer): RdbmsSnapshotOnDisk =
               let rd = readRowData(b)
               rows[ri] = (pk, rd)
             if b.pos < s7 + fsz2: b.pos = s7 + fsz2
+          of 8:
+            let s8 = b.pos
+            let xn = int(b.readUint32LE())
+            indexes = newSeq[IndexDef](xn)
+            for xi in 0..<xn: indexes[xi] = readIndexDef(b)
+            if b.pos < s8 + fsz2: b.pos = s8 + fsz2
           else: b.skipBytes(fsz2)
         endReadInnerStruct(b)
-        tables[i] = (name: name, primaryKey: primaryKey, pkType: PrimaryKeyMode(pkTypeByte), pkSequence: pkSequence, columns: columns, foreignKeys: foreignKeys, rows: rows)
+        tables[i] = (name: name, primaryKey: primaryKey, pkType: PrimaryKeyMode(pkTypeByte), pkSequence: pkSequence, columns: columns, foreignKeys: foreignKeys, indexes: indexes, rows: rows)
       if b.pos < start + fsz: b.pos = start + fsz
     else: b.skipBytes(fsz)
   endReadRootStruct(b)

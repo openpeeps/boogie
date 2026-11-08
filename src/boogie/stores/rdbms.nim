@@ -71,6 +71,10 @@ type
       # set of column names that have equality indexes built
     eqIndex: Table[string, Table[string, HashSet[string]]]
       # equality indexes for columns. Maps column name to a mapping of cell value keys to sets of primary keys.
+    indexes*: Table[string, IndexDef]
+      ## Named secondary indexes by index name (single-column for now).
+      ## The key set mirrors `indexedCols`/`eqIndex`; UNIQUE indexes also
+      ## enforce uniqueness of non-NULL values.
     foreignKeys*: seq[ForeignKeyDef]
       # foreign key constraints owned by this table.
     slot: TableSlot[RdbWriteTask]
@@ -140,6 +144,9 @@ proc ensureWritable(s: Store) =
 # fwd declarations
 proc where*(t: DbTable, column: string, value: Value): seq[(string, RowData)]
 proc insertRowNoWal(t: DbTable, pk: string, data: var RowData): string
+proc maybeAutoCheckpointConcurrent(s: Store)
+proc appendWalIfEnabled(s: Store, op: WalOp, table, pk, payload: string): uint64
+proc markCommitted(s: Store, lsn: uint64)
 proc deleteRowNoWal(t: DbTable, pk: string): bool
 proc rowToPayload(data: RowData): string
 
@@ -350,6 +357,7 @@ proc newTable*(name: string, primaryKey: string, columns: openArray[ColumnDef],
       rowsByPk: initOrderedTable[string, RowRecord](),
       indexedCols: initHashSet[string](),
       eqIndex: initTable[string, Table[string, HashSet[string]]](),
+      indexes: initTable[string, IndexDef](),
       foreignKeys: @foreignKeys,
     )
   else:
@@ -363,6 +371,7 @@ proc newTable*(name: string, primaryKey: string, columns: openArray[ColumnDef],
       rowsByPk: initOrderedTable[string, RowRecord](),
       indexedCols: initHashSet[string](),
       eqIndex: initTable[string, Table[string, HashSet[string]]](),
+      indexes: initTable[string, IndexDef](),
       foreignKeys: @foreignKeys,
     )
 
@@ -451,7 +460,9 @@ proc removeFromEqIndexes(t: DbTable, pk: string, data: RowData) =
       t.eqIndex.del(col)
 
 proc createIndex*(t: DbTable, column: string) =
-  ## Create an equality index on the specified column
+  ## Legacy equality index on one column (auto-named). Kept for the FK path
+  ## and existing callers; named indexes go through the store-level
+  ## `createIndex` below so names stay globally unique.
   if t.findColumn(column).isNone:
     raise newException(StoreError, fmt"unknown column '{column}' in table '{t.name}'")
   if t.indexedCols.contains(column):
@@ -465,6 +476,179 @@ proc createIndex*(t: DbTable, column: string) =
 
   t.eqIndex[column] = colMap
   t.indexedCols.incl(column)
+  let autoName = "auto_idx_" & t.name & "_" & column
+  if not t.indexes.hasKey(autoName):
+    t.indexes[autoName] = IndexDef(name: autoName, columns: @[column],
+      unique: false)
+
+proc hasIndex*(t: DbTable, name: string): bool =
+  t.indexes.hasKey(name)
+
+proc listIndexes*(t: DbTable): seq[IndexDef] =
+  for _, d in t.indexes.pairs:
+    result.add(d)
+
+proc columnStillIndexed(t: DbTable, col: string, skipName = ""): bool =
+  for n, d in t.indexes.pairs:
+    if n != skipName and d.columns.contains(col):
+      return true
+  false
+
+proc buildEqIndexFor(t: DbTable, column: string) =
+  var colMap = initTable[string, HashSet[string]]()
+  for pk, rec in t.rowsByPk.pairs:
+    if rec.cols.hasKey(column):
+      let k = cellIndexKey(rec.cols[column])
+      colMap.mgetOrPut(k, initHashSet[string]()).incl(pk)
+  t.eqIndex[column] = colMap
+  t.indexedCols.incl(column)
+
+proc findIndexTable*(s: Store, indexName: string): tuple[found: bool,
+    tableName: string] =
+  ## Locates the table owning a named index (index names are global).
+  if s.cc != nil:
+    withMetaRead(s.cc):
+      for tn, t in s.tables.pairs:
+        if t.indexes.hasKey(indexName):
+          return (true, tn)
+    return (false, "")
+  for tn, t in s.tables.pairs:
+    if t.indexes.hasKey(indexName):
+      return (true, tn)
+  (false, "")
+
+proc checkCreateIndex(s: Store, tableName, indexName: string,
+    columns: openArray[string], unique: bool) =
+  ## Validates a CREATE INDEX without mutating. Runs before any WAL append
+  ## so a failed CREATE never leaves a log entry that would break replay.
+  if not s.tables.hasKey(tableName):
+    raise newException(StoreError, fmt"table not found: {tableName}")
+  if indexName.len == 0:
+    raise newException(StoreError, "index name cannot be empty")
+  if columns.len == 0:
+    raise newException(StoreError, fmt"index '{indexName}' requires a column list")
+  if columns.len > 1:
+    raise newException(StoreError,
+      fmt"composite index '{indexName}' is not supported yet (single column only)")
+  let t = s.tables[tableName]
+  if t.indexes.hasKey(indexName):
+    raise newException(StoreError, fmt"index already exists: {indexName}")
+  for tn, other in s.tables.pairs:
+    if tn != tableName and other.indexes.hasKey(indexName):
+      raise newException(StoreError, fmt"index already exists: {indexName}")
+  for col in columns:
+    if t.findColumn(col).isNone:
+      raise newException(StoreError,
+        fmt"unknown column '{col}' in table '{tableName}'")
+  if unique:
+    # existing values must already satisfy uniqueness (NULLs exempt)
+    for col in columns:
+      var seen = initHashSet[string]()
+      for _, rec in t.rowsByPk.pairs:
+        if rec.cols.hasKey(col):
+          let v = rec.cols[col]
+          if v.kind == dtNull:
+            continue
+          let k = cellIndexKey(v)
+          if k in seen:
+            raise newException(StoreError,
+              fmt"unique index violation '{indexName}' on table '{tableName}' column '{col}'")
+          seen.incl(k)
+
+proc createIndexNoWal(s: Store, tableName, indexName: string,
+    columns: openArray[string], unique: bool) =
+  s.checkCreateIndex(tableName, indexName, columns, unique)
+  let t = s.tables[tableName]
+  t.indexes[indexName] = IndexDef(name: indexName, columns: @columns,
+    unique: unique)
+  for col in columns:
+    if not t.indexedCols.contains(col):
+      t.buildEqIndexFor(col)
+
+proc dropIndexNoWal(s: Store, indexName: string) =
+  var owner = ""
+  var ownerTbl: DbTable = nil
+  for tn, t in s.tables.pairs:
+    if t.indexes.hasKey(indexName):
+      owner = tn
+      ownerTbl = t
+      break
+  if ownerTbl.isNil:
+    raise newException(StoreError, fmt"index not found: {indexName}")
+  let cols = ownerTbl.indexes[indexName].columns
+  ownerTbl.indexes.del(indexName)
+  for col in cols:
+    if not ownerTbl.columnStillIndexed(col):
+      ownerTbl.indexedCols.excl(col)
+      ownerTbl.eqIndex.del(col)
+
+proc createIndex*(s: Store, tableName, indexName: string,
+    columns: openArray[string], unique = false) =
+  ## Named secondary index with WAL + commit. Single-column for P0.
+  s.ensureWritable()
+  if s.cc != nil:
+    withMetaWrite(s.cc):
+      s.createIndexNoWal(tableName, indexName, columns, unique)
+    if s.hasWal:
+      let payload = $(%*{"name": indexName, "columns": @columns,
+        "unique": unique})
+      s.cc.appendWal(s.wal,
+        WalEntry(op: woCreateIndex, table: tableName, pk: indexName,
+          payload: payload), int(s.walFlushEveryOps))
+    s.maybeAutoCheckpointConcurrent()
+    return
+  s.checkCreateIndex(tableName, indexName, columns, unique)
+  let payload = $(%*{"name": indexName, "columns": @columns,
+    "unique": unique})
+  let lsn = s.appendWalIfEnabled(woCreateIndex, tableName, indexName, payload)
+  s.createIndexNoWal(tableName, indexName, columns, unique)
+  s.markCommitted(lsn)
+
+proc dropIndex*(s: Store, indexName: string) =
+  ## Drops a named index with WAL + commit.
+  s.ensureWritable()
+  if s.cc != nil:
+    var tableName = ""
+    withMetaWrite(s.cc):
+      var ownerTbl: DbTable = nil
+      for tn, t in s.tables.pairs:
+        if t.indexes.hasKey(indexName):
+          tableName = tn
+          ownerTbl = t
+          break
+      if ownerTbl.isNil:
+        raise newException(StoreError, fmt"index not found: {indexName}")
+      s.dropIndexNoWal(indexName)
+    if s.hasWal:
+      s.cc.appendWal(s.wal,
+        WalEntry(op: woDropIndex, table: tableName, pk: indexName,
+          payload: ""), int(s.walFlushEveryOps))
+    s.maybeAutoCheckpointConcurrent()
+    return
+  let loc = s.findIndexTable(indexName)
+  if not loc.found:
+    raise newException(StoreError, fmt"index not found: {indexName}")
+  let lsn = s.appendWalIfEnabled(woDropIndex, loc.tableName, indexName, "")
+  s.dropIndexNoWal(indexName)
+  s.markCommitted(lsn)
+
+proc checkUniqueOnInsert(t: DbTable, data: RowData, excludePk = "") =
+  ## Raises on UNIQUE violation for non-NULL indexed values.
+  for _, d in t.indexes.pairs:
+    if not d.unique:
+      continue
+    for col in d.columns:
+      if not data.hasKey(col):
+        continue
+      let v = data[col]
+      if v.kind == dtNull:
+        continue
+      let k = cellIndexKey(v)
+      if t.eqIndex.hasKey(col) and t.eqIndex[col].hasKey(k):
+        for pk in t.eqIndex[col][k].items:
+          if pk != excludePk:
+            raise newException(StoreError,
+              fmt"unique index violation '{d.name}' on table '{t.name}' column '{col}'")
 
 proc jsonToStoreValue*(j: JsonNode): Value {.gcsafe.}
   ## Converts a JSON literal into a store value. Used for column defaults.
@@ -566,6 +750,11 @@ proc schemaToPayload(t: DbTable): string =
     "columns": cols,
     "foreignKeys": fks
   }
+  if t.indexes.len > 0:
+    var idxs = newJArray()
+    for _, d in t.indexes.pairs:
+      idxs.add(%*{"name": d.name, "columns": d.columns, "unique": d.unique})
+    payload["indexes"] = idxs
   if t.pkType == pkmSerial:
     payload["pkSequence"] = %t.pkSequence
   result = $payload
@@ -597,6 +786,15 @@ proc tableFromPayload(tableName, payload: string): DbTable =
   var t = newTable(tableName, n["primaryKey"].getStr(), cols, pkm, foreignKeys)
   if pkm == pkmSerial and n.hasKey("pkSequence"):
     t.pkSequence = n["pkSequence"].getInt.uint64
+  if n.hasKey("indexes"):
+    for ix in n["indexes"].items:
+      var cols: seq[string] = @[]
+      for c in ix["columns"].items: cols.add(c.getStr())
+      let unique = if ix.hasKey("unique"): ix["unique"].getBool() else: false
+      let nm = ix["name"].getStr()
+      t.indexes[nm] = IndexDef(name: nm, columns: cols, unique: unique)
+      for col in cols:
+        t.indexedCols.incl(col)
   t
 
 proc rowToPayload(data: RowData): string =
@@ -762,6 +960,7 @@ proc insertRowNoWal(t: DbTable, pk: string, data: var RowData): string =
 
   t.normalizedRowWithPk(data, effectivePk)
   validateRow(t, data)
+  t.checkUniqueOnInsert(data, effectivePk)
 
   let rec = RowRecord(pk: effectivePk, cols: data)
   t.rowsByPk[effectivePk] = rec
@@ -794,6 +993,9 @@ proc updateRowNoWal(t: DbTable, pk: string, data: var RowData): bool =
   # the equality indexes and the order index consistent.
   if not t.rowsByPk.hasKey(pk):
     return false
+  var probe = data
+  t.normalizedRowWithPk(probe, pk)
+  t.checkUniqueOnInsert(probe, pk)
   discard t.deleteRowNoWal(pk)
   discard t.insertRowNoWal(pk, data)
   true
@@ -807,7 +1009,7 @@ type
 proc buildSnapshot(s: Store): SnapshotOnDisk =
   # Build a snapshot of the current store state for persistence.
   # This captures the full state of the store.
-  result.version = 1'u32
+  result.version = 2'u32
   result.checkpointLsn = s.checkpointLsn
   for _, t in s.tables.pairs:
     var rows: seq[(string, RowData)] = @[]
@@ -824,19 +1026,26 @@ proc buildSnapshot(s: Store): SnapshotOnDisk =
       pkSequence: (if t.pkType == pkmSerial: t.pkSequence else: 0'u64),
       columns: t.columns,
       foreignKeys: t.foreignKeys,
+      indexes: t.listIndexes(),
       rows: rows
     ))
 
 proc loadSnapshotIntoStore(s: Store, snap: SnapshotOnDisk) =
   # Load the given snapshot into the store state. This will
   # replace any existing state in the store.
-  if snap.version != 1'u32:
+  if snap.version != 1'u32 and snap.version != 2'u32:
     raise newException(StoreError, "unsupported .db snapshot version")
   s.tables = initTable[string, DbTable]()
   s.checkpointLsn = snap.checkpointLsn
   for td in snap.tables:
     var t = newTable(td.name, td.primaryKey, td.columns, td.pkType, td.foreignKeys)
     t.ensureForeignKeyIndexes()
+    # v2 restores named secondary indexes; v1 snapshots predate them
+    # (decoded as an empty list).
+    for idx in td.indexes:
+      t.indexes[idx.name] = idx
+      for col in idx.columns:
+        t.indexedCols.incl(col)
     if s.cc != nil:
       t.slot = newTableSlot[RdbWriteTask](cast[pointer](t))
     if td.pkType == pkmSerial:
@@ -915,9 +1124,9 @@ proc needsWalCompact(s: Store): bool =
 
 proc compactWalFromMemory(s: Store) =
   ## Rewrites the WAL file from live in-memory state: one create-table entry
-  ## per live table plus one insert per live row (drops, deletes and
-  ## superseded updates are omitted). LSNs continue monotonically from
-  ## `wal.nextLsn`, so recovery replays the compacted log identically.
+  ## per live table plus index entries plus one insert per live row (drops,
+  ## deletes and superseded updates are omitted). LSNs continue monotonically
+  ## from `wal.nextLsn`, so recovery replays the compacted log identically.
   ## The consumer worker is stalled for the whole operation by holding every
   ## table read lock (lock order: meta-read, slot-reads sorted by table name,
   ## then the WAL lock — the inverse of no existing path, so no deadlock),
@@ -941,6 +1150,15 @@ proc compactWalFromMemory(s: Store) =
         let t = s.tables[n]
         compacted.add(WalEntry(op: woCreateTable, table: t.name, pk: "",
                                payload: schemaToPayload(t)))
+        for _, d in t.indexes.pairs:
+          # auto FK indexes are rebuilt from the schema; only named
+          # secondary indexes need explicit replay entries.
+          if d.name.startsWith("auto_idx_"):
+            continue
+          compacted.add(WalEntry(op: woCreateIndex, table: t.name,
+            pk: d.name,
+            payload: $(%*{"name": d.name, "columns": d.columns,
+              "unique": d.unique})))
         for pk, rec in t.rowsByPk.pairs:
           compacted.add(WalEntry(op: woInsertRow, table: t.name, pk: pk,
                                  payload: rowToPayload(rec.cols)))
@@ -1403,6 +1621,26 @@ proc applyWalEntry(s: Store, e: WalEntry) =
     var row = rowFromPayload(e.payload)
     discard t.updateRowNoWal(e.pk, row)
     s.tables[e.table] = t
+  of woCreateIndex:
+    if unlikely(not s.tables.hasKey(e.table)):
+      raise newException(StoreError, "WAL replay: table not found: " & e.table)
+    let n = parseJson(e.payload)
+    var cols: seq[string] = @[]
+    for c in n["columns"].items: cols.add(c.getStr())
+    let unique = if n.hasKey("unique"): n["unique"].getBool() else: false
+    let t = s.tables[e.table]
+    if t.indexes.hasKey(e.pk):
+      let old = t.indexes[e.pk]
+      if old.columns != cols or old.unique != unique:
+        raise newException(StoreError,
+          "WAL replay: conflicting index definition: " & e.pk)
+      # already restored from the snapshot schema: skip rebuild
+    else:
+      s.createIndexNoWal(e.table, e.pk, cols, unique)
+  of woDropIndex:
+    # idempotent replay: index may already be gone via snapshot restore
+    try: s.dropIndexNoWal(e.pk)
+    except StoreError: discard
 
 proc recoverFromWal*(s: Store) =
   ## Load snapshot if present, then apply WAL entries to bring state up to date.

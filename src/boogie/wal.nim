@@ -38,7 +38,9 @@ type
     woDropTable,
     woInsertRow,
     woDeleteRow,
-    woUpdateRow
+    woUpdateRow,
+    woCreateIndex,
+    woDropIndex
 
   WalEntry* = object
     ## A single WAL entry representing a change to the database

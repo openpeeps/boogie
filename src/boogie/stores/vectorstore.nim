@@ -456,6 +456,9 @@ proc applyWalEntry(s: VectorStore, e: WalEntry) =
       discard c.deleteNoWal(e.pk)
   of woUpdateRow:
     raise newException(VectorStoreError, "WAL replay: woUpdateRow not implemented")
+  of woCreateIndex, woDropIndex:
+    # RDBMS-only ops; never emitted by the vector store.
+    discard
 
 proc recoverFromWal*(s: VectorStore) =
   ## Recovers the vector store state by loading a snapshot from disk (if available) and then

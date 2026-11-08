@@ -39,12 +39,14 @@ export vm.initValue
 ##   placeholders map to named VM globals so rebinding never recompiles.
 ##
 ## Supported statement subset (v1): CREATE TABLE [IF NOT EXISTS] with column
-## types/PRIMARY KEY/NOT NULL/DEFAULT, DROP TABLE [IF EXISTS], INSERT with
-## multiple rows and serial primary keys, SELECT with WHERE/ORDER BY/LIMIT/
-## OFFSET/DISTINCT over a single table, UPDATE ... SET ... WHERE and DELETE
-## FROM ... WHERE. Expressions support literals, columns, placeholders,
-## comparisons, AND/OR/NOT, IS [NOT] NULL, IN (list) and arithmetic.
-## JOINs, GROUP BY/HAVING, aggregates, subqueries and ALTER are not supported.
+## types/PRIMARY KEY/NOT NULL/DEFAULT, DROP TABLE [IF EXISTS],
+## CREATE [UNIQUE] INDEX [IF NOT EXISTS] / DROP INDEX [IF EXISTS]
+## (single-column), INSERT with multiple rows and serial primary keys, SELECT
+## with WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT over a single
+## table, UPDATE ... SET ... WHERE and DELETE FROM ... WHERE. Expressions
+## support literals, columns, placeholders, comparisons, AND/OR/NOT,
+## IS [NOT] NULL, IN (list) and arithmetic. JOINs, subqueries and ALTER are
+## not supported.
 
 type
   SqlEngineError* = object of CatchableError
@@ -53,7 +55,7 @@ type
 
   StmtKind* = enum
     skSelect, skInsert, skUpdate, skDelete, skCreateTable, skDropTable,
-    skCreateIndex
+    skCreateIndex, skDropIndex
 
   ExecResult* = object
     kind*: StmtKind
@@ -117,6 +119,22 @@ type
       ## OFFSET value applied post-sort when deferredRange
     placeholders: seq[string]
       ## global names bound positionally ("?1", "?2", ...)
+    isGrouped: bool
+      ## true for GROUP BY / HAVING aggregates executed by execGroupedStmt
+      ## instead of the VM loop (both fast and multi-statement paths share it)
+    groupTable: string
+    groupCols: seq[string]
+      ## GROUP BY column names in order
+    groupWhere: SqlNode
+    groupHaving: SqlNode
+    groupKeys: seq[tuple[groupIdx: int, outName: string]]
+      ## SELECT key items in output order
+    groupAggs: seq[tuple[fn: string, arg: string, outName: string]]
+      ## SELECT aggregates in output order (`arg` = "*" or column name)
+    groupAllAggs: seq[tuple[fn: string, arg: string]]
+      ## union of SELECT + HAVING aggregates (HAVING-only appended)
+    groupOrder: seq[string]
+      ## SELECT output order: "k<idx>" for keys, "a<idx>" for aggs
 
   SqlEngine* = ref object
     ## Compiles and executes SQL against one store. One instance per
@@ -450,15 +468,36 @@ proc makeForeignProcs(ctx: SqlExecCtx): seq[(string, int, bool, ForeignProc)] =
       initValue(0'i64)
 
   proc fCreateIndex(args: StackView, argc: int): Value =
-    ## Builds the equality index for one column of an existing table.
-    let tableName = args[0].stringVal[]
-    let colName = args[1].stringVal[]
+    ## Named secondary index on one column (single-col for P0).
+    ## Args: indexName, tableName, colName, uniqueFlag, ifNotExistsFlag.
+    let indexName = args[0].stringVal[]
+    let tableName = args[1].stringVal[]
+    let colName = args[2].stringVal[]
+    let unique = args[3].intVal != 0
+    let ifNotExists = args[4].intVal != 0
     if not ctx.store.hasTable(tableName):
       fail("no such table: " & tableName)
+    let loc = ctx.store.findIndexTable(indexName)
+    if loc.found:
+      if ifNotExists:
+        return initValue(0'i64)
+      fail("index already exists: " & indexName)
     let t = ctx.store.getTable(tableName).get()
     if t.findColumn(colName).isNone:
       fail("unknown column '" & colName & "' in table '" & tableName & "'")
-    t.createIndex(colName)
+    ctx.store.createIndex(tableName, indexName, [colName], unique)
+    inc ctx.affected
+    initValue(1'i64)
+
+  proc fDropIndex(args: StackView, argc: int): Value =
+    let indexName = args[0].stringVal[]
+    let ifExists = args[1].intVal != 0
+    let loc = ctx.store.findIndexTable(indexName)
+    if not loc.found:
+      if ifExists:
+        return initValue(0'i64)
+      fail("index not found: " & indexName)
+    ctx.store.dropIndex(indexName)
     inc ctx.affected
     initValue(1'i64)
 
@@ -475,7 +514,8 @@ proc makeForeignProcs(ctx: SqlExecCtx): seq[(string, int, bool, ForeignProc)] =
     ("sql_finish", 1, true, ForeignProc(fFinish)),
     ("sql_create_table", 1, true, ForeignProc(fCreateTable)),
     ("sql_drop_table", 2, true, ForeignProc(fDropTable)),
-    ("sql_create_index", 2, true, ForeignProc(fCreateIndex)),
+    ("sql_create_index", 5, true, ForeignProc(fCreateIndex)),
+    ("sql_drop_index", 2, true, ForeignProc(fDropIndex)),
   ]
 
 #
@@ -830,6 +870,350 @@ proc genScanTail(l: var Lowerer) =
   l.ch.emit(opcDiscard)
   l.ch.emit(1'u8)
 
+#
+# GROUP BY / HAVING (P0)
+#
+# Grouped statements run in Nim (shared by the fast path and the VM
+# multi-statement path) instead of VM aggregate locals: the keys are plain
+# column refs, aggregates reuse the group-less NULL semantics, and HAVING
+# resolves to group keys, SELECT aliases and aggregate calls. Anything else
+# fails with a clear error so the interpreter never silently disagrees.
+#
+
+const GroupAggNames = ["count", "sum", "avg", "min", "max"]
+
+proc groupColName(n: SqlNode): string =
+  ## Plain column ref for GROUP BY keys and agg args; "" when not plain.
+  case n.kind
+  of nkIdent, nkQuotedIdent: n.strVal
+  of nkDot:
+    if n.len >= 2: groupColName(n[1]) else: ""
+  else: ""
+
+proc collectGroupedPh(n: SqlNode, phs: var seq[string]) =
+  ## Placeholder names in first-appearance order. Mirrors `walkPhFast`
+  ## recursion so the Lowerer list and the executor mapping agree; node visit
+  ## order is fixed by the caller (WHERE, GROUP BY, SELECT, HAVING).
+  if n.isNil: return
+  case n.kind
+  of nkPlaceholder:
+    discard phNameFast(n.strVal, phs)
+  of nkInfix:
+    if n.len >= 3:
+      collectGroupedPh(n[1], phs)
+      collectGroupedPh(n[2], phs)
+  of nkPrefix:
+    if n.len >= 2: collectGroupedPh(n[1], phs)
+  of nkDot, nkSelectPair, nkPrGroup:
+    if n.len >= 1: collectGroupedPh(n[0], phs)
+  of nkCall:
+    for i in 1 ..< n.len: collectGroupedPh(n[i], phs)
+  of nkCase, nkWhen, nkElse, nkCast:
+    for c in n.sons: collectGroupedPh(c, phs)
+  of nkGroup, nkOrder, nkSelectColumns, nkWhere, nkHaving, nkColumnList,
+     nkValueList, nkLimit, nkOffset, nkFrom, nkStmtList:
+    for c in n.sons: collectGroupedPh(c, phs)
+  else: discard
+
+proc groupKeyEncode(v: Value): string =
+  ## Typed group key: integral floats normalize to ints so 1 and 1.0 group
+  ## together (matches `cmpCells` and PK numeric affinity).
+  if v == nil: return "z:"
+  case v.typeId
+  of tyInt: "n:i:" & $v.intVal
+  of tyFloat:
+    if v.floatVal == trunc(v.floatVal): "n:i:" & $v.floatVal.int64
+    else: "n:f:" & $v.floatVal
+  of tyString: "t:" & v.stringVal[]
+  of tyBool: "b:" & (if v.boolVal: "1" else: "0")
+  else: "x:"
+
+proc collectHavingAggs(having: SqlNode, tbl: DbTable,
+    outAggs: var seq[tuple[fn: string, arg: string]]) =
+  ## Collects aggregate calls in HAVING (deduped by fn|arg). Args are `*`
+  ## (COUNT only) or plain columns; anything else fails.
+  if having.isNil: return
+  var stack = @[having]
+  while stack.len > 0:
+    let n = stack.pop()
+    if n.isNil: continue
+    if n.kind == nkCall and n.len >= 1 and n[0].kind == nkIdent:
+      let fn = n[0].strVal.toLowerAscii()
+      if fn in GroupAggNames:
+        var arg = ""
+        if fn == "count" and n.len >= 2 and n[1].kind == nkIdent and
+            n[1].strVal == "*":
+          arg = "*"
+        elif n.len >= 2:
+          arg = groupColName(n[1])
+          if arg.len == 0:
+            fail("unsupported aggregate argument in HAVING")
+          if tbl.findColumn(arg).isNone:
+            # resolve case-insensitively like the rest of the engine
+            var canon = ""
+            for c in tbl.columns:
+              if c.name.toLowerAscii() == arg.toLowerAscii():
+                canon = c.name
+                break
+            if canon.len == 0:
+              fail("no such column: '" & arg & "' in table '" & tbl.name & "'")
+            arg = canon
+        else:
+          fail(fn.toUpperAscii & " requires an argument")
+        let key = fn & "|" & arg.toLowerAscii()
+        var seen = false
+        for a in outAggs:
+          if a.fn & "|" & a.arg.toLowerAscii() == key:
+            seen = true
+            break
+        if not seen:
+          outAggs.add((fn, arg))
+        continue
+      else:
+        fail("unsupported function '" & n[0].strVal & "' in HAVING")
+    if n.kind notin {nkIdent, nkQuotedIdent, nkStringLit, nkBitStringLit,
+        nkHexStringLit, nkIntegerLit, nkNumericLit, nkPlaceholder, nkRaw}:
+      for c in n.sons:
+        stack.add(c)
+
+proc planGroupedSelect(tbl: DbTable, root: SqlNode, isDistinct: bool,
+    phs: var seq[string], stmt: var CompiledStmt) =
+  ## Parses GROUP BY / HAVING SELECTs into `stmt` grouped fields. Placeholders
+  ## are collected into `phs` in fixed order (WHERE, GROUP BY, SELECT, HAVING)
+  ## so lowering and execution agree. SELECT non-agg items must be GROUP BY
+  ## columns; `SELECT *` with GROUP BY fails.
+  var tableName = ""
+  var whereNode, groupNode, havingNode, orderNode, limitNode,
+    offsetNode, colsNode: SqlNode = nil
+  for child in root.sons:
+    case child.kind
+    of nkSelectColumns:
+      if colsNode.isNil: colsNode = child
+    of nkFrom: tableName = nodeIdent(child[0][0])
+    of nkWhere: whereNode = child[0]
+    of nkGroup: groupNode = child
+    of nkHaving: havingNode = child[0]
+    of nkOrder: orderNode = child
+    of nkLimit: limitNode = child[0]
+    of nkOffset: offsetNode = child[0]
+    else: discard
+  if colsNode.isNil:
+    fail("SELECT requires a column list")
+  if tableName.len == 0:
+    fail("SELECT requires a FROM clause")
+  # canonical group columns (case-insensitive resolution, exact storage)
+  var groupCols: seq[string] = @[]
+  if not groupNode.isNil:
+    for g in groupNode.sons:
+      let raw = groupColName(g)
+      if raw.len == 0:
+        fail("GROUP BY expressions must be plain columns")
+      var canon = ""
+      for c in tbl.columns:
+        if c.name.toLowerAscii() == raw.toLowerAscii():
+          canon = c.name
+          break
+      if canon.len == 0:
+        fail("no such column: '" & raw & "' in table '" & tbl.name & "'")
+      groupCols.add(canon)
+  # SELECT items: keys must be group columns, aggs restricted like group-less
+  var groupKeys: seq[tuple[groupIdx: int, outName: string]] = @[]
+  var groupAggs: seq[tuple[fn: string, arg: string, outName: string]] = @[]
+  var groupOrder: seq[string] = @[]
+  for rawEntry in colsNode.sons:
+    var aliasName = ""
+    var entry = rawEntry
+    if entry.kind == nkSelectPair and entry.len >= 1:
+      if entry.len >= 2:
+        aliasName = entry[1].nodeIdent()
+      entry = entry[0]
+    if entry.kind == nkIdent and entry.strVal == "*":
+      fail("SELECT * with GROUP BY is not supported")
+    if entry.kind == nkCall and entry.len >= 1 and entry[0].kind == nkIdent:
+      let fn = entry[0].strVal.toLowerAscii()
+      if fn in GroupAggNames:
+        var arg = ""
+        if fn == "count" and entry.len >= 2 and entry[1].kind == nkIdent and
+            entry[1].strVal == "*":
+          arg = "*"
+        elif entry.len >= 2:
+          let raw = groupColName(entry[1])
+          if raw.len == 0:
+            fail("unsupported aggregate argument")
+          var canon = ""
+          for c in tbl.columns:
+            if c.name.toLowerAscii() == raw.toLowerAscii():
+              canon = c.name
+              break
+          if canon.len == 0:
+            fail("no such column: '" & raw & "' in table '" & tbl.name & "'")
+          arg = canon
+        else:
+          fail(fn.toUpperAscii & " requires an argument")
+        let outName =
+          if aliasName.len > 0: aliasName
+          elif arg == "*": "COUNT(*)"
+          else: fn.toUpperAscii & "(" & arg & ")"
+        groupAggs.add((fn, arg, outName))
+        groupOrder.add("a" & $(groupAggs.len - 1))
+        continue
+    # plain key: must match a GROUP BY column
+    let raw = groupColName(entry)
+    if raw.len == 0:
+      fail("GROUP BY requires plain columns in the SELECT list")
+    var gidx = -1
+    for i, gc in groupCols:
+      if gc.toLowerAscii() == raw.toLowerAscii():
+        gidx = i
+        break
+    if gidx < 0:
+      if groupCols.len == 0:
+        fail("column '" & raw & "' must appear in GROUP BY or be aggregated")
+      else:
+        fail("column '" & raw & "' must appear in GROUP BY or be aggregated")
+    let outName = if aliasName.len > 0: aliasName else: groupCols[gidx]
+    groupKeys.add((gidx, outName))
+    groupOrder.add("k" & $(groupKeys.len - 1))
+  if groupAggs.len == 0 and groupKeys.len == 0:
+    fail("GROUP BY requires select columns")
+  # HAVING aggregates + ident validation
+  var havingAggs: seq[tuple[fn: string, arg: string]] = @[]
+  collectHavingAggs(havingNode, tbl, havingAggs)
+  var allAggs: seq[tuple[fn: string, arg: string]] = @[]
+  for a in groupAggs:
+    allAggs.add((a.fn, a.arg))
+  for h in havingAggs:
+    let key = h.fn & "|" & h.arg.toLowerAscii()
+    var seen = false
+    for a in allAggs:
+      if a.fn & "|" & a.arg.toLowerAscii() == key:
+        seen = true
+        break
+    if not seen:
+      allAggs.add(h)
+  if not havingNode.isNil:
+    var aliasLower: seq[string] = @[]
+    for k in groupKeys: aliasLower.add(k.outName.toLowerAscii())
+    for a in groupAggs: aliasLower.add(a.outName.toLowerAscii())
+    var gLower: seq[string] = @[]
+    for gc in groupCols: gLower.add(gc.toLowerAscii())
+    var stack = @[havingNode]
+    while stack.len > 0:
+      let n = stack.pop()
+      if n.isNil: continue
+      if n.kind == nkCall and n.len >= 1 and n[0].kind == nkIdent and
+          n[0].strVal.toLowerAscii() in GroupAggNames:
+        continue # args already validated
+      case n.kind
+      of nkInfix:
+        # sons are [op, left, right]; the operator is not a column ref
+        if n.len >= 3:
+          stack.add(n[1])
+          stack.add(n[2])
+        continue
+      of nkPrefix:
+        if n.len >= 2:
+          stack.add(n[1])
+        continue
+      of nkIdent:
+        case n.strVal.toLowerAscii()
+        of "null", "true", "false": discard
+        else:
+          if n.strVal.toLowerAscii() notin aliasLower and
+             n.strVal.toLowerAscii() notin gLower:
+            fail("column '" & n.strVal & "' must appear in GROUP BY " &
+              "or be aggregated")
+        continue
+      of nkPlaceholder:
+        continue
+      of nkQuotedIdent, nkStringLit, nkBitStringLit, nkHexStringLit,
+         nkIntegerLit, nkNumericLit, nkRaw:
+        continue
+      else:
+        for c in n.sons:
+          stack.add(c)
+  # ORDER BY: P0 resolves against SELECT outputs only (no hidden columns)
+  var orderKeys: seq[(int, bool)] = @[]
+  var projCols: seq[string] = @[]
+  for o in groupOrder:
+    if o[0] == 'k':
+      projCols.add(groupKeys[parseInt(o[1 ..^ 1])].outName)
+    else:
+      projCols.add(groupAggs[parseInt(o[1 ..^ 1])].outName)
+  if not orderNode.isNil:
+    for key in orderNode.sons:
+      var desc = false
+      var colNode = key
+      if key.kind == nkDesc:
+        desc = true
+        colNode = key[0]
+      # ORDER BY agg call (e.g. COUNT(*)) resolves to the SELECT aggregate
+      if colNode.kind == nkCall and colNode.len >= 1 and
+          colNode[0].kind == nkIdent and
+          colNode[0].strVal.toLowerAscii() in GroupAggNames:
+        let fn = colNode[0].strVal.toLowerAscii()
+        var arg = ""
+        if fn == "count" and colNode.len >= 2 and
+            colNode[1].kind == nkIdent and colNode[1].strVal == "*":
+          arg = "*"
+        elif colNode.len >= 2:
+          arg = groupColName(colNode[1])
+        var idx = -1
+        if arg.len > 0:
+          for i, o in groupOrder:
+            if o[0] == 'a':
+              let a = groupAggs[parseInt(o[1 ..^ 1])]
+              if a.fn == fn and a.arg.toLowerAscii() == arg.toLowerAscii():
+                idx = i
+                break
+        if idx < 0:
+          fail("ORDER BY on grouped queries must reference a SELECT output")
+        orderKeys.add((idx, desc))
+        continue
+      let colName = colNode.nodeIdent()
+      if colName.len == 0:
+        fail("unsupported ORDER BY expression")
+      var idx = -1
+      for i, p in projCols:
+        if p.toLowerAscii() == colName.toLowerAscii():
+          idx = i
+          break
+      if idx < 0:
+        fail("ORDER BY on grouped queries must reference a SELECT output")
+      orderKeys.add((idx, desc))
+  var limitVal = -1'i64
+  var offsetVal = 0'i64
+  try:
+    if not limitNode.isNil: limitVal = limitNode.strVal.parseBiggestInt.int64
+    if not offsetNode.isNil: offsetVal = offsetNode.strVal.parseBiggestInt.int64
+  except ValueError:
+    fail("LIMIT/OFFSET must be integer literals")
+  # placeholders in fixed order
+  if not whereNode.isNil: collectGroupedPh(whereNode, phs)
+  if not groupNode.isNil: collectGroupedPh(groupNode, phs)
+  collectGroupedPh(colsNode, phs)
+  if not havingNode.isNil: collectGroupedPh(havingNode, phs)
+  stmt.isGrouped = true
+  stmt.groupTable = tableName
+  stmt.groupCols = groupCols
+  stmt.groupWhere = whereNode
+  stmt.groupHaving = havingNode
+  stmt.groupKeys = groupKeys
+  stmt.groupAggs = groupAggs
+  stmt.groupAllAggs = allAggs
+  stmt.groupOrder = groupOrder
+  stmt.projCols = projCols
+  stmt.orderKeys = orderKeys
+  stmt.hiddenCols = 0
+  stmt.isDistinct = isDistinct
+  stmt.deferredRange = orderKeys.len > 0
+  stmt.deferLimit = if orderKeys.len > 0: limitVal else: -1'i64
+  stmt.deferOffset = if orderKeys.len > 0: offsetVal else: 0'i64
+  if orderKeys.len == 0:
+    # unordered LIMIT/OFFSET apply at execution like the plain path
+    stmt.deferLimit = limitVal
+    stmt.deferOffset = offsetVal
+
 proc compileSelect(l: var Lowerer, root: SqlNode): CompiledStmt =
   let isDistinct = root.kind == nkSelectDistinct
   var tableName = ""
@@ -857,6 +1241,21 @@ proc compileSelect(l: var Lowerer, root: SqlNode): CompiledStmt =
     fail("SELECT requires a FROM clause")
   let tbl = l.mustTable(tableName)
   l.tbl = some(tbl)
+
+  # GROUP BY / HAVING: Nim-side grouped execution shared with the fast path.
+  var hasGroup = false
+  for child in root.sons:
+    if child.kind == nkGroup or child.kind == nkHaving:
+      hasGroup = true
+      break
+  if hasGroup:
+    var stmt = CompiledStmt(kind: skSelect)
+    planGroupedSelect(tbl, root, isDistinct, l.placeholders, stmt)
+    stmt.script = l.script
+    stmt.chunk = l.ch
+    stmt.placeholders = l.placeholders
+    l.ch.emit(opcHalt)
+    return stmt
 
   # aggregate detection: GROUP-less COUNT/SUM/AVG/MIN/MAX projection entries.
   # Runs before plain projection resolution so mixing is caught in one pass.
@@ -1349,21 +1748,67 @@ proc compileDdl(l: var Lowerer, root: SqlNode): CompiledStmt =
       placeholders: l.placeholders
     )
   of nkCreateIndex, nkCreateIndexIfNotExists:
-    # CREATE INDEX name ON table (col)
-    let tableName = nodeIdent(root[1])
-    let tbl = l.mustTable(tableName)
-    if root[2].kind != nkColumnList or root[2].len == 0:
+    # CREATE [UNIQUE] INDEX name ON table (col): single-column for P0.
+    # Parser sons: [nkUnique?, name, table, colList, (where?)].
+    let ifNotExists = root.kind == nkCreateIndexIfNotExists
+    var idx = 0
+    var unique = false
+    if idx < root.len and root[idx].kind == nkUnique:
+      unique = true
+      inc idx
+    if idx >= root.len:
+      fail("CREATE INDEX requires an index name")
+    let indexName = nodeIdent(root[idx])
+    inc idx
+    if indexName.len == 0:
+      fail("CREATE INDEX requires an index name")
+    if idx >= root.len:
+      fail("CREATE INDEX requires a table name")
+    let tableName = nodeIdent(root[idx])
+    inc idx
+    discard l.mustTable(tableName)
+    var colList: SqlNode = nil
+    if idx < root.len and root[idx].kind == nkColumnList:
+      colList = root[idx]
+    if colList.isNil or colList.len == 0:
       fail("CREATE INDEX requires a column list")
-    let colName = nodeIdent(root[2][0])
+    if colList.len > 1:
+      fail("composite indexes are not supported yet (single column only)")
+    let colName = nodeIdent(colList[0])
+    let tbl = l.mustTable(tableName)
     if tbl.findColumn(colName).isNone:
       fail("unknown column '" & colName & "' in table '" & tableName & "'")
+    discard l.pushS(indexName)
     discard l.pushS(tableName)
     discard l.pushS(colName)
+    l.ch.emit(opcPushI)
+    l.ch.emit(int64(ord(unique)))
+    l.ch.emit(opcPushI)
+    l.ch.emit(int64(ord(ifNotExists)))
     l.callF("sql_create_index")
     l.ch.emit(opcDiscard); l.ch.emit(1'u8)
     l.ch.emit(opcHalt)
     CompiledStmt(
       kind: skCreateIndex,
+      script: l.script,
+      chunk: l.ch,
+      placeholders: l.placeholders
+    )
+  of nkDropIndex, nkDropIndexIfExists:
+    let ifExists = root.kind == nkDropIndexIfExists
+    if root.len == 0:
+      fail("DROP INDEX requires an index name")
+    let indexName = nodeIdent(root[0])
+    if indexName.len == 0:
+      fail("DROP INDEX requires an index name")
+    discard l.pushS(indexName)
+    l.ch.emit(opcPushI)
+    l.ch.emit(int64(ord(ifExists)))
+    l.callF("sql_drop_index")
+    l.ch.emit(opcDiscard); l.ch.emit(1'u8)
+    l.ch.emit(opcHalt)
+    CompiledStmt(
+      kind: skDropIndex,
       script: l.script,
       chunk: l.ch,
       placeholders: l.placeholders
@@ -1392,6 +1837,12 @@ template declineFast() =
 proc postProcessSelect(eng: SqlEngine, stmt: CompiledStmt): ExecResult
   ## Forward declaration: the native SELECT path reuses the VM result
   ## post-processing (sort/distinct/limit/stringify).
+
+proc execGroupedStmt(eng: SqlEngine, stmt: CompiledStmt,
+    params: openArray[Value]): Value
+  ## Forward declaration: grouped execution shared by fast and VM paths.
+  ## Runs the WHERE filter, hash-groups by typed keys, finalizes aggregates,
+  ## applies HAVING, then fills `ctx.results` for `postProcessSelect`.
 
 type FastCx = object
   tbl: DbTable
@@ -1971,14 +2422,22 @@ proc fastSelect(eng: SqlEngine, root: SqlNode, cx: FastCx): ExecResult =
   let isDistinct = root.kind == nkSelectDistinct
   var tableName = ""
   var whereNode: SqlNode = nil
+  var hasGroup = false
   for child in root.sons:
     case child.kind
     of nkFrom: tableName = nodeIdent(child[0][0])
     of nkWhere: whereNode = child[0]
+    of nkGroup, nkHaving: hasGroup = true
     else: discard
   if tableName.len == 0:
     fail("SELECT requires a FROM clause")
   let tbl = eng.fastTable(tableName)
+  if hasGroup:
+    var stmt = CompiledStmt(kind: skSelect)
+    var dummyPhs: seq[string] = @[]
+    planGroupedSelect(tbl, root, isDistinct, dummyPhs, stmt)
+    discard eng.execGroupedStmt(stmt, cx.params)
+    return eng.postProcessSelect(stmt)
   let (proj, orderKeys, hidden, limitVal, offsetVal, aggs) =
     eng.fastSelectProj(root, tbl, cx)
   if aggs.len > 0:
@@ -2115,6 +2574,316 @@ proc fastSelect(eng: SqlEngine, root: SqlNode, cx: FastCx): ExecResult =
       rows = rows[0 ..< int(limitVal)]
     eng.ctx.results = rows
   eng.postProcessSelect(stmt)
+
+type GroupAggAcc = object
+  countNonNull: int64
+  sumAcc: Value
+  avgCnt: int64
+  minAcc, maxAcc: Value
+
+proc evalGroupHaving(cx: FastCx, n: SqlNode, keyVals: seq[Value],
+    groupCols: seq[string], aliases: Table[string, Value],
+    aggVals: seq[Value],
+    allAggs: seq[tuple[fn: string, arg: string]]): tuple[ok: bool, v: Value] =
+  ## HAVING evaluator over one group. Idents resolve to GROUP BY keys or
+  ## SELECT aliases; aggregate calls read precomputed `aggVals`. Operators
+  ## mirror `evalCellFast`; anything else reports ok=false so the caller
+  ## fails with a clear message.
+  case n.kind
+  of nkIntegerLit:
+    try: (true, initValue(n.strVal.parseBiggestInt.int64))
+    except ValueError: (false, nil)
+  of nkNumericLit:
+    if '.' in n.strVal or 'e' in n.strVal.toLowerAscii():
+      try: (true, initValue(parseFloat(n.strVal)))
+      except ValueError: (false, nil)
+    else:
+      try: (true, initValue(n.strVal.parseBiggestInt.int64))
+      except ValueError: (false, nil)
+  of nkStringLit: (true, initValue(n.strVal))
+  of nkIdent:
+    case n.strVal.toLowerAscii()
+    of "null": (true, nil)
+    of "true": (true, initValue(true))
+    of "false": (true, initValue(false))
+    else:
+      for i, gc in groupCols:
+        if gc.toLowerAscii() == n.strVal.toLowerAscii():
+          return (true, keyVals[i])
+      let k = n.strVal.toLowerAscii()
+      if aliases.hasKey(k):
+        return (true, aliases[k])
+      (false, nil)
+  of nkPlaceholder: (true, takePh(cx, n))
+  of nkCall:
+    if n.len >= 1 and n[0].kind == nkIdent:
+      let fn = n[0].strVal.toLowerAscii()
+      var arg = ""
+      if fn == "count" and n.len >= 2 and n[1].kind == nkIdent and
+          n[1].strVal == "*":
+        arg = "*"
+      elif n.len >= 2:
+        arg = groupColName(n[1])
+        if arg.len == 0:
+          return (false, nil)
+      else:
+        return (false, nil)
+      for i, a in allAggs:
+        if a.fn == fn and a.arg.toLowerAscii() == arg.toLowerAscii():
+          return (true, aggVals[i])
+      return (false, nil)
+    (false, nil)
+  of nkPrefix:
+    if n.len < 2: return (false, nil)
+    case n[0].strVal.toLowerAscii()
+    of "-":
+      let (ok, x) = evalGroupHaving(cx, n[1], keyVals, groupCols, aliases,
+        aggVals, allAggs)
+      if not ok: return (false, nil)
+      (true, sqlArithFast(SqlArithSub.int, initValue(0'i64), x))
+    of "+":
+      evalGroupHaving(cx, n[1], keyVals, groupCols, aliases, aggVals, allAggs)
+    of "not":
+      let (ok, x) = evalGroupHaving(cx, n[1], keyVals, groupCols, aliases,
+        aggVals, allAggs)
+      if not ok or x == nil or x.typeId != tyBool: return (false, nil)
+      (true, initValue(not x.boolVal))
+    else: (false, nil)
+  of nkInfix:
+    if n.len < 3: return (false, nil)
+    let op = n[0].strVal.toLowerAscii()
+    case op
+    of "=", "!=", "<>", "<", "<=", ">", ">=":
+      let (okL, a) = evalGroupHaving(cx, n[1], keyVals, groupCols, aliases,
+        aggVals, allAggs)
+      let (okR, b) = evalGroupHaving(cx, n[2], keyVals, groupCols, aliases,
+        aggVals, allAggs)
+      if not okL or not okR: return (false, nil)
+      let mode =
+        case op
+        of "=": SqlCmpEq.int
+        of "<": SqlCmpLt.int
+        of "<=": SqlCmpLe.int
+        of ">": SqlCmpGt.int
+        of ">=": SqlCmpGe.int
+        else: SqlCmpNe.int
+      (true, initValue(sqlCmpFast(mode, a, b)))
+    of "is":
+      let (ok, x) = evalGroupHaving(cx, n[1], keyVals, groupCols, aliases,
+        aggVals, allAggs)
+      if not ok: return (false, nil)
+      (true, initValue(x == nil))
+    of "is not":
+      let (ok, x) = evalGroupHaving(cx, n[1], keyVals, groupCols, aliases,
+        aggVals, allAggs)
+      if not ok: return (false, nil)
+      (true, initValue(x != nil))
+    of "and":
+      let (okL, a) = evalGroupHaving(cx, n[1], keyVals, groupCols, aliases,
+        aggVals, allAggs)
+      if not okL: return (false, nil)
+      if not vmTruthFast(a): return (true, initValue(false))
+      let (okR, b) = evalGroupHaving(cx, n[2], keyVals, groupCols, aliases,
+        aggVals, allAggs)
+      if not okR: return (false, nil)
+      (true, initValue(vmTruthFast(b)))
+    of "or":
+      let (okL, a) = evalGroupHaving(cx, n[1], keyVals, groupCols, aliases,
+        aggVals, allAggs)
+      if not okL: return (false, nil)
+      if vmTruthFast(a): return (true, initValue(true))
+      let (okR, b) = evalGroupHaving(cx, n[2], keyVals, groupCols, aliases,
+        aggVals, allAggs)
+      if not okR: return (false, nil)
+      (true, initValue(vmTruthFast(b)))
+    of "+", "-", "*", "/":
+      let (okL, a) = evalGroupHaving(cx, n[1], keyVals, groupCols, aliases,
+        aggVals, allAggs)
+      let (okR, b) = evalGroupHaving(cx, n[2], keyVals, groupCols, aliases,
+        aggVals, allAggs)
+      if not okL or not okR: return (false, nil)
+      let mode = case op
+        of "+": SqlArithAdd.int
+        of "-": SqlArithSub.int
+        of "*": SqlArithMul.int
+        else: SqlArithDiv.int
+      (true, sqlArithFast(mode, a, b))
+    else: (false, nil)
+  of nkSelectPair, nkPrGroup:
+    if n.len >= 1:
+      evalGroupHaving(cx, n[0], keyVals, groupCols, aliases, aggVals, allAggs)
+    else: (false, nil)
+  else: (false, nil)
+
+proc execGroupedStmt(eng: SqlEngine, stmt: CompiledStmt,
+    params: openArray[Value]): Value =
+  ## Shared GROUP BY executor: filters rows, hash-groups by typed keys,
+  ## finalizes aggregates with group-less NULL semantics, applies HAVING,
+  ## and fills `ctx.results` for `postProcessSelect`.
+  if not eng.ctx.store.hasTable(stmt.groupTable):
+    fail("no such table: " & stmt.groupTable)
+  let tbl = eng.ctx.store.getTable(stmt.groupTable).get()
+  var cx = FastCx(tbl: tbl, params: @params)
+  if not stmt.groupWhere.isNil: walkPhFast(stmt.groupWhere, cx)
+  if not stmt.groupHaving.isNil: walkPhFast(stmt.groupHaving, cx)
+  if not stmt.groupWhere.isNil:
+    try:
+      checkExprFast(stmt.groupWhere, tbl)
+    except FastUnsupported:
+      fail("GROUP BY with this WHERE shape is not supported yet")
+  let wr = eng.resolveWhereFast(cx, tbl, stmt.groupWhere)
+  var keyIndex = initTable[string, int]()
+  var gKeys: seq[seq[Value]] = @[]
+  var gRowCount: seq[int64] = @[]
+  var gAccs: seq[seq[GroupAggAcc]] = @[]
+  let nAggs = stmt.groupAllAggs.len
+  template newAccs(): seq[GroupAggAcc] =
+    var s = newSeq[GroupAggAcc](nAggs)
+    for i in 0 ..< nAggs:
+      s[i] = GroupAggAcc(sumAcc: initValue(0'i64))
+    s
+  template visitRow(row: RowData) =
+    var kv = newSeqOfCap[Value](stmt.groupCols.len)
+    for gc in stmt.groupCols:
+      if row.hasKey(gc): kv.add(toVmValue(row[gc]))
+      else: kv.add(nil)
+    var key = ""
+    for v in kv: key.add(groupKeyEncode(v) & "\x1f")
+    var gi = keyIndex.getOrDefault(key, -1)
+    if gi < 0:
+      gi = gKeys.len
+      keyIndex[key] = gi
+      gKeys.add(kv)
+      gRowCount.add(0)
+      gAccs.add(newAccs())
+    inc gRowCount[gi]
+    for ai in 0 ..< nAggs:
+      let fn = stmt.groupAllAggs[ai].fn
+      let arg = stmt.groupAllAggs[ai].arg
+      if fn == "count" and arg == "*":
+        continue
+      if not row.hasKey(arg):
+        continue
+      let v = toVmValue(row[arg])
+      if v == nil:
+        continue
+      case fn
+      of "count":
+        inc gAccs[gi][ai].countNonNull
+      of "sum", "avg":
+        if v.typeId in {tyInt, tyFloat}:
+          let acc = gAccs[gi][ai].sumAcc
+          let nv = if v.typeId == tyInt: v.intVal.float64 else: v.floatVal
+          if acc == nil or acc.typeId notin {tyInt, tyFloat}:
+            gAccs[gi][ai].sumAcc = initValue(nv)
+          elif acc.typeId == tyInt and v.typeId == tyInt:
+            gAccs[gi][ai].sumAcc = initValue(acc.intVal + v.intVal)
+          else:
+            let sv = if acc.typeId == tyInt: acc.intVal.float64
+                     else: acc.floatVal
+            gAccs[gi][ai].sumAcc = initValue(sv + nv)
+          if fn == "avg":
+            inc gAccs[gi][ai].avgCnt
+      of "min", "max":
+        let cur = if fn == "min": gAccs[gi][ai].minAcc
+                  else: gAccs[gi][ai].maxAcc
+        if cur == nil:
+          if fn == "min": gAccs[gi][ai].minAcc = v
+          else: gAccs[gi][ai].maxAcc = v
+        else:
+          template lessThan(x, y: Value): bool =
+            if x.typeId in {tyInt, tyFloat} and
+               y.typeId in {tyInt, tyFloat}:
+              let xn = if x.typeId == tyInt: x.intVal.float64 else: x.floatVal
+              let yn = if y.typeId == tyInt: y.intVal.float64 else: y.floatVal
+              xn < yn
+            elif x.typeId == tyString and y.typeId == tyString:
+              x.stringVal[] < y.stringVal[]
+            else: false
+          if fn == "min":
+            if lessThan(v, cur): gAccs[gi][ai].minAcc = v
+          else:
+            if lessThan(cur, v): gAccs[gi][ai].maxAcc = v
+      else: discard
+  if wr.hasPks:
+    for pk in wr.pks:
+      let r = eng.ctx.store.getRow(tbl.name, pk)
+      if r.isSome:
+        if not wr.filter.isNil:
+          let (ok, fv) = evalCellFast(cx, wr.filter, r.get, true)
+          if not ok:
+            fail("GROUP BY with this WHERE shape is not supported yet")
+          if not vmTruthFast(fv): continue
+        visitRow(r.get)
+  else:
+    for _, rec in tbl.allRowsByPk:
+      if not wr.filter.isNil:
+        let (ok, fv) = evalCellFast(cx, wr.filter, rec, true)
+        if not ok:
+          fail("GROUP BY with this WHERE shape is not supported yet")
+        if not vmTruthFast(fv): continue
+      visitRow(rec)
+  # finalize + HAVING + projection
+  eng.ctx.results.setLen(0)
+  if stmt.groupCols.len == 0 and gKeys.len == 0:
+    # global aggregation (HAVING without GROUP BY): a single empty group so
+    # COUNT(*) = 0 etc. still evaluate instead of yielding zero rows.
+    gKeys.add(@[])
+    gRowCount.add(0)
+    gAccs.add(newAccs())
+  # SELECT-alias lookup for HAVING (filled per group below)
+  for gi in 0 ..< gKeys.len:
+    var aggVals = newSeqOfCap[Value](nAggs)
+    for ai in 0 ..< nAggs:
+      let fn = stmt.groupAllAggs[ai].fn
+      let arg = stmt.groupAllAggs[ai].arg
+      case fn
+      of "count":
+        aggVals.add(initValue(
+          if arg == "*": gRowCount[gi] else: gAccs[gi][ai].countNonNull))
+      of "sum":
+        aggVals.add(gAccs[gi][ai].sumAcc)
+      of "avg":
+        aggVals.add(sqlArithFast(SqlArithDiv.int, gAccs[gi][ai].sumAcc,
+          initValue(gAccs[gi][ai].avgCnt)))
+      of "min":
+        aggVals.add(gAccs[gi][ai].minAcc)
+      else:
+        aggVals.add(gAccs[gi][ai].maxAcc)
+    # map SELECT aggs to allAggs indices for output + alias table
+    var selAggIdx: seq[int] = @[]
+    for sa in stmt.groupAggs:
+      let key = sa.fn & "|" & sa.arg.toLowerAscii()
+      var idx = -1
+      for ai in 0 ..< nAggs:
+        if stmt.groupAllAggs[ai].fn & "|" &
+            stmt.groupAllAggs[ai].arg.toLowerAscii() == key:
+          idx = ai
+          break
+      selAggIdx.add(idx)
+    var aliases = initTable[string, Value]()
+    for ki, k in stmt.groupKeys:
+      aliases[k.outName.toLowerAscii()] = gKeys[gi][k.groupIdx]
+    for si, sa in stmt.groupAggs:
+      aliases[sa.outName.toLowerAscii()] = aggVals[selAggIdx[si]]
+    if not stmt.groupHaving.isNil:
+      let (ok, hv) = evalGroupHaving(cx, stmt.groupHaving, gKeys[gi],
+        stmt.groupCols, aliases, aggVals, stmt.groupAllAggs)
+      if not ok:
+        fail("unsupported HAVING expression")
+      if not vmTruthFast(hv):
+        continue
+    var outRow = newSeqOfCap[Value](stmt.groupOrder.len)
+    for o in stmt.groupOrder:
+      if o[0] == 'k':
+        let ki = parseInt(o[1 ..^ 1])
+        outRow.add(gKeys[gi][stmt.groupKeys[ki].groupIdx])
+      else:
+        let si = parseInt(o[1 ..^ 1])
+        outRow.add(aggVals[selAggIdx[si]])
+    eng.ctx.results.add(outRow)
+  eng.ctx.affected = int64(eng.ctx.results.len)
+  nil
 
 proc fastUpdate(eng: SqlEngine, root: SqlNode, cx: FastCx): ExecResult =
   let tableName = nodeIdent(root[0])
@@ -2298,6 +3067,8 @@ proc runCompiled(eng: SqlEngine, stmt: CompiledStmt,
   eng.ctx.results.setLen(0)
   eng.ctx.cells.setLen(0)
   eng.ctx.affected = 0
+  if stmt.isGrouped:
+    return eng.execGroupedStmt(stmt, params)
   when defined(boogieSqlDebug):
     echo "[run] procs=", stmt.script.procs.len,
          " code=", stmt.chunk.code.len, " strings=", stmt.chunk.strings
@@ -2392,7 +3163,8 @@ proc compileRoots(eng: SqlEngine, sqlText: string,
       of nkDelete: l.compileUpdateDelete(r)
       of nkCreateTable, nkCreateTableIfNotExists,
          nkDropTable, nkDropTableIfExists,
-         nkCreateIndex, nkCreateIndexIfNotExists: l.compileDdl(r)
+         nkCreateIndex, nkCreateIndexIfNotExists,
+         nkDropIndex, nkDropIndexIfExists: l.compileDdl(r)
       else: fail("unsupported SQL statement")
     compiled.add(stmt)
   compiled
@@ -2458,7 +3230,7 @@ proc execSql*(eng: SqlEngine, sqlText: string,
         kind: stmt.kind,
         affected: eng.ctx.affected
       )
-    of skCreateTable, skDropTable, skCreateIndex:
+    of skCreateTable, skDropTable, skCreateIndex, skDropIndex:
       result = ExecResult(kind: stmt.kind, affected: eng.ctx.affected)
       # schema changed: cached plans may embed stale projections/column lists
       eng.cache.clear()

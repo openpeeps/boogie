@@ -40,6 +40,11 @@ type
     refColumn*: string
     onDelete*: ForeignKeyAction
 
+  IndexDef* = object
+    name*: string
+    columns*: seq[string]
+    unique*: bool
+
 proc newNullValue*(): Value = Value(kind: dtNull)
 proc newIntValue*(v: int64): Value = Value(kind: dtInt, intVal: v)
 proc newFloatValue*(v: float64): Value = Value(kind: dtFloat, floatVal: v)
