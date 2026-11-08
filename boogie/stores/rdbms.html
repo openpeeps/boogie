@@ -98,6 +98,10 @@
   <li><a class="reference" href="#%3D%3D%2CRowRecord%2CRowRecord" title="`==`(a, b: RowRecord): bool">`==`(a, b: RowRecord): bool</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">addColumn
+  <li><a class="reference" href="#addColumn%2CStore%2Cstring%2CColumnDef" title="addColumn(s: Store; tableName: string; col: ColumnDef)">addColumn(s: Store; tableName: string; col: ColumnDef)</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">checkpoint
   <li><a class="reference" href="#checkpoint%2CStore" title="checkpoint(s: Store)">checkpoint(s: Store)</a></li>
 
@@ -224,6 +228,14 @@
 </ul>
 <ul class="simple nested-toc-section">recoverFromWal
   <li><a class="reference" href="#recoverFromWal%2CStore" title="recoverFromWal(s: Store)">recoverFromWal(s: Store)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">renameColumn
+  <li><a class="reference" href="#renameColumn%2CStore%2Cstring%2Cstring%2Cstring" title="renameColumn(s: Store; tableName, oldName, newName: string)">renameColumn(s: Store; tableName, oldName, newName: string)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">renameTable
+  <li><a class="reference" href="#renameTable%2CStore%2Cstring%2Cstring" title="renameTable(s: Store; oldName, newName: string)">renameTable(s: Store; oldName, newName: string)</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">row
@@ -353,6 +365,20 @@
     <p>Equality comp for RowRecord. Used by the SortedTable to determine if two records are the same. We consider two records equal if their primary keys are equal, since the primary key is the unique identifier for a row.</p>
 <p>This allows us to update a row by deleting the old record and inserting a new one with the same primary key.</p>
 
+    
+  </dd>
+</div>
+
+</div>
+<div id="addColumn-procs-all">
+  <div id="addColumn,Store,string,ColumnDef">
+  <dt><pre><span class="Keyword">proc</span> <a href="#addColumn%2CStore%2Cstring%2CColumnDef"><span class="Identifier">addColumn</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">;</span> <span class="Identifier">tableName</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">col</span><span class="Other">:</span> <a href="../rdbms_types.html#ColumnDef"><span class="Identifier">ColumnDef</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span>
+    <span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span>
+    <span class="Identifier">JsonParsingError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">TimeEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Adds a column with WAL + commit (backfills existing rows).
     
   </dd>
 </div>
@@ -642,7 +668,7 @@
     <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    Converts a JSON literal into a store value. Used for column defaults.
+    
     
   </dd>
 </div>
@@ -764,6 +790,32 @@
 </div>
 
 </div>
+<div id="renameColumn-procs-all">
+  <div id="renameColumn,Store,string,string,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#renameColumn%2CStore%2Cstring%2Cstring%2Cstring"><span class="Identifier">renameColumn</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">;</span> <span class="Identifier">tableName</span><span class="Other">,</span> <span class="Identifier">oldName</span><span class="Other">,</span> <span class="Identifier">newName</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Renames a column with WAL + commit (data, indexes and FKs follow).
+    
+  </dd>
+</div>
+
+</div>
+<div id="renameTable-procs-all">
+  <div id="renameTable,Store,string,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#renameTable%2CStore%2Cstring%2Cstring"><span class="Identifier">renameTable</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">;</span> <span class="Identifier">oldName</span><span class="Other">,</span> <span class="Identifier">newName</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Renames a table with WAL + commit (child FK references follow).
+    
+  </dd>
+</div>
+
+</div>
 <div id="row-procs-all">
   <div id="row,openArray[]">
   <dt><pre><span class="Keyword">proc</span> <a href="#row%2CopenArray%5B%5D"><span class="Identifier">row</span></a><span class="Other">(</span><span class="Identifier">pairs</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <a href="../rdbms_types.html#Value"><span class="Identifier">Value</span></a><span class="Other">)</span><span class="Other">]</span><span class="Other">)</span><span class="Other">:</span> <a href="../rdbms_types.html#RowData"><span class="Identifier">RowData</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
@@ -849,7 +901,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-11-08 23:07:40 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-11-08 23:23:17 UTC</small>
       </div>
     </div>
   </div>

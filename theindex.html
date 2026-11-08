@@ -59,6 +59,10 @@
                 timeoutMs = -1): FileLock" href="boogie/filelock.html#acquireFileLock%2Cstring%2CLockMode%2Cint">filelock: proc acquireFileLock(lockPath: string; mode: LockMode = lmExclusive; blocking = true;
                 timeoutMs = -1): FileLock</a></li>
           </ul></dd>
+<dt><a name="addColumn" href="#addColumn"><span>addColumn:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms: proc addColumn(s: Store; tableName: string; col: ColumnDef)" href="boogie/stores/rdbms.html#addColumn%2CStore%2Cstring%2CColumnDef">rdbms: proc addColumn(s: Store; tableName: string; col: ColumnDef)</a></li>
+          </ul></dd>
 <dt><a name="AggKind" href="#AggKind"><span>AggKind:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="columnar: enum AggKind" href="boogie/stores/columnar.html#AggKind">columnar: enum AggKind</a></li>
@@ -1061,6 +1065,14 @@
 <li><a class="reference external"
           data-doc-search-tag="graphstore: object Relationship" href="boogie/stores/graphstore.html#Relationship">graphstore: object Relationship</a></li>
           </ul></dd>
+<dt><a name="renameColumn" href="#renameColumn"><span>renameColumn:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms: proc renameColumn(s: Store; tableName, oldName, newName: string)" href="boogie/stores/rdbms.html#renameColumn%2CStore%2Cstring%2Cstring%2Cstring">rdbms: proc renameColumn(s: Store; tableName, oldName, newName: string)</a></li>
+          </ul></dd>
+<dt><a name="renameTable" href="#renameTable"><span>renameTable:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms: proc renameTable(s: Store; oldName, newName: string)" href="boogie/stores/rdbms.html#renameTable%2CStore%2Cstring%2Cstring">rdbms: proc renameTable(s: Store; oldName, newName: string)</a></li>
+          </ul></dd>
 <dt><a name="replay" href="#replay"><span>replay:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: proc replay(w: Wal; onEntry: proc (e: WalEntry))" href="boogie/wal.html#replay%2CWal%2Cproc%28WalEntry%29">wal: proc replay(w: Wal; onEntry: proc (e: WalEntry))</a></li>
@@ -1433,6 +1445,18 @@
 <li><a class="reference external"
           data-doc-search-tag="concurrency: template withWalLock[T](cc: ConcurrentState[T]; body: untyped)" href="boogie/concurrency.html#withWalLock.t%2CConcurrentState%5BT%5D%2Cuntyped">concurrency: template withWalLock[T](cc: ConcurrentState[T]; body: untyped)</a></li>
           </ul></dd>
+<dt><a name="woAlterAddColumn" href="#woAlterAddColumn"><span>woAlterAddColumn:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="wal: WalOp.woAlterAddColumn" href="boogie/wal.html#woAlterAddColumn">wal: WalOp.woAlterAddColumn</a></li>
+          </ul></dd>
+<dt><a name="woAlterRenameColumn" href="#woAlterRenameColumn"><span>woAlterRenameColumn:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="wal: WalOp.woAlterRenameColumn" href="boogie/wal.html#woAlterRenameColumn">wal: WalOp.woAlterRenameColumn</a></li>
+          </ul></dd>
+<dt><a name="woAlterRenameTable" href="#woAlterRenameTable"><span>woAlterRenameTable:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="wal: WalOp.woAlterRenameTable" href="boogie/wal.html#woAlterRenameTable">wal: WalOp.woAlterRenameTable</a></li>
+          </ul></dd>
 <dt><a name="woCreateIndex" href="#woCreateIndex"><span>woCreateIndex:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: WalOp.woCreateIndex" href="boogie/wal.html#woCreateIndex">wal: WalOp.woCreateIndex</a></li>
@@ -1483,7 +1507,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-11-08 23:07:40 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-11-08 23:23:18 UTC</small>
       </div>
     </div>
   </div>
