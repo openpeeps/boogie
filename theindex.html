@@ -224,6 +224,10 @@
 <dt><a name="createIndex" href="#createIndex"><span>createIndex:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="rdbms: proc createIndex(t: DbTable; column: string)" href="boogie/stores/rdbms.html#createIndex%2CDbTable%2Cstring">rdbms: proc createIndex(t: DbTable; column: string)</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="rdbms: proc createIndex(s: Store; tableName, indexName: string; columns: openArray[string];
+            unique = false)" href="boogie/stores/rdbms.html#createIndex%2CStore%2Cstring%2Cstring%2CopenArray%5Bstring%5D">rdbms: proc createIndex(s: Store; tableName, indexName: string; columns: openArray[string];
+            unique = false)</a></li>
           </ul></dd>
 <dt><a name="createNode" href="#createNode"><span>createNode:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -381,6 +385,10 @@
 <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc dropCollection(s: VectorStore; name: string)" href="boogie/stores/vectorstore.html#dropCollection%2CVectorStore%2Cstring">vectorstore: proc dropCollection(s: VectorStore; name: string)</a></li>
           </ul></dd>
+<dt><a name="dropIndex" href="#dropIndex"><span>dropIndex:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms: proc dropIndex(s: Store; indexName: string)" href="boogie/stores/rdbms.html#dropIndex%2CStore%2Cstring">rdbms: proc dropIndex(s: Store; indexName: string)</a></li>
+          </ul></dd>
 <dt><a name="dropTable" href="#dropTable"><span>dropTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="columnar: proc dropTable(s: var ColumnarStore; table: string; sync: bool = true)" href="boogie/stores/columnar.html#dropTable%2CColumnarStore%2Cstring%2Cbool">columnar: proc dropTable(s: var ColumnarStore; table: string; sync: bool = true)</a></li>
@@ -494,6 +502,12 @@
 <dt><a name="findColumn" href="#findColumn"><span>findColumn:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="rdbms: proc findColumn(t: DbTable; colName: string): Option[ColumnDef]" href="boogie/stores/rdbms.html#findColumn%2CDbTable%2Cstring">rdbms: proc findColumn(t: DbTable; colName: string): Option[ColumnDef]</a></li>
+          </ul></dd>
+<dt><a name="findIndexTable" href="#findIndexTable"><span>findIndexTable:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms: proc findIndexTable(s: Store; indexName: string): tuple[found: bool,
+    tableName: string]" href="boogie/stores/rdbms.html#findIndexTable%2CStore%2Cstring">rdbms: proc findIndexTable(s: Store; indexName: string): tuple[found: bool,
+    tableName: string]</a></li>
           </ul></dd>
 <dt><a name="findNodesByLabel" href="#findNodesByLabel"><span>findNodesByLabel:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -621,6 +635,10 @@
 <li><a class="reference external"
           data-doc-search-tag="vectorstore: proc hasCollection(s: VectorStore; name: string): bool" href="boogie/stores/vectorstore.html#hasCollection%2CVectorStore%2Cstring">vectorstore: proc hasCollection(s: VectorStore; name: string): bool</a></li>
           </ul></dd>
+<dt><a name="hasIndex" href="#hasIndex"><span>hasIndex:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms: proc hasIndex(t: DbTable; name: string): bool" href="boogie/stores/rdbms.html#hasIndex%2CDbTable%2Cstring">rdbms: proc hasIndex(t: DbTable; name: string): bool</a></li>
+          </ul></dd>
 <dt><a name="hasKey" href="#hasKey"><span>hasKey:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="docstore: proc hasKey(store: DocumentStore; key: string): bool" href="boogie/stores/docstore.html#hasKey%2CDocumentStore%2Cstring">docstore: proc hasKey(store: DocumentStore; key: string): bool</a></li>
@@ -630,6 +648,10 @@
 <dt><a name="hasTable" href="#hasTable"><span>hasTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="rdbms: proc hasTable(s: Store; name: string): bool" href="boogie/stores/rdbms.html#hasTable%2CStore%2Cstring">rdbms: proc hasTable(s: Store; name: string): bool</a></li>
+          </ul></dd>
+<dt><a name="IndexDef" href="#IndexDef"><span>IndexDef:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms_types: object IndexDef" href="boogie/rdbms_types.html#IndexDef">rdbms_types: object IndexDef</a></li>
           </ul></dd>
 <dt><a name="initRwLock" href="#initRwLock"><span>initRwLock:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -770,6 +792,10 @@
 <dt><a name="listenSignalOnce" href="#listenSignalOnce"><span>listenSignalOnce:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="signals: proc listenSignalOnce(s: OsSignal; cb: SignalCallback): ListenerHandle" href="boogie/signals.html#listenSignalOnce%2COsSignal%2CSignalCallback">signals: proc listenSignalOnce(s: OsSignal; cb: SignalCallback): ListenerHandle</a></li>
+          </ul></dd>
+<dt><a name="listIndexes" href="#listIndexes"><span>listIndexes:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="rdbms: proc listIndexes(t: DbTable): seq[IndexDef]" href="boogie/stores/rdbms.html#listIndexes%2CDbTable">rdbms: proc listIndexes(t: DbTable): seq[IndexDef]</a></li>
           </ul></dd>
 <dt><a name="lmExclusive" href="#lmExclusive"><span>lmExclusive:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -1008,6 +1034,10 @@
 <dt><a name="readEntryAt" href="#readEntryAt"><span>readEntryAt:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: proc readEntryAt(w: Wal; offset: int64): WalEntry" href="boogie/wal.html#readEntryAt%2CWal%2Cint64">wal: proc readEntryAt(w: Wal; offset: int64): WalEntry</a></li>
+          </ul></dd>
+<dt><a name="readIndexDef" href="#readIndexDef"><span>readIndexDef:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc readIndexDef(b: var Buffer): IndexDef" href="boogie/fbe_codec.html#readIndexDef%2CBuffer">fbe_codec: proc readIndexDef(b: var Buffer): IndexDef</a></li>
           </ul></dd>
 <dt><a name="readWith" href="#readWith"><span>readWith:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -1403,6 +1433,10 @@
 <li><a class="reference external"
           data-doc-search-tag="concurrency: template withWalLock[T](cc: ConcurrentState[T]; body: untyped)" href="boogie/concurrency.html#withWalLock.t%2CConcurrentState%5BT%5D%2Cuntyped">concurrency: template withWalLock[T](cc: ConcurrentState[T]; body: untyped)</a></li>
           </ul></dd>
+<dt><a name="woCreateIndex" href="#woCreateIndex"><span>woCreateIndex:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="wal: WalOp.woCreateIndex" href="boogie/wal.html#woCreateIndex">wal: WalOp.woCreateIndex</a></li>
+          </ul></dd>
 <dt><a name="woCreateTable" href="#woCreateTable"><span>woCreateTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: WalOp.woCreateTable" href="boogie/wal.html#woCreateTable">wal: WalOp.woCreateTable</a></li>
@@ -1410,6 +1444,10 @@
 <dt><a name="woDeleteRow" href="#woDeleteRow"><span>woDeleteRow:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="wal: WalOp.woDeleteRow" href="boogie/wal.html#woDeleteRow">wal: WalOp.woDeleteRow</a></li>
+          </ul></dd>
+<dt><a name="woDropIndex" href="#woDropIndex"><span>woDropIndex:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="wal: WalOp.woDropIndex" href="boogie/wal.html#woDropIndex">wal: WalOp.woDropIndex</a></li>
           </ul></dd>
 <dt><a name="woDropTable" href="#woDropTable"><span>woDropTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -1429,6 +1467,10 @@
                   version: int32 = 1'i32): bool" href="boogie/stores/docstore.html#writeBSONDocument%2CDocumentStore%2Cstring%2Cstring%2Cint32">docstore: proc writeBSONDocument(store: DocumentStore; key, path: string;
                   version: int32 = 1'i32): bool</a></li>
           </ul></dd>
+<dt><a name="writeIndexDef" href="#writeIndexDef"><span>writeIndexDef:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="fbe_codec: proc writeIndexDef(b: var Buffer; idx: IndexDef)" href="boogie/fbe_codec.html#writeIndexDef%2CBuffer%2CIndexDef">fbe_codec: proc writeIndexDef(b: var Buffer; idx: IndexDef)</a></li>
+          </ul></dd>
 <dt><a name="WriteRing" href="#WriteRing"><span>WriteRing:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="concurrency: type WriteRing" href="boogie/concurrency.html#WriteRing">concurrency: type WriteRing</a></li>
@@ -1441,7 +1483,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-11-08 22:12:05 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-11-08 22:50:13 UTC</small>
       </div>
     </div>
   </div>

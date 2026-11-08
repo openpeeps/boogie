@@ -79,6 +79,10 @@
   refTable*: string
   refColumn*: string
   onDelete*: ForeignKeyAction">ForeignKeyDef</a></li>
+<li><a class="reference" href="#IndexDef" title="IndexDef = object
+  name*: string
+  columns*: seq[string]
+  unique*: bool">IndexDef</a></li>
 <li><a class="reference" href="#PrimaryKeyMode" title="PrimaryKeyMode = enum
   pkmManual, pkmSerial">PrimaryKeyMode</a></li>
 <li><a class="reference" href="#RowData" title="RowData = OrderedTable[string, Value]">RowData</a></li>
@@ -189,6 +193,17 @@
   <span class="Identifier">refTable</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
   <span class="Identifier">refColumn</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
   <span class="Identifier">onDelete</span><span class="Operator">*</span><span class="Other">:</span> <a href="#ForeignKeyAction"><span class="Identifier">ForeignKeyAction</span></a></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+<div id="IndexDef">
+  <dt><pre><a href="#IndexDef"><span class="Identifier">IndexDef</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
+  <span class="Identifier">name</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">columns</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>
+  <span class="Identifier">unique</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span></pre></dt>
   <dd>
     
     
@@ -337,7 +352,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-11-08 22:12:05 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-11-08 22:50:13 UTC</small>
       </div>
     </div>
   </div>

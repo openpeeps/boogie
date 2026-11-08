@@ -3,23 +3,25 @@ nim	bufToString	boogie/fbe_codec.html#bufToString,Buffer	proc bufToString(b: Buf
 nim	stringToBuf	boogie/fbe_codec.html#stringToBuf,string	proc stringToBuf(s: string): Buffer		20
 nim	encodeRowPayload	boogie/fbe_codec.html#encodeRowPayload,RowData	proc encodeRowPayload(data: RowData): string		188
 nim	decodeRowPayload	boogie/fbe_codec.html#decodeRowPayload,string	proc decodeRowPayload(payload: string): RowData		193
-nim	KvSnapshotOnDisk	boogie/fbe_codec.html#KvSnapshotOnDisk	tuple KvSnapshotOnDisk		261
-nim	encodeKvSnapshot	boogie/fbe_codec.html#encodeKvSnapshot,Buffer,KvSnapshotOnDisk	proc encodeKvSnapshot(b: var Buffer; snap: KvSnapshotOnDisk)		266
-nim	decodeKvSnapshot	boogie/fbe_codec.html#decodeKvSnapshot,Buffer	proc decodeKvSnapshot(b: var Buffer): KvSnapshotOnDisk		278
-nim	encodeKvSnapshotToString	boogie/fbe_codec.html#encodeKvSnapshotToString,KvSnapshotOnDisk	proc encodeKvSnapshotToString(snap: KvSnapshotOnDisk): string		303
-nim	decodeKvSnapshotFromString	boogie/fbe_codec.html#decodeKvSnapshotFromString,string	proc decodeKvSnapshotFromString(s: string): KvSnapshotOnDisk		308
-nim	DocSnapshotOnDisk	boogie/fbe_codec.html#DocSnapshotOnDisk	tuple DocSnapshotOnDisk		316
-nim	encodeDocSnapshot	boogie/fbe_codec.html#encodeDocSnapshot,Buffer,DocSnapshotOnDisk	proc encodeDocSnapshot(b: var Buffer; snap: DocSnapshotOnDisk)		321
-nim	decodeDocSnapshot	boogie/fbe_codec.html#decodeDocSnapshot,Buffer	proc decodeDocSnapshot(b: var Buffer): DocSnapshotOnDisk		333
-nim	encodeDocSnapshotToString	boogie/fbe_codec.html#encodeDocSnapshotToString,DocSnapshotOnDisk	proc encodeDocSnapshotToString(snap: DocSnapshotOnDisk): string		356
-nim	decodeDocSnapshotFromString	boogie/fbe_codec.html#decodeDocSnapshotFromString,string	proc decodeDocSnapshotFromString(s: string): DocSnapshotOnDisk		361
-nim	VectorSnapshotOnDisk	boogie/fbe_codec.html#VectorSnapshotOnDisk	tuple VectorSnapshotOnDisk		369
-nim	encodeVectorSnapshot	boogie/fbe_codec.html#encodeVectorSnapshot,Buffer,VectorSnapshotOnDisk	proc encodeVectorSnapshot(b: var Buffer; snap: VectorSnapshotOnDisk)		374
-nim	decodeVectorSnapshot	boogie/fbe_codec.html#decodeVectorSnapshot,Buffer	proc decodeVectorSnapshot(b: var Buffer): VectorSnapshotOnDisk		398
-nim	encodeVectorSnapshotToString	boogie/fbe_codec.html#encodeVectorSnapshotToString,VectorSnapshotOnDisk	proc encodeVectorSnapshotToString(snap: VectorSnapshotOnDisk): string		446
-nim	decodeVectorSnapshotFromString	boogie/fbe_codec.html#decodeVectorSnapshotFromString,string	proc decodeVectorSnapshotFromString(s: string): VectorSnapshotOnDisk		451
-nim	RdbmsSnapshotOnDisk	boogie/fbe_codec.html#RdbmsSnapshotOnDisk	tuple RdbmsSnapshotOnDisk		459
-nim	encodeRdbmsSnapshot	boogie/fbe_codec.html#encodeRdbmsSnapshot,Buffer,RdbmsSnapshotOnDisk	proc encodeRdbmsSnapshot(b: var Buffer; snap: RdbmsSnapshotOnDisk)		472
-nim	decodeRdbmsSnapshot	boogie/fbe_codec.html#decodeRdbmsSnapshot,Buffer	proc decodeRdbmsSnapshot(b: var Buffer): RdbmsSnapshotOnDisk		503
-nim	encodeRdbmsSnapshotToString	boogie/fbe_codec.html#encodeRdbmsSnapshotToString,RdbmsSnapshotOnDisk	proc encodeRdbmsSnapshotToString(snap: RdbmsSnapshotOnDisk): string		565
-nim	decodeRdbmsSnapshotFromString	boogie/fbe_codec.html#decodeRdbmsSnapshotFromString,string	proc decodeRdbmsSnapshotFromString(s: string): RdbmsSnapshotOnDisk		570
+nim	writeIndexDef	boogie/fbe_codec.html#writeIndexDef,Buffer,IndexDef	proc writeIndexDef(b: var Buffer; idx: IndexDef)		257
+nim	readIndexDef	boogie/fbe_codec.html#readIndexDef,Buffer	proc readIndexDef(b: var Buffer): IndexDef		267
+nim	KvSnapshotOnDisk	boogie/fbe_codec.html#KvSnapshotOnDisk	tuple KvSnapshotOnDisk		293
+nim	encodeKvSnapshot	boogie/fbe_codec.html#encodeKvSnapshot,Buffer,KvSnapshotOnDisk	proc encodeKvSnapshot(b: var Buffer; snap: KvSnapshotOnDisk)		298
+nim	decodeKvSnapshot	boogie/fbe_codec.html#decodeKvSnapshot,Buffer	proc decodeKvSnapshot(b: var Buffer): KvSnapshotOnDisk		310
+nim	encodeKvSnapshotToString	boogie/fbe_codec.html#encodeKvSnapshotToString,KvSnapshotOnDisk	proc encodeKvSnapshotToString(snap: KvSnapshotOnDisk): string		335
+nim	decodeKvSnapshotFromString	boogie/fbe_codec.html#decodeKvSnapshotFromString,string	proc decodeKvSnapshotFromString(s: string): KvSnapshotOnDisk		340
+nim	DocSnapshotOnDisk	boogie/fbe_codec.html#DocSnapshotOnDisk	tuple DocSnapshotOnDisk		348
+nim	encodeDocSnapshot	boogie/fbe_codec.html#encodeDocSnapshot,Buffer,DocSnapshotOnDisk	proc encodeDocSnapshot(b: var Buffer; snap: DocSnapshotOnDisk)		353
+nim	decodeDocSnapshot	boogie/fbe_codec.html#decodeDocSnapshot,Buffer	proc decodeDocSnapshot(b: var Buffer): DocSnapshotOnDisk		365
+nim	encodeDocSnapshotToString	boogie/fbe_codec.html#encodeDocSnapshotToString,DocSnapshotOnDisk	proc encodeDocSnapshotToString(snap: DocSnapshotOnDisk): string		388
+nim	decodeDocSnapshotFromString	boogie/fbe_codec.html#decodeDocSnapshotFromString,string	proc decodeDocSnapshotFromString(s: string): DocSnapshotOnDisk		393
+nim	VectorSnapshotOnDisk	boogie/fbe_codec.html#VectorSnapshotOnDisk	tuple VectorSnapshotOnDisk		401
+nim	encodeVectorSnapshot	boogie/fbe_codec.html#encodeVectorSnapshot,Buffer,VectorSnapshotOnDisk	proc encodeVectorSnapshot(b: var Buffer; snap: VectorSnapshotOnDisk)		406
+nim	decodeVectorSnapshot	boogie/fbe_codec.html#decodeVectorSnapshot,Buffer	proc decodeVectorSnapshot(b: var Buffer): VectorSnapshotOnDisk		430
+nim	encodeVectorSnapshotToString	boogie/fbe_codec.html#encodeVectorSnapshotToString,VectorSnapshotOnDisk	proc encodeVectorSnapshotToString(snap: VectorSnapshotOnDisk): string		478
+nim	decodeVectorSnapshotFromString	boogie/fbe_codec.html#decodeVectorSnapshotFromString,string	proc decodeVectorSnapshotFromString(s: string): VectorSnapshotOnDisk		483
+nim	RdbmsSnapshotOnDisk	boogie/fbe_codec.html#RdbmsSnapshotOnDisk	tuple RdbmsSnapshotOnDisk		491
+nim	encodeRdbmsSnapshot	boogie/fbe_codec.html#encodeRdbmsSnapshot,Buffer,RdbmsSnapshotOnDisk	proc encodeRdbmsSnapshot(b: var Buffer; snap: RdbmsSnapshotOnDisk)		505
+nim	decodeRdbmsSnapshot	boogie/fbe_codec.html#decodeRdbmsSnapshot,Buffer	proc decodeRdbmsSnapshot(b: var Buffer): RdbmsSnapshotOnDisk		540
+nim	encodeRdbmsSnapshotToString	boogie/fbe_codec.html#encodeRdbmsSnapshotToString,RdbmsSnapshotOnDisk	proc encodeRdbmsSnapshotToString(snap: RdbmsSnapshotOnDisk): string		609
+nim	decodeRdbmsSnapshotFromString	boogie/fbe_codec.html#decodeRdbmsSnapshotFromString,string	proc decodeRdbmsSnapshotFromString(s: string): RdbmsSnapshotOnDisk		614

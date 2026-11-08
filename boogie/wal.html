@@ -89,7 +89,8 @@
   payload*: string           ## The payload of the log entry, typically a JSON string representing the row data for inserts/updates">WalEntry</a></li>
 <li><a class="reference" href="#WalError" title="WalError = object of CatchableError">WalError</a></li>
 <li><a class="reference" href="#WalOp" title="WalOp = enum
-  woCreateTable, woDropTable, woInsertRow, woDeleteRow, woUpdateRow">WalOp</a></li>
+  woCreateTable, woDropTable, woInsertRow, woDeleteRow, woUpdateRow,
+  woCreateIndex, woDropIndex">WalOp</a></li>
 
     </ul>
   </details>
@@ -269,7 +270,8 @@
 </div>
 <div id="WalOp">
   <dt><pre><a href="#WalOp"><span class="Identifier">WalOp</span></a> <span class="Other">=</span> <span class="Keyword">enum</span>
-  <span class="Identifier">woCreateTable</span><span class="Other">,</span> <span class="Identifier">woDropTable</span><span class="Other">,</span> <span class="Identifier">woInsertRow</span><span class="Other">,</span> <span class="Identifier">woDeleteRow</span><span class="Other">,</span> <span class="Identifier">woUpdateRow</span></pre></dt>
+  <span class="Identifier">woCreateTable</span><span class="Other">,</span> <span class="Identifier">woDropTable</span><span class="Other">,</span> <span class="Identifier">woInsertRow</span><span class="Other">,</span> <span class="Identifier">woDeleteRow</span><span class="Other">,</span> <span class="Identifier">woUpdateRow</span><span class="Other">,</span>
+  <span class="Identifier">woCreateIndex</span><span class="Other">,</span> <span class="Identifier">woDropIndex</span></pre></dt>
   <dd>
     
     Supported WAL operations. This is used to identify the type of change being logged.
@@ -521,7 +523,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-11-08 22:12:04 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-11-08 22:50:12 UTC</small>
       </div>
     </div>
   </div>

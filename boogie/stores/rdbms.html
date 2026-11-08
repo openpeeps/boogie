@@ -75,6 +75,9 @@
   else:
     nil
   columns*: seq[ColumnDef]   ## Schema definition of the table columns
+  indexes*: Table[string, IndexDef] ## Named secondary indexes by index name (single-column for now).
+                                    ## The key set mirrors `indexedCols`/`eqIndex`; UNIQUE indexes also
+                                    ## enforce uniqueness of non-NULL values.
   foreignKeys*: seq[ForeignKeyDef]">DbTable</a></li>
 <li><a class="reference" href="#RowIndex" title="RowIndex = SortedTable[RowRecord, string]">RowIndex</a></li>
 <li><a class="reference" href="#StorageMode" title="StorageMode = enum
@@ -104,7 +107,10 @@
 
 </ul>
 <ul class="simple nested-toc-section">createIndex
-  <li><a class="reference" href="#createIndex%2CDbTable%2Cstring" title="createIndex(t: DbTable; column: string)">createIndex(t: DbTable; column: string)</a></li>
+  <li><a class="reference" href="#createIndex%2CStore%2Cstring%2Cstring%2CopenArray%5Bstring%5D" title="createIndex(s: Store; tableName, indexName: string; columns: openArray[string];
+            unique = false)">createIndex(s: Store; tableName, indexName: string; columns: openArray[string];
+            unique = false)</a></li>
+<li><a class="reference" href="#createIndex%2CDbTable%2Cstring" title="createIndex(t: DbTable; column: string)">createIndex(t: DbTable; column: string)</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">createTable
@@ -120,12 +126,22 @@
 <li><a class="reference" href="#deleteRow%2CDbTable%2Cstring" title="deleteRow(t: DbTable; pk: string): bool">deleteRow(t: DbTable; pk: string): bool</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">dropIndex
+  <li><a class="reference" href="#dropIndex%2CStore%2Cstring" title="dropIndex(s: Store; indexName: string)">dropIndex(s: Store; indexName: string)</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">dropTable
   <li><a class="reference" href="#dropTable%2CStore%2Cstring" title="dropTable(s: Store; name: string)">dropTable(s: Store; name: string)</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">findColumn
   <li><a class="reference" href="#findColumn%2CDbTable%2Cstring" title="findColumn(t: DbTable; colName: string): Option[ColumnDef]">findColumn(t: DbTable; colName: string): Option[ColumnDef]</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">findIndexTable
+  <li><a class="reference" href="#findIndexTable%2CStore%2Cstring" title="findIndexTable(s: Store; indexName: string): tuple[found: bool,
+    tableName: string]">findIndexTable(s: Store; indexName: string): tuple[found: bool,
+    tableName: string]</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">getRow
@@ -135,6 +151,10 @@
 </ul>
 <ul class="simple nested-toc-section">getTable
   <li><a class="reference" href="#getTable%2CStore%2Cstring" title="getTable(s: Store; name: string): Option[DbTable]">getTable(s: Store; name: string): Option[DbTable]</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">hasIndex
+  <li><a class="reference" href="#hasIndex%2CDbTable%2Cstring" title="hasIndex(t: DbTable; name: string): bool">hasIndex(t: DbTable; name: string): bool</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">hasTable
@@ -158,6 +178,10 @@
 </ul>
 <ul class="simple nested-toc-section">jsonToStoreValue
   <li><a class="reference" href="#jsonToStoreValue%2CJsonNode" title="jsonToStoreValue(j: JsonNode): Value">jsonToStoreValue(j: JsonNode): Value</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">listIndexes
+  <li><a class="reference" href="#listIndexes%2CDbTable" title="listIndexes(t: DbTable): seq[IndexDef]">listIndexes(t: DbTable): seq[IndexDef]</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">newColumn
@@ -267,6 +291,9 @@
   <span class="Keyword">else</span><span class="Other">:</span>
     <span class="Keyword">nil</span>
   <span class="Identifier">columns</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="../rdbms_types.html#ColumnDef"><span class="Identifier">ColumnDef</span></a><span class="Other">]</span>   <span class="Comment">## Schema definition of the table columns</span>
+  <span class="Identifier">indexes</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Table</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">,</span> <a href="../rdbms_types.html#IndexDef"><span class="Identifier">IndexDef</span></a><span class="Other">]</span> <span class="Comment">## Named secondary indexes by index name (single-column for now).</span>
+                                    <span class="Comment">## The key set mirrors `indexedCols`/`eqIndex`; UNIQUE indexes also</span>
+                                    <span class="Comment">## enforce uniqueness of non-NULL values.</span>
   <span class="Identifier">foreignKeys</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="../rdbms_types.html#ForeignKeyDef"><span class="Identifier">ForeignKeyDef</span></a><span class="Other">]</span></pre></dt>
   <dd>
     
@@ -358,12 +385,23 @@
 
 </div>
 <div id="createIndex-procs-all">
-  <div id="createIndex,DbTable,string">
+  <div id="createIndex,Store,string,string,openArray[string]">
+  <dt><pre><span class="Keyword">proc</span> <a href="#createIndex%2CStore%2Cstring%2Cstring%2CopenArray%5Bstring%5D"><span class="Identifier">createIndex</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">;</span> <span class="Identifier">tableName</span><span class="Other">,</span> <span class="Identifier">indexName</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span>
+                 <span class="Identifier">columns</span><span class="Other">:</span> <span class="Identifier">openArray</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span><span class="Other">;</span> <span class="Identifier">unique</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Named secondary index with WAL + commit. Single-column for P0.
+    
+  </dd>
+</div>
+<div id="createIndex,DbTable,string">
   <dt><pre><span class="Keyword">proc</span> <a href="#createIndex%2CDbTable%2Cstring"><span class="Identifier">createIndex</span></a><span class="Other">(</span><span class="Identifier">t</span><span class="Other">:</span> <a href="#DbTable"><span class="Identifier">DbTable</span></a><span class="Other">;</span> <span class="Identifier">column</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">StoreError</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    Create an equality index on the specified column
+    Legacy equality index on one column (auto-named). Kept for the FK path and existing callers; named indexes go through the store-level <tt class="docutils literal"><span class="pre"><span class="Identifier">createIndex</span></span></tt> below so names stay globally unique.
     
   </dd>
 </div>
@@ -421,6 +459,19 @@
 </div>
 
 </div>
+<div id="dropIndex-procs-all">
+  <div id="dropIndex,Store,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#dropIndex%2CStore%2Cstring"><span class="Identifier">dropIndex</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">;</span> <span class="Identifier">indexName</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">WalError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">TimeEffect</span><span class="Other">,</span> <span class="Identifier">WriteIOEffect</span><span class="Other">,</span> <span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Drops a named index with WAL + commit.
+    
+  </dd>
+</div>
+
+</div>
 <div id="dropTable-procs-all">
   <div id="dropTable,Store,string">
   <dt><pre><span class="Keyword">proc</span> <a href="#dropTable%2CStore%2Cstring"><span class="Identifier">dropTable</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">;</span> <span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">StoreError</span><span class="Other">,</span> <span class="Identifier">StoreError</span><span class="Other">,</span>
@@ -442,6 +493,18 @@
   <dd>
     
     
+    
+  </dd>
+</div>
+
+</div>
+<div id="findIndexTable-procs-all">
+  <div id="findIndexTable,Store,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#findIndexTable%2CStore%2Cstring"><span class="Identifier">findIndexTable</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <a href="#Store"><span class="Identifier">Store</span></a><span class="Other">;</span> <span class="Identifier">indexName</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Keyword">tuple</span><span class="Other">[</span><span class="Identifier">found</span><span class="Other">:</span> <span class="Identifier">bool</span><span class="Other">,</span>
+    <span class="Identifier">tableName</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">]</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Locates the table owning a named index (index names are global).
     
   </dd>
 </div>
@@ -475,6 +538,18 @@
   <dd>
     
     Get a table by name. Returns none if not found.
+    
+  </dd>
+</div>
+
+</div>
+<div id="hasIndex-procs-all">
+  <div id="hasIndex,DbTable,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#hasIndex%2CDbTable%2Cstring"><span class="Identifier">hasIndex</span></a><span class="Other">(</span><span class="Identifier">t</span><span class="Other">:</span> <a href="#DbTable"><span class="Identifier">DbTable</span></a><span class="Other">;</span> <span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">bool</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
     
   </dd>
 </div>
@@ -568,6 +643,17 @@
   <dd>
     
     Converts a JSON literal into a store value. Used for column defaults.
+    
+  </dd>
+</div>
+
+</div>
+<div id="listIndexes-procs-all">
+  <div id="listIndexes,DbTable">
+  <dt><pre><span class="Keyword">proc</span> <a href="#listIndexes%2CDbTable"><span class="Identifier">listIndexes</span></a><span class="Other">(</span><span class="Identifier">t</span><span class="Other">:</span> <a href="#DbTable"><span class="Identifier">DbTable</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="../rdbms_types.html#IndexDef"><span class="Identifier">IndexDef</span></a><span class="Other">]</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
     
   </dd>
 </div>
@@ -753,7 +839,7 @@
 <div class="section" id="19">
   <h1><a class="toc-backref" href="#19">Exports</a></h1>
   <dl class="item">
-    <a href="../rdbms_types.html#$,Value"><span class="Identifier">$</span></a>, <a href="../rdbms_types.html#==,Value,Value"><span class="Identifier">==</span></a>, <a href="../rdbms_types.html#ColumnDef"><span class="Identifier">ColumnDef</span></a>, <a href="../rdbms_types.html#DataType"><span class="Identifier">DataType</span></a>, <a href="../rdbms_types.html#ForeignKeyAction"><span class="Identifier">ForeignKeyAction</span></a>, <a href="../rdbms_types.html#ForeignKeyDef"><span class="Identifier">ForeignKeyDef</span></a>, <a href="../rdbms_types.html#PrimaryKeyMode"><span class="Identifier">PrimaryKeyMode</span></a>, <a href="../rdbms_types.html#RowData"><span class="Identifier">RowData</span></a>, <a href="../rdbms_types.html#Value"><span class="Identifier">Value</span></a>, <a href="../rdbms_types.html#newBoolValue,bool"><span class="Identifier">newBoolValue</span></a>, <a href="../rdbms_types.html#newFloatValue,float64"><span class="Identifier">newFloatValue</span></a>, <a href="../rdbms_types.html#newIntValue,int64"><span class="Identifier">newIntValue</span></a>, <a href="../rdbms_types.html#newJSONValue,JsonNode"><span class="Identifier">newJSONValue</span></a>, <a href="../rdbms_types.html#newNullValue"><span class="Identifier">newNullValue</span></a>, <a href="../rdbms_types.html#newTextValue,string"><span class="Identifier">newTextValue</span></a>
+    <a href="../rdbms_types.html#$,Value"><span class="Identifier">$</span></a>, <a href="../rdbms_types.html#==,Value,Value"><span class="Identifier">==</span></a>, <a href="../rdbms_types.html#ColumnDef"><span class="Identifier">ColumnDef</span></a>, <a href="../rdbms_types.html#DataType"><span class="Identifier">DataType</span></a>, <a href="../rdbms_types.html#ForeignKeyAction"><span class="Identifier">ForeignKeyAction</span></a>, <a href="../rdbms_types.html#ForeignKeyDef"><span class="Identifier">ForeignKeyDef</span></a>, <a href="../rdbms_types.html#IndexDef"><span class="Identifier">IndexDef</span></a>, <a href="../rdbms_types.html#PrimaryKeyMode"><span class="Identifier">PrimaryKeyMode</span></a>, <a href="../rdbms_types.html#RowData"><span class="Identifier">RowData</span></a>, <a href="../rdbms_types.html#Value"><span class="Identifier">Value</span></a>, <a href="../rdbms_types.html#newBoolValue,bool"><span class="Identifier">newBoolValue</span></a>, <a href="../rdbms_types.html#newFloatValue,float64"><span class="Identifier">newFloatValue</span></a>, <a href="../rdbms_types.html#newIntValue,int64"><span class="Identifier">newIntValue</span></a>, <a href="../rdbms_types.html#newJSONValue,JsonNode"><span class="Identifier">newJSONValue</span></a>, <a href="../rdbms_types.html#newNullValue"><span class="Identifier">newNullValue</span></a>, <a href="../rdbms_types.html#newTextValue,string"><span class="Identifier">newTextValue</span></a>
   </dl>
 </div>
 
@@ -763,7 +849,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-11-08 22:12:05 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-11-08 22:50:13 UTC</small>
       </div>
     </div>
   </div>

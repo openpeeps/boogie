@@ -74,7 +74,8 @@
 <li><a class="reference" href="#RdbmsSnapshotOnDisk" title="RdbmsSnapshotOnDisk = tuple[version: uint32, checkpointLsn: uint64, tables: seq[tuple[
     name: string, primaryKey: string, pkType: PrimaryKeyMode,
     pkSequence: uint64, columns: seq[ColumnDef],
-    foreignKeys: seq[ForeignKeyDef], rows: seq[(string, RowData)]]]]">RdbmsSnapshotOnDisk</a></li>
+    foreignKeys: seq[ForeignKeyDef], indexes: seq[IndexDef],
+    rows: seq[(string, RowData)]]]]">RdbmsSnapshotOnDisk</a></li>
 <li><a class="reference" href="#VectorSnapshotOnDisk" title="VectorSnapshotOnDisk = tuple[version: uint32, checkpointLsn: uint64, collections: seq[tuple[
     name: string, dimension: int, rows: seq[(string, seq[float32], string)]]]]">VectorSnapshotOnDisk</a></li>
 
@@ -161,8 +162,16 @@
   <li><a class="reference" href="#encodeVectorSnapshotToString%2CVectorSnapshotOnDisk" title="encodeVectorSnapshotToString(snap: VectorSnapshotOnDisk): string">encodeVectorSnapshotToString(snap: VectorSnapshotOnDisk): string</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">readIndexDef
+  <li><a class="reference" href="#readIndexDef%2CBuffer" title="readIndexDef(b: var Buffer): IndexDef">readIndexDef(b: var Buffer): IndexDef</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">stringToBuf
   <li><a class="reference" href="#stringToBuf%2Cstring" title="stringToBuf(s: string): Buffer">stringToBuf(s: string): Buffer</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">writeIndexDef
+  <li><a class="reference" href="#writeIndexDef%2CBuffer%2CIndexDef" title="writeIndexDef(b: var Buffer; idx: IndexDef)">writeIndexDef(b: var Buffer; idx: IndexDef)</a></li>
 
 </ul>
 
@@ -209,7 +218,8 @@
   <dt><pre><a href="#RdbmsSnapshotOnDisk"><span class="Identifier">RdbmsSnapshotOnDisk</span></a> <span class="Other">=</span> <span class="Keyword">tuple</span><span class="Other">[</span><span class="Identifier">version</span><span class="Other">:</span> <span class="Identifier">uint32</span><span class="Other">,</span> <span class="Identifier">checkpointLsn</span><span class="Other">:</span> <span class="Identifier">uint64</span><span class="Other">,</span> <span class="Identifier">tables</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Keyword">tuple</span><span class="Other">[</span>
     <span class="Identifier">name</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">primaryKey</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">pkType</span><span class="Other">:</span> <a href="rdbms_types.html#PrimaryKeyMode"><span class="Identifier">PrimaryKeyMode</span></a><span class="Other">,</span>
     <span class="Identifier">pkSequence</span><span class="Other">:</span> <span class="Identifier">uint64</span><span class="Other">,</span> <span class="Identifier">columns</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="rdbms_types.html#ColumnDef"><span class="Identifier">ColumnDef</span></a><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">foreignKeys</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="rdbms_types.html#ForeignKeyDef"><span class="Identifier">ForeignKeyDef</span></a><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">rows</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <a href="rdbms_types.html#RowData"><span class="Identifier">RowData</span></a><span class="Other">)</span><span class="Other">]</span><span class="Other">]</span><span class="Other">]</span><span class="Other">]</span></pre></dt>
+    <span class="Identifier">foreignKeys</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="rdbms_types.html#ForeignKeyDef"><span class="Identifier">ForeignKeyDef</span></a><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">indexes</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="rdbms_types.html#IndexDef"><span class="Identifier">IndexDef</span></a><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">rows</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Other">(</span><span class="Identifier">string</span><span class="Other">,</span> <a href="rdbms_types.html#RowData"><span class="Identifier">RowData</span></a><span class="Other">)</span><span class="Other">]</span><span class="Other">]</span><span class="Other">]</span><span class="Other">]</span></pre></dt>
   <dd>
     
     
@@ -458,9 +468,33 @@
 </div>
 
 </div>
+<div id="readIndexDef-procs-all">
+  <div id="readIndexDef,Buffer">
+  <dt><pre><span class="Keyword">proc</span> <a href="#readIndexDef%2CBuffer"><span class="Identifier">readIndexDef</span></a><span class="Other">(</span><span class="Identifier">b</span><span class="Other">:</span> <span class="Keyword">var</span> <span class="Identifier">Buffer</span><span class="Other">)</span><span class="Other">:</span> <a href="rdbms_types.html#IndexDef"><span class="Identifier">IndexDef</span></a> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">CatchableError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
 <div id="stringToBuf-procs-all">
   <div id="stringToBuf,string">
   <dt><pre><span class="Keyword">proc</span> <a href="#stringToBuf%2Cstring"><span class="Identifier">stringToBuf</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">Buffer</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+
+</div>
+<div id="writeIndexDef-procs-all">
+  <div id="writeIndexDef,Buffer,IndexDef">
+  <dt><pre><span class="Keyword">proc</span> <a href="#writeIndexDef%2CBuffer%2CIndexDef"><span class="Identifier">writeIndexDef</span></a><span class="Other">(</span><span class="Identifier">b</span><span class="Other">:</span> <span class="Keyword">var</span> <span class="Identifier">Buffer</span><span class="Other">;</span> <span class="Identifier">idx</span><span class="Other">:</span> <a href="rdbms_types.html#IndexDef"><span class="Identifier">IndexDef</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">CatchableError</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
@@ -479,7 +513,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-11-08 22:12:05 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-11-08 22:50:13 UTC</small>
       </div>
     </div>
   </div>
