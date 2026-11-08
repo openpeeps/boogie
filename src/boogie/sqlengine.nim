@@ -43,8 +43,8 @@ export vm.initValue
 ## CREATE [UNIQUE] INDEX [IF NOT EXISTS] / DROP INDEX [IF EXISTS]
 ## (single-column), INSERT with multiple rows and serial primary keys, SELECT
 ## with WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT over single
-## tables, INNER/CROSS JOINs with ON/USING (no GROUP BY over joins yet),
-## UPDATE ... SET ... WHERE and DELETE FROM ... WHERE. Expressions
+## tables and INNER/CROSS JOINs with ON/USING (incl. GROUP BY/HAVING over
+## joins), UPDATE ... SET ... WHERE and DELETE FROM ... WHERE. Expressions
 ## support literals, columns, placeholders, comparisons, AND/OR/NOT,
 ## IS [NOT] NULL, IN (list) and arithmetic. Subqueries and ALTER are
 ## not supported.
@@ -152,6 +152,12 @@ type
     joinKeys: seq[tuple[expr: SqlNode, outName: string]]
     joinAggs: seq[tuple[fn: string, arg: SqlNode, outName: string]]
       ## group-less aggregates over the joined row (`arg` nil = COUNT(*))
+    joinGroupExprs: seq[SqlNode]
+      ## raw GROUP BY expressions (ident/dot only) for GROUP BY over joins
+    joinGroupHaving: SqlNode
+    joinGroupAllAggs: seq[tuple[fn: string, argKey: string]]
+      ## union of SELECT + HAVING-only aggregates (`"*"` or `"scope.col"`)
+      ## for GROUP BY over joins
 
   SqlEngine* = ref object
     ## Compiles and executes SQL against one store. One instance per
@@ -1406,14 +1412,72 @@ proc collectJoinPh(n: SqlNode, phs: var seq[string]) =
     for c in n.sons: collectJoinPh(c, phs)
   else: discard
 
+proc sameJoinRef(a, b: SqlNode): bool =
+  ## Structural equality for plain column refs (case-insensitive).
+  if a.kind == nkIdent and b.kind == nkIdent:
+    return a.strVal.toLowerAscii() == b.strVal.toLowerAscii()
+  if a.kind == nkDot and b.kind == nkDot and a.len >= 2 and b.len >= 2:
+    return nodeIdent(a[0]).toLowerAscii() == nodeIdent(b[0]).toLowerAscii() and
+      groupColName(a[1]).toLowerAscii() == groupColName(b[1]).toLowerAscii()
+  false
+
+proc joinArgKey(scope: seq[JoinScopeEntry], arg: SqlNode): string =
+  ## Normalized aggregate argument: `"*"` or `"scope.col"` (exact case).
+  if arg.isNil:
+    return "*"
+  if arg.kind == nkDot and arg.len >= 2:
+    let (si, canon) = resolveJoinQual(scope, nodeIdent(arg[0]),
+      groupColName(arg[1]))
+    return scope[si].scopeName & "." & canon
+  let (si, canon) = resolveJoinBare(scope, groupColName(arg))
+  scope[si].scopeName & "." & canon
+
+proc collectJoinHavingAggs(having: SqlNode, scope: seq[JoinScopeEntry],
+    outAggs: var seq[tuple[fn: string, argKey: string]]) =
+  ## Aggregate calls in HAVING over joins, deduped by normalized key.
+  if having.isNil: return
+  var stack = @[having]
+  while stack.len > 0:
+    let n = stack.pop()
+    if n.isNil: continue
+    if n.kind == nkCall and n.len >= 1 and n[0].kind == nkIdent:
+      let fn = n[0].strVal.toLowerAscii()
+      if fn in ["count", "sum", "avg", "min", "max"]:
+        var argKey = ""
+        if fn == "count" and n.len >= 2 and n[1].kind == nkIdent and
+            n[1].strVal == "*":
+          argKey = "*"
+        elif n.len >= 2:
+          if n[1].kind != nkIdent and n[1].kind != nkDot:
+            fail("unsupported aggregate argument in HAVING")
+          argKey = joinArgKey(scope, n[1])
+        else:
+          fail(fn.toUpperAscii & " requires an argument")
+        var seen = false
+        for a in outAggs:
+          if a.fn == fn and a.argKey.toLowerAscii() == argKey.toLowerAscii():
+            seen = true
+            break
+        if not seen:
+          outAggs.add((fn, argKey))
+        continue
+      else:
+        fail("unsupported function '" & n[0].strVal & "' in HAVING")
+    if n.kind notin {nkIdent, nkQuotedIdent, nkStringLit, nkBitStringLit,
+        nkHexStringLit, nkIntegerLit, nkNumericLit, nkPlaceholder, nkRaw}:
+      for c in n.sons:
+        stack.add(c)
+
 proc planJoinSelect(eng: SqlEngine, root: SqlNode, isDistinct: bool,
     phs: var seq[string], stmt: var CompiledStmt) =
-  ## Parses a multi-table SELECT into `stmt` join fields. GROUP BY/HAVING
-  ## with JOINs fail; mixing plain columns and aggregates fails like the
-  ## single-table path. Placeholders collect in fixed order: ONs (join
-  ## order), WHERE, SELECT.
-  var fromNode, whereNode, orderNode, limitNode, offsetNode,
-    colsNode: SqlNode = nil
+  ## Parses a multi-table SELECT into `stmt` join fields. Plain items must
+  ## be scope-resolved expressions; mixing plain columns and aggregates
+  ## fails like the single-table path unless GROUP BY/HAVING is present,
+  ## in which case plain items must be group keys and HAVING resolves to
+  ## aliases, group keys and aggregate calls. Placeholders collect in fixed
+  ## order: ONs (join order), WHERE, GROUP BY, SELECT, HAVING.
+  var fromNode, whereNode, groupNode, havingNode, orderNode, limitNode,
+    offsetNode, colsNode: SqlNode = nil
   for child in root.sons:
     case child.kind
     of nkSelectColumns:
@@ -1421,8 +1485,8 @@ proc planJoinSelect(eng: SqlEngine, root: SqlNode, isDistinct: bool,
     of nkFrom:
       fromNode = child
     of nkWhere: whereNode = child[0]
-    of nkGroup: fail("GROUP BY with JOIN is not supported yet")
-    of nkHaving: fail("GROUP BY with JOIN is not supported yet")
+    of nkGroup: groupNode = child
+    of nkHaving: havingNode = child[0]
     of nkOrder: orderNode = child
     of nkLimit: limitNode = child[0]
     of nkOffset: offsetNode = child[0]
@@ -1518,6 +1582,7 @@ proc planJoinSelect(eng: SqlEngine, root: SqlNode, isDistinct: bool,
         newNode(nkIdent, c.name)])
       plains.add((e, scp[ti].scopeName & "." & c.name))
       order.add("k" & $(plains.len - 1))
+  var starUsed = false
   for rawEntry in colsNode.sons:
     var aliasName = ""
     var entry = rawEntry
@@ -1526,10 +1591,12 @@ proc planJoinSelect(eng: SqlEngine, root: SqlNode, isDistinct: bool,
         aliasName = entry[1].nodeIdent()
       entry = entry[0]
     if entry.kind == nkIdent and entry.strVal == "*":
+      starUsed = true
       for ti in 0 ..< scope.len: addStar(scope, ti)
       continue
     if entry.kind == nkDot and entry.len >= 2 and
         groupColName(entry[1]) == "*":
+      starUsed = true
       let q = nodeIdent(entry[0])
       var si = -1
       for i, e in scope:
@@ -1574,10 +1641,104 @@ proc planJoinSelect(eng: SqlEngine, root: SqlNode, isDistinct: bool,
       else: outName = "col" & $plains.len
     plains.add((entry, outName))
     order.add("k" & $(plains.len - 1))
-  if aggs.len > 0 and plains.len > 0:
+  if aggs.len > 0 and plains.len > 0 and groupNode.isNil and
+      havingNode.isNil:
     fail("mixing aggregates with plain columns is not supported")
   if aggs.len == 0 and plains.len == 0:
     fail("SELECT requires select columns")
+  # GROUP BY over joins: plain items must be group keys, `*` rejected,
+  # HAVING resolves to aliases, group keys and aggregate calls.
+  var grouped = not groupNode.isNil or not havingNode.isNil
+  var groupExprs: seq[SqlNode] = @[]
+  var havingAggs: seq[tuple[fn: string, argKey: string]] = @[]
+  if grouped:
+    if not groupNode.isNil:
+      for g in groupNode.sons:
+        if g.kind != nkIdent and
+            not (g.kind == nkDot and g.len >= 2):
+          fail("GROUP BY expressions must be plain columns")
+        checkJoinExpr(g, scope)
+        groupExprs.add(g)
+    if starUsed:
+      fail("SELECT * with GROUP BY is not supported")
+    for p in plains:
+      var ok = false
+      for g in groupExprs:
+        if sameJoinRef(p.expr, g):
+          ok = true
+          break
+      if not ok:
+        fail("column '" & p.outName &
+          "' must appear in GROUP BY or be aggregated")
+    collectJoinHavingAggs(havingNode, scope, havingAggs)
+    if not havingNode.isNil:
+      var aliasLower: seq[string] = @[]
+      for p in plains: aliasLower.add(p.outName.toLowerAscii())
+      for a in aggs: aliasLower.add(a.outName.toLowerAscii())
+      var stack = @[havingNode]
+      while stack.len > 0:
+        let n = stack.pop()
+        if n.isNil: continue
+        if n.kind == nkCall and n.len >= 1 and n[0].kind == nkIdent and
+            n[0].strVal.toLowerAscii() in AggNames:
+          continue # args validated during collection
+        case n.kind
+        of nkInfix:
+          if n.len >= 3:
+            stack.add(n[1])
+            stack.add(n[2])
+          continue
+        of nkPrefix:
+          if n.len >= 2:
+            stack.add(n[1])
+          continue
+        of nkIdent:
+          case n.strVal.toLowerAscii()
+          of "null", "true", "false": discard
+          else:
+            if n.strVal.toLowerAscii() in aliasLower: discard
+            else:
+              var ok = false
+              for g in groupExprs:
+                if g.kind == nkIdent and g.strVal.toLowerAscii() ==
+                    n.strVal.toLowerAscii():
+                  ok = true
+                  break
+              if not ok:
+                fail("column '" & n.strVal &
+                  "' must appear in GROUP BY or be aggregated")
+          continue
+        of nkDot:
+          var ok = false
+          for g in groupExprs:
+            if sameJoinRef(n, g):
+              ok = true
+              break
+          if not ok:
+            fail("column '" & nodeIdent(n[0]) & "." & groupColName(n[1]) &
+              "' must appear in GROUP BY or be aggregated")
+          continue
+        of nkPlaceholder:
+          continue
+        of nkQuotedIdent, nkStringLit, nkBitStringLit, nkHexStringLit,
+           nkIntegerLit, nkNumericLit, nkRaw:
+          continue
+        else:
+          for c in n.sons:
+            stack.add(c)
+  var allAggs: seq[tuple[fn: string, argKey: string]] = @[]
+  if grouped:
+    for a in aggs:
+      allAggs.add((a.fn, joinArgKey(scope, a.arg)))
+    for h in havingAggs:
+      var seen = false
+      for x in allAggs:
+        if x.fn == h.fn and
+            x.argKey.toLowerAscii() == h.argKey.toLowerAscii():
+          seen = true
+          break
+      if not seen:
+        allAggs.add(h)
   # ORDER BY over SELECT outputs only (agg calls resolve like GROUP BY)
   var orderKeys: seq[(int, bool)] = @[]
   var projCols: seq[string] = @[]
@@ -1671,12 +1832,15 @@ proc planJoinSelect(eng: SqlEngine, root: SqlNode, isDistinct: bool,
     if not offsetNode.isNil: offsetVal = offsetNode.strVal.parseBiggestInt.int64
   except ValueError:
     fail("LIMIT/OFFSET must be integer literals")
-  # placeholders in fixed order: ONs, WHERE, SELECT
+  # placeholders in fixed order: ONs, WHERE, GROUP BY, SELECT, HAVING
   for on in ons:
     if not on.isNil: collectJoinPh(on, phs)
   if not whereNode.isNil: collectJoinPh(whereNode, phs)
+  if grouped and not groupNode.isNil:
+    for g in groupNode.sons: collectJoinPh(g, phs)
   for rawEntry in colsNode.sons:
     collectJoinPh(rawEntry, phs)
+  if grouped and not havingNode.isNil: collectJoinPh(havingNode, phs)
   stmt.isJoin = true
   stmt.joinTables = tables
   stmt.joinScopes = scopes
@@ -1689,6 +1853,10 @@ proc planJoinSelect(eng: SqlEngine, root: SqlNode, isDistinct: bool,
   var jaggs: seq[tuple[fn: string, arg: SqlNode, outName: string]] = @[]
   for a in aggs: jaggs.add((a[0], a[1], a[2]))
   stmt.joinAggs = jaggs
+  if grouped:
+    stmt.joinGroupExprs = groupExprs
+    stmt.joinGroupHaving = havingNode
+    stmt.joinGroupAllAggs = allAggs
   stmt.projCols = projCols
   stmt.orderKeys = orderKeys
   stmt.hiddenCols = 0
@@ -2348,6 +2516,11 @@ proc execJoinStmt(eng: SqlEngine, stmt: CompiledStmt,
   ## joined row, then plain projection or group-less aggregation into
   ## `ctx.results` for `postProcessSelect`.
 
+proc execJoinGroupedStmt(eng: SqlEngine, stmt: CompiledStmt,
+    params: openArray[Value]): Value
+  ## Forward declaration: GROUP BY over joins. Same nested-loop row source
+  ## as `execJoinStmt`, then hash-grouping, per-group aggregates, HAVING.
+
 type FastCx = object
   tbl: DbTable
   phIdx: Table[pointer, int]
@@ -2941,7 +3114,10 @@ proc fastSelect(eng: SqlEngine, root: SqlNode, cx: FastCx): ExecResult =
     var stmt = CompiledStmt(kind: skSelect)
     var dummyPhs: seq[string] = @[]
     planJoinSelect(eng, root, isDistinct, dummyPhs, stmt)
-    discard eng.execJoinStmt(stmt, cx.params)
+    if stmt.joinGroupExprs.len > 0 or not stmt.joinGroupHaving.isNil:
+      discard eng.execJoinGroupedStmt(stmt, cx.params)
+    else:
+      discard eng.execJoinStmt(stmt, cx.params)
     return eng.postProcessSelect(stmt)
   if tableName.len == 0:
     fail("SELECT requires a FROM clause")
@@ -3670,6 +3846,353 @@ proc execJoinStmt(eng: SqlEngine, stmt: CompiledStmt,
   eng.ctx.affected = int64(eng.ctx.results.len)
   nil
 
+proc rebuildJoinScope(eng: SqlEngine,
+    stmt: CompiledStmt): seq[JoinScopeEntry] =
+  ## Re-resolves a cached join plan's tables (schemas may have changed since
+  ## lowering only through DDL, which clears the plan cache).
+  var tbls: seq[DbTable] = @[]
+  for tn in stmt.joinTables:
+    if not eng.ctx.store.hasTable(tn):
+      fail("no such table: " & tn)
+    tbls.add(eng.ctx.store.getTable(tn).get())
+  for i in 0 ..< tbls.len:
+    result.add((stmt.joinScopes[i], stmt.joinTables[i], tbls[i]))
+
+proc evalJoinHaving(cx: FastCx, n: SqlNode, keyVals: seq[Value],
+    groupExprs: seq[SqlNode], aliases: Table[string, Value],
+    aggVals: seq[Value], allAggs: seq[tuple[fn: string, argKey: string]],
+    scope: seq[JoinScopeEntry]): tuple[ok: bool, v: Value] =
+  ## HAVING evaluator over one joined group. Idents resolve to SELECT
+  ## aliases or GROUP BY key expressions (bare idents match ident keys,
+  ## qualified dots match dot keys); aggregate calls read precomputed
+  ## `aggVals`. Operators mirror `evalJoinCell`.
+  case n.kind
+  of nkIntegerLit:
+    try: (true, initValue(n.strVal.parseBiggestInt.int64))
+    except ValueError: (false, nil)
+  of nkNumericLit:
+    if '.' in n.strVal or 'e' in n.strVal.toLowerAscii():
+      try: (true, initValue(parseFloat(n.strVal)))
+      except ValueError: (false, nil)
+    else:
+      try: (true, initValue(n.strVal.parseBiggestInt.int64))
+      except ValueError: (false, nil)
+  of nkStringLit: (true, initValue(n.strVal))
+  of nkIdent:
+    case n.strVal.toLowerAscii()
+    of "null": (true, nil)
+    of "true": (true, initValue(true))
+    of "false": (true, initValue(false))
+    else:
+      let k = n.strVal.toLowerAscii()
+      if aliases.hasKey(k):
+        return (true, aliases[k])
+      for i, g in groupExprs:
+        if g.kind == nkIdent and g.strVal.toLowerAscii() == k:
+          return (true, keyVals[i])
+      (false, nil)
+  of nkDot:
+    if n.len < 2: return (false, nil)
+    for i, g in groupExprs:
+      if sameJoinRef(n, g):
+        return (true, keyVals[i])
+    (false, nil)
+  of nkPlaceholder: (true, takePh(cx, n))
+  of nkCall:
+    if n.len >= 1 and n[0].kind == nkIdent:
+      let fn = n[0].strVal.toLowerAscii()
+      var key = ""
+      if fn == "count" and n.len >= 2 and n[1].kind == nkIdent and
+          n[1].strVal == "*":
+        key = "*"
+      elif n.len >= 2 and
+          (n[1].kind == nkIdent or n[1].kind == nkDot):
+        key = joinArgKey(scope, n[1])
+      else:
+        return (false, nil)
+      for i, a in allAggs:
+        if a.fn == fn and a.argKey.toLowerAscii() == key.toLowerAscii():
+          return (true, aggVals[i])
+    (false, nil)
+  of nkPrefix:
+    if n.len < 2: return (false, nil)
+    case n[0].strVal.toLowerAscii()
+    of "-":
+      let (ok, x) = evalJoinHaving(cx, n[1], keyVals, groupExprs, aliases,
+        aggVals, allAggs, scope)
+      if not ok: return (false, nil)
+      (true, sqlArithFast(SqlArithSub.int, initValue(0'i64), x))
+    of "+":
+      evalJoinHaving(cx, n[1], keyVals, groupExprs, aliases, aggVals,
+        allAggs, scope)
+    of "not":
+      let (ok, x) = evalJoinHaving(cx, n[1], keyVals, groupExprs, aliases,
+        aggVals, allAggs, scope)
+      if not ok or x == nil or x.typeId != tyBool: return (false, nil)
+      (true, initValue(not x.boolVal))
+    else: (false, nil)
+  of nkInfix:
+    if n.len < 3: return (false, nil)
+    let op = n[0].strVal.toLowerAscii()
+    case op
+    of "=", "!=", "<>", "<", "<=", ">", ">=":
+      let (okL, a) = evalJoinHaving(cx, n[1], keyVals, groupExprs, aliases,
+        aggVals, allAggs, scope)
+      let (okR, b) = evalJoinHaving(cx, n[2], keyVals, groupExprs, aliases,
+        aggVals, allAggs, scope)
+      if not okL or not okR: return (false, nil)
+      let mode =
+        case op
+        of "=": SqlCmpEq.int
+        of "<": SqlCmpLt.int
+        of "<=": SqlCmpLe.int
+        of ">": SqlCmpGt.int
+        of ">=": SqlCmpGe.int
+        else: SqlCmpNe.int
+      (true, initValue(sqlCmpFast(mode, a, b)))
+    of "is":
+      let (ok, x) = evalJoinHaving(cx, n[1], keyVals, groupExprs, aliases,
+        aggVals, allAggs, scope)
+      if not ok: return (false, nil)
+      (true, initValue(x == nil))
+    of "is not":
+      let (ok, x) = evalJoinHaving(cx, n[1], keyVals, groupExprs, aliases,
+        aggVals, allAggs, scope)
+      if not ok: return (false, nil)
+      (true, initValue(x != nil))
+    of "and":
+      let (okL, a) = evalJoinHaving(cx, n[1], keyVals, groupExprs, aliases,
+        aggVals, allAggs, scope)
+      if not okL: return (false, nil)
+      if not vmTruthFast(a): return (true, initValue(false))
+      let (okR, b) = evalJoinHaving(cx, n[2], keyVals, groupExprs, aliases,
+        aggVals, allAggs, scope)
+      if not okR: return (false, nil)
+      (true, initValue(vmTruthFast(b)))
+    of "or":
+      let (okL, a) = evalJoinHaving(cx, n[1], keyVals, groupExprs, aliases,
+        aggVals, allAggs, scope)
+      if not okL: return (false, nil)
+      if vmTruthFast(a): return (true, initValue(true))
+      let (okR, b) = evalJoinHaving(cx, n[2], keyVals, groupExprs, aliases,
+        aggVals, allAggs, scope)
+      if not okR: return (false, nil)
+      (true, initValue(vmTruthFast(b)))
+    of "+", "-", "*", "/":
+      let (okL, a) = evalJoinHaving(cx, n[1], keyVals, groupExprs, aliases,
+        aggVals, allAggs, scope)
+      let (okR, b) = evalJoinHaving(cx, n[2], keyVals, groupExprs, aliases,
+        aggVals, allAggs, scope)
+      if not okL or not okR: return (false, nil)
+      let mode = case op
+        of "+": SqlArithAdd.int
+        of "-": SqlArithSub.int
+        of "*": SqlArithMul.int
+        else: SqlArithDiv.int
+      (true, sqlArithFast(mode, a, b))
+    else: (false, nil)
+  of nkSelectPair, nkPrGroup:
+    if n.len >= 1:
+      evalJoinHaving(cx, n[0], keyVals, groupExprs, aliases, aggVals,
+        allAggs, scope)
+    else: (false, nil)
+  else: (false, nil)
+
+proc execJoinGroupedStmt(eng: SqlEngine, stmt: CompiledStmt,
+    params: openArray[Value]): Value =
+  ## GROUP BY over joins: nested-loop over table snapshots, combined
+  ## ON/WHERE filter, hash-grouping by typed keys, per-group aggregates
+  ## with group-less NULL semantics, HAVING, then projection.
+  let scope = rebuildJoinScope(eng, stmt)
+  let N = scope.len
+  var cx = FastCx(tbl: scope[0].tbl, params: @params)
+  for on in stmt.joinOns:
+    if not on.isNil: walkPhFast(on, cx)
+  if not stmt.joinWhere.isNil: walkPhFast(stmt.joinWhere, cx)
+  for g in stmt.joinGroupExprs: walkPhFast(g, cx)
+  for k in stmt.joinKeys: walkPhFast(k.expr, cx)
+  if not stmt.joinGroupHaving.isNil: walkPhFast(stmt.joinGroupHaving, cx)
+  var snaps = newSeq[seq[RowData]](N)
+  for i in 0 ..< N:
+    for _, rec in scope[i].tbl.allRowsByPk:
+      snaps[i].add(rec)
+  var conds: seq[SqlNode] = @[]
+  for on in stmt.joinOns:
+    if not on.isNil: conds.add(on)
+  if not stmt.joinWhere.isNil: conds.add(stmt.joinWhere)
+  template rowMatches(m: RowData): bool =
+    var okAll = true
+    for cond in conds:
+      let (ok, fv) = evalJoinCell(cx, cond, m, scope)
+      if not ok:
+        fail("JOIN with this expression shape is not supported yet")
+      if not vmTruthFast(fv):
+        okAll = false
+        break
+    okAll
+  let nAggs = stmt.joinGroupAllAggs.len
+  var keyIndex = initTable[string, int]()
+  var gKeys: seq[seq[Value]] = @[]
+  var gRowCount: seq[int64] = @[]
+  var gAccs: seq[seq[GroupAggAcc]] = @[]
+  template newAccs(): seq[GroupAggAcc] =
+    var s = newSeq[GroupAggAcc](nAggs)
+    for i in 0 ..< nAggs:
+      s[i] = GroupAggAcc(sumAcc: initValue(0'i64))
+    s
+  template visitRow(m: RowData) =
+    var kv = newSeqOfCap[Value](stmt.joinGroupExprs.len)
+    for ge in stmt.joinGroupExprs:
+      let (ok, v) = evalJoinCell(cx, ge, m, scope)
+      if not ok:
+        fail("JOIN with this expression shape is not supported yet")
+      kv.add(v)
+    var key = ""
+    for v in kv: key.add(groupKeyEncode(v) & "\x1f")
+    var gi = keyIndex.getOrDefault(key, -1)
+    if gi < 0:
+      gi = gKeys.len
+      keyIndex[key] = gi
+      gKeys.add(kv)
+      gRowCount.add(0)
+      gAccs.add(newAccs())
+    inc gRowCount[gi]
+    for ai in 0 ..< nAggs:
+      let fn = stmt.joinGroupAllAggs[ai].fn
+      let ak = stmt.joinGroupAllAggs[ai].argKey
+      if fn == "count" and ak == "*":
+        continue
+      if not m.hasKey(ak):
+        continue
+      let v = toVmValue(m[ak])
+      if v == nil:
+        continue
+      case fn
+      of "count":
+        inc gAccs[gi][ai].countNonNull
+      of "sum", "avg":
+        if v.typeId in {tyInt, tyFloat}:
+          let acc = gAccs[gi][ai].sumAcc
+          let nv = if v.typeId == tyInt: v.intVal.float64 else: v.floatVal
+          if acc == nil or acc.typeId notin {tyInt, tyFloat}:
+            gAccs[gi][ai].sumAcc = initValue(nv)
+          elif acc.typeId == tyInt and v.typeId == tyInt:
+            gAccs[gi][ai].sumAcc = initValue(acc.intVal + v.intVal)
+          else:
+            let sv = if acc.typeId == tyInt: acc.intVal.float64
+                     else: acc.floatVal
+            gAccs[gi][ai].sumAcc = initValue(sv + nv)
+          if fn == "avg":
+            inc gAccs[gi][ai].avgCnt
+      of "min", "max":
+        let cur = if fn == "min": gAccs[gi][ai].minAcc
+                  else: gAccs[gi][ai].maxAcc
+        if cur == nil:
+          if fn == "min": gAccs[gi][ai].minAcc = v
+          else: gAccs[gi][ai].maxAcc = v
+        else:
+          template lessThan(x, y: Value): bool =
+            if x.typeId in {tyInt, tyFloat} and
+               y.typeId in {tyInt, tyFloat}:
+              let xn = if x.typeId == tyInt: x.intVal.float64 else: x.floatVal
+              let yn = if y.typeId == tyInt: y.intVal.float64 else: y.floatVal
+              xn < yn
+            elif x.typeId == tyString and y.typeId == tyString:
+              x.stringVal[] < y.stringVal[]
+            else: false
+          if fn == "min":
+            if lessThan(v, cur): gAccs[gi][ai].minAcc = v
+          else:
+            if lessThan(cur, v): gAccs[gi][ai].maxAcc = v
+      else: discard
+  if N > 0 and snaps.allIt(it.len > 0):
+    var idxs = newSeq[int](N)
+    var cur = newSeq[RowData](N)
+    while true:
+      for i in 0 ..< N: cur[i] = snaps[i][idxs[i]]
+      var m = initOrderedTable[string, rdbms.Value]()
+      for i in 0 ..< N:
+        for col, v in cur[i].pairs:
+          m[scope[i].scopeName & "." & col] = v
+      if rowMatches(m):
+        visitRow(m)
+      var p = N - 1
+      while p >= 0:
+        inc idxs[p]
+        if idxs[p] < snaps[p].len: break
+        idxs[p] = 0
+        dec p
+      if p < 0: break
+  eng.ctx.results.setLen(0)
+  if stmt.joinGroupExprs.len == 0 and gKeys.len == 0:
+    # global aggregation (HAVING without GROUP BY): a single empty group
+    gKeys.add(@[])
+    gRowCount.add(0)
+    gAccs.add(newAccs())
+  # SELECT agg -> allAggs index map (static per statement)
+  var selAggIdx: seq[int] = @[]
+  for sa in stmt.joinAggs:
+    let sk = if sa.arg.isNil: sa.fn.toLowerAscii() & "|*"
+             else: sa.fn.toLowerAscii() & "|" & joinArgKey(scope, sa.arg)
+    var idx = -1
+    for ai in 0 ..< nAggs:
+      let ak = stmt.joinGroupAllAggs[ai].fn & "|" &
+        stmt.joinGroupAllAggs[ai].argKey
+      if ak.toLowerAscii() == sk.toLowerAscii():
+        idx = ai
+        break
+    selAggIdx.add(idx)
+  # SELECT plain key -> group expr index map (validated to exist at plan)
+  var keyToGroup: seq[int] = @[]
+  for k in stmt.joinKeys:
+    var gi = -1
+    for i, g in stmt.joinGroupExprs:
+      if sameJoinRef(k.expr, g):
+        gi = i
+        break
+    keyToGroup.add(gi)
+  for gi in 0 ..< gKeys.len:
+    var aggVals = newSeqOfCap[Value](nAggs)
+    for ai in 0 ..< nAggs:
+      let fn = stmt.joinGroupAllAggs[ai].fn
+      let ak = stmt.joinGroupAllAggs[ai].argKey
+      case fn
+      of "count":
+        aggVals.add(initValue(
+          if ak == "*": gRowCount[gi] else: gAccs[gi][ai].countNonNull))
+      of "sum":
+        aggVals.add(gAccs[gi][ai].sumAcc)
+      of "avg":
+        aggVals.add(sqlArithFast(SqlArithDiv.int, gAccs[gi][ai].sumAcc,
+          initValue(gAccs[gi][ai].avgCnt)))
+      of "min":
+        aggVals.add(gAccs[gi][ai].minAcc)
+      else:
+        aggVals.add(gAccs[gi][ai].maxAcc)
+    var aliases = initTable[string, Value]()
+    for ki, k in stmt.joinKeys:
+      aliases[k.outName.toLowerAscii()] = gKeys[gi][keyToGroup[ki]]
+    for si, sa in stmt.joinAggs:
+      aliases[sa.outName.toLowerAscii()] = aggVals[selAggIdx[si]]
+    if not stmt.joinGroupHaving.isNil:
+      let (ok, hv) = evalJoinHaving(cx, stmt.joinGroupHaving, gKeys[gi],
+        stmt.joinGroupExprs, aliases, aggVals, stmt.joinGroupAllAggs, scope)
+      if not ok:
+        fail("unsupported HAVING expression")
+      if not vmTruthFast(hv):
+        continue
+    var outRow = newSeqOfCap[Value](stmt.joinOrder.len)
+    for o in stmt.joinOrder:
+      if o[0] == 'k':
+        let ki = parseInt(o[1 ..^ 1])
+        outRow.add(gKeys[gi][keyToGroup[ki]])
+      else:
+        let si = parseInt(o[1 ..^ 1])
+        outRow.add(aggVals[selAggIdx[si]])
+    eng.ctx.results.add(outRow)
+  eng.ctx.affected = int64(eng.ctx.results.len)
+  nil
+
 proc fastUpdate(eng: SqlEngine, root: SqlNode, cx: FastCx): ExecResult =
   checkNoJoin(root, "UPDATE")
   let tableName = nodeIdent(root[0])
@@ -3857,6 +4380,8 @@ proc runCompiled(eng: SqlEngine, stmt: CompiledStmt,
   if stmt.isGrouped:
     return eng.execGroupedStmt(stmt, params)
   if stmt.isJoin:
+    if stmt.joinGroupExprs.len > 0 or not stmt.joinGroupHaving.isNil:
+      return eng.execJoinGroupedStmt(stmt, params)
     return eng.execJoinStmt(stmt, params)
   when defined(boogieSqlDebug):
     echo "[run] procs=", stmt.script.procs.len,

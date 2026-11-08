@@ -1,4 +1,4 @@
-import std/[unittest, os, times, monotimes, strutils]
+import std/[unittest, os, times, monotimes, strutils, tables]
 import ../src/boogie/db_boogie
 import ../src/boogie/sqlengine
 import ../src/boogie/stores/rdbms
@@ -180,13 +180,6 @@ suite "join errors":
       discard db.getAllRows(sql"SELECT a.name FROM a LEFT OUTER JOIN b ON a.id = b.aid")
     db.close()
 
-  test "GROUP BY with JOIN is rejected clearly":
-    let db = open(":memory:", "", "", "")
-    seedAB(db)
-    expect DbError:
-      discard db.getAllRows(sql"SELECT a.name, COUNT(*) FROM a JOIN b ON a.id = b.aid GROUP BY a.name")
-    db.close()
-
   test "UPDATE and DELETE with JOIN are rejected clearly":
     let db = open(":memory:", "", "", "")
     seedAB(db)
@@ -211,4 +204,96 @@ suite "join errors":
       discard db.getAllRows(sql"SELECT * FROM l JOIN r USING (id, v)")
     expect DbError:
       discard db.getAllRows(sql"SELECT * FROM l CROSS JOIN r ON l.id = r.id")
+    db.close()
+
+suite "GROUP BY over joins":
+
+  proc seedDO(db: DbConn) =
+    db.exec(sql"CREATE TABLE d (id INTEGER PRIMARY KEY, name TEXT)")
+    db.exec(sql"CREATE TABLE o (id INTEGER PRIMARY KEY, did INT, amt INT)")
+    db.exec(sql"INSERT INTO d (name) VALUES ('a')")
+    db.exec(sql"INSERT INTO d (name) VALUES ('b')")
+    db.exec(sql"INSERT INTO d (name) VALUES ('c')")
+    db.exec(sql"INSERT INTO o (did, amt) VALUES (1, 10)")
+    db.exec(sql"INSERT INTO o (did, amt) VALUES (1, 20)")
+    db.exec(sql"INSERT INTO o (did, amt) VALUES (2, 5)")
+    db.exec(sql"INSERT INTO o (did, amt) VALUES (NULL, 7)")
+
+  test "grouped join basics":
+    let db = open(":memory:", "", "", "")
+    seedDO(db)
+    let rows = db.getAllRows(sql"SELECT d.name, COUNT(*), SUM(o.amt), MIN(o.amt), MAX(o.amt) FROM d JOIN o ON o.did = d.id GROUP BY d.name ORDER BY d.name")
+    check rows == @[@["a", "2", "30", "10", "20"], @["b", "1", "5", "5", "5"]]
+    db.close()
+
+  test "aliases, USING and WHERE with grouped join":
+    let db = open(":memory:", "", "", "")
+    seedDO(db)
+    let r1 = db.getAllRows(sql"SELECT x.name AS n, COUNT(*) AS c FROM d AS x JOIN o AS y ON y.did = x.id WHERE y.amt > 6 GROUP BY x.name ORDER BY c DESC")
+    check r1 == @[@["a", "2"]]
+    db.exec(sql"CREATE TABLE l (id INTEGER PRIMARY KEY, v INT)")
+    db.exec(sql"CREATE TABLE r (id INTEGER PRIMARY KEY, w INT)")
+    db.exec(sql"INSERT INTO l (v) VALUES (1)")
+    db.exec(sql"INSERT INTO r (w) VALUES (10)")
+    let r2 = db.getAllRows(sql"SELECT l.id, SUM(r.w) FROM l JOIN r USING (id) GROUP BY l.id")
+    check r2 == @[@["1", "10"]]
+    db.close()
+
+  test "HAVING over joins":
+    let db = open(":memory:", "", "", "")
+    seedDO(db)
+    check db.getAllRows(sql"SELECT d.name FROM d JOIN o ON o.did = d.id GROUP BY d.name HAVING COUNT(*) > 1") == @[@["a"]]
+    check db.getAllRows(sql"SELECT d.name FROM d JOIN o ON o.did = d.id GROUP BY d.name HAVING SUM(o.amt) > 100") == newSeq[seq[string]]()
+    check db.getAllRows(sql"SELECT COUNT(*) FROM d, o HAVING COUNT(*) = 12").len == 1
+    check db.getAllRows(sql"SELECT COUNT(*) FROM d, o HAVING COUNT(*) = 1").len == 0
+    db.close()
+
+  test "HAVING placeholders and group-key refs":
+    let db = open(":memory:", "", "", "")
+    seedDO(db)
+    let ps = db.prepare("SELECT d.name, COUNT(*) AS c FROM d JOIN o ON o.did = d.id GROUP BY d.name HAVING SUM(o.amt) > ? AND d.name <> ? ORDER BY c")
+    ps.bindParam(1, 6)
+    ps.bindParam(2, "b")
+    check db.getAllRows(ps) == @[@["a", "2"]]
+    db.close()
+
+  test "NULL group keys over joins":
+    let db = open(":memory:", "", "", "")
+    db.exec(sql"CREATE TABLE t1 (id INTEGER PRIMARY KEY, k TEXT)")
+    db.exec(sql"CREATE TABLE t2 (id INTEGER PRIMARY KEY, k TEXT, v INT)")
+    db.exec(sql"INSERT INTO t1 (k) VALUES ('a')")
+    db.exec(sql"INSERT INTO t2 (k, v) VALUES ('a', 1)")
+    db.exec(sql"INSERT INTO t2 (k, v) VALUES (NULL, 2)")
+    let rows = db.getAllRows(sql"SELECT t2.k, COUNT(t2.v) FROM t1 JOIN t2 ON t1.k = t2.k OR t2.k IS NULL GROUP BY t2.k ORDER BY COUNT(t2.v) DESC")
+    check rows.len == 2
+    var seen = initTable[string, string]()
+    for r in rows: seen[r[0]] = r[1]
+    check seen["a"] == "1"
+    check seen[""] == "1"
+    db.close()
+
+  test "grouped join via multi-statement VM path":
+    let store = newInMemoryStore()
+    var eng = newSqlEngine(store)
+    discard eng.execSql("CREATE TABLE d (id INTEGER PRIMARY KEY, name TEXT)")
+    discard eng.execSql("CREATE TABLE o (id INTEGER PRIMARY KEY, did INT)")
+    discard eng.execSql("INSERT INTO d (name) VALUES ('a')")
+    discard eng.execSql("INSERT INTO o (did) VALUES (1)")
+    discard eng.execSql("INSERT INTO o (did) VALUES (1)")
+    let r = eng.execSql("SELECT id FROM d WHERE id < 0; SELECT d.name, COUNT(*) AS c FROM d JOIN o ON o.did = d.id GROUP BY d.name HAVING c = 2")
+    check r.columns == @["name", "c"]
+    check r.rows == @[@["a", "2"]]
+    store.close()
+
+  test "grouped join errors":
+    let db = open(":memory:", "", "", "")
+    seedDO(db)
+    expect DbError: # SELECT * with GROUP BY
+      discard db.getAllRows(sql"SELECT * FROM d JOIN o ON o.did = d.id GROUP BY d.name")
+    expect DbError: # non-grouped plain column
+      discard db.getAllRows(sql"SELECT o.amt, COUNT(*) FROM d JOIN o ON o.did = d.id GROUP BY d.name")
+    expect DbError: # HAVING on non-group, non-agg column
+      discard db.getAllRows(sql"SELECT d.name FROM d JOIN o ON o.did = d.id GROUP BY d.name HAVING o.amt > 1")
+    expect DbError: # no such scope in GROUP BY
+      discard db.getAllRows(sql"SELECT d.name, COUNT(*) FROM d JOIN o ON o.did = d.id GROUP BY z.name")
     db.close()

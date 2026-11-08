@@ -294,8 +294,8 @@ UNIQUE enforced), multi-row `INSERT` with serial primary keys, `SELECT` with
 `WHERE`/`ORDER BY`/`LIMIT`/`OFFSET`/`DISTINCT`, `GROUP BY` over plain columns
 with `HAVING` (aggregates `COUNT`/`SUM`/`AVG`/`MIN`/`MAX`, `ORDER BY` over
 SELECT outputs), `INNER`/`CROSS JOIN` (aliases, `ON`/`USING`, qualified refs,
-aggregates over joins; `GROUP BY` + `JOIN` not yet), `UPDATE ... SET ...
-WHERE`, `DELETE FROM ... WHERE`,
+aggregates and `GROUP BY`/`HAVING` over joins), `UPDATE ... SET ... WHERE`,
+`DELETE FROM ... WHERE`,
 aggregates without GROUP BY, and expressions with comparisons, `AND`/`OR`/
 `NOT`, arithmetic, `IS [NOT] NULL` and `?`/`$n` placeholders. Subqueries
 are not supported yet.
@@ -324,5 +324,5 @@ are not supported yet.
 - 👋 Wanna help? [Fork it!](https://github.com/openpeeps/boogie/fork)
 
 ### 🎩 License
-LGPLv3 license. [Made by Humans from OpenPeeps](https://github.com/openpeeps).<br>
+MIT license. [Made by Humans from OpenPeeps](https://github.com/openpeeps).<br>
 Copyright OpenPeeps & Contributors &mdash; All rights reserved.
