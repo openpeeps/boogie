@@ -338,8 +338,10 @@ proc tryBuildPred*(whereNode: SqlNode, tbl: DbTable): tuple[ok: bool,
 # Code generation: stack machine over unboxed slots.
 #
 # Conventions: leaves (value, null) in (r10, r11) / (x9, x10); binary ops
-# spill the left side to the scratch area and hold the right side in
-# (rcx, rdx) / (x11, x12). Slot `i` lives at [base + i*8].
+# spill the left side to the scratch area into (rcx, rdx) / (x11, x12)
+# and hold the right side in (r10, r11) / (x9, x10).
+# So `cmp rcx, r10` / `cmp x11, x9` and `sub rax, r10` / `subs x9, x11, x9`
+# both mean left op right. Slot `i` lives at [base + i*8].
 # ---------------------------------------------------------------------------
 
 type JitGen* = object
@@ -606,7 +608,7 @@ proc genNodeArm*(a: var Assembler, g: var JitGen, n: JitNode) =
       b.ne fwd(lf)
       cmp x12, 0
       b.ne fwd(lf)
-      cmp x9, x11
+      cmp x11, x9
     case n.cmpMode
     of JitCmpEq:
       dynasm a:
@@ -664,12 +666,12 @@ proc genNodeArm*(a: var Assembler, g: var JitGen, n: JitNode) =
       of JitArithAdd:
         dynasm a:
           arch aarch64
-          adds x9, x9, x11
+          adds x9, x11, x9
           b.vs fwd("jit_ovf")
       of JitArithSub:
         dynasm a:
           arch aarch64
-          subs x9, x9, x11
+          subs x9, x11, x9
           b.vs fwd("jit_ovf")
       else:
         # 64-bit multiply overflow without smulh: reject the INT64_MIN
@@ -703,11 +705,11 @@ proc genNodeArm*(a: var Assembler, g: var JitGen, n: JitNode) =
       of JitArithAdd:
         dynasm a:
           arch aarch64
-          add x9, x9, x11
+          add x9, x11, x9
       of JitArithSub:
         dynasm a:
           arch aarch64
-          sub x9, x9, x11
+          sub x9, x11, x9
       else:
         dynasm a:
           arch aarch64
