@@ -293,10 +293,12 @@ NOT NULL, DEFAULT), `DROP TABLE [IF EXISTS]`, `CREATE [UNIQUE] INDEX
 UNIQUE enforced), multi-row `INSERT` with serial primary keys, `SELECT` with
 `WHERE`/`ORDER BY`/`LIMIT`/`OFFSET`/`DISTINCT`, `GROUP BY` over plain columns
 with `HAVING` (aggregates `COUNT`/`SUM`/`AVG`/`MIN`/`MAX`, `ORDER BY` over
-SELECT outputs), `UPDATE ... SET ... WHERE`, `DELETE FROM ... WHERE`,
+SELECT outputs), `INNER`/`CROSS JOIN` (aliases, `ON`/`USING`, qualified refs,
+aggregates over joins; `GROUP BY` + `JOIN` not yet), `UPDATE ... SET ...
+WHERE`, `DELETE FROM ... WHERE`,
 aggregates without GROUP BY, and expressions with comparisons, `AND`/`OR`/
-`NOT`, arithmetic, `IS [NOT] NULL` and `?`/`$n` placeholders. JOINs and
-subqueries are not supported yet.
+`NOT`, arithmetic, `IS [NOT] NULL` and `?`/`$n` placeholders. Subqueries
+are not supported yet.
 
 > Statements are parsed once per connection and cached; `exec()` binds its
 > arguments as typed values so repeated calls hit the plan cache.
