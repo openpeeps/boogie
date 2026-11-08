@@ -40,7 +40,10 @@ type
     woDeleteRow,
     woUpdateRow,
     woCreateIndex,
-    woDropIndex
+    woDropIndex,
+    woAlterAddColumn,
+    woAlterRenameColumn,
+    woAlterRenameTable
 
   WalEntry* = object
     ## A single WAL entry representing a change to the database

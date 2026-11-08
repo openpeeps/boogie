@@ -39,15 +39,16 @@ export vm.initValue
 ##   placeholders map to named VM globals so rebinding never recompiles.
 ##
 ## Supported statement subset (v1): CREATE TABLE [IF NOT EXISTS] with column
-## types/PRIMARY KEY/NOT NULL/DEFAULT, DROP TABLE [IF EXISTS],
+## types/PRIMARY KEY/NOT NULL/DEFAULT/inline REFERENCES, DROP TABLE
+## [IF EXISTS], ALTER TABLE ... ADD COLUMN / RENAME COLUMN / RENAME TO,
 ## CREATE [UNIQUE] INDEX [IF NOT EXISTS] / DROP INDEX [IF EXISTS]
 ## (single-column), INSERT with multiple rows and serial primary keys, SELECT
 ## with WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT over single
 ## tables and INNER/CROSS JOINs with ON/USING (incl. GROUP BY/HAVING over
 ## joins), UPDATE ... SET ... WHERE and DELETE FROM ... WHERE. Expressions
 ## support literals, columns, placeholders, comparisons, AND/OR/NOT,
-## IS [NOT] NULL, IN (list) and arithmetic. Subqueries and ALTER are
-## not supported.
+## IS [NOT] NULL, IN (list) and arithmetic. Subqueries, DROP COLUMN and
+## ALTER COLUMN variants are not supported.
 
 type
   SqlEngineError* = object of CatchableError
@@ -56,7 +57,7 @@ type
 
   StmtKind* = enum
     skSelect, skInsert, skUpdate, skDelete, skCreateTable, skDropTable,
-    skCreateIndex, skDropIndex
+    skCreateIndex, skDropIndex, skAlterTable
 
   ExecResult* = object
     kind*: StmtKind
@@ -249,6 +250,22 @@ proc nodeIdent(n: SqlNode): string =
   of nkIdent, nkQuotedIdent, nkIntegerLit, nkNumericLit, nkStringLit, nkRaw:
     n.strVal
   else: ""
+
+proc defaultJsonFromNode(n: SqlNode): JsonNode =
+  ## DEFAULT literal shared by CREATE and ALTER TABLE. Returns the JSON
+  ## value (callers persist it as JSON *text* so WAL and snapshot payloads
+  ## stay consistent).
+  case n.kind
+  of nkIntegerLit: %*parseBiggestInt(n.strVal)
+  of nkNumericLit: %*parseFloat(n.strVal)
+  of nkStringLit: %*n.strVal
+  of nkIdent:
+    case n.strVal.toLowerAscii()
+    of "true": %*true
+    of "false": %*false
+    of "null": newJNull()
+    else: fail("unsupported DEFAULT value")
+  else: fail("unsupported DEFAULT value")
 
 #
 # runtime context / foreign procs
@@ -455,7 +472,7 @@ proc makeForeignProcs(ctx: SqlExecCtx): seq[(string, int, bool, ForeignProc)] =
     ## Schema JSON contract:
     ## {"name": ..., "pk": ..., "serial": bool,
     ##  "cols": [{"name":..., "kind":"dtInt"|..., "nullable":bool,
-    ##            "default": <raw json literal>, ...]}]}
+    ##            "default": "<json text>", ...}]}]}
     when defined(boogieSqlDebug):
       echo "[fCreateTable] raw=", args[0].stringVal[]
     let spec = args[0].stringVal[].parseJson()
@@ -469,12 +486,26 @@ proc makeForeignProcs(ctx: SqlExecCtx): seq[(string, int, bool, ForeignProc)] =
           parseEnum[DataType](c["kind"].getStr()),
           c["nullable"].getBool(true))
         if c.hasKey("default"):
-          def.defaultValue = $c["default"]
+          def.defaultValue = c["default"].getStr()
         cols.add(def)
+      var fks: seq[ForeignKeyDef] = @[]
+      if spec.hasKey("foreignKeys"):
+        for fk in spec["foreignKeys"]:
+          var refCol = fk["refColumn"].getStr()
+          if refCol.len == 0:
+            # bare REFERENCES table means the parent primary key
+            if not ctx.store.hasTable(fk["refTable"].getStr()):
+              fail("foreign key references unknown table '" &
+                fk["refTable"].getStr() & "'")
+            refCol = ctx.store.getTable(fk["refTable"].getStr()).get()
+              .primaryKey
+          fks.add(newForeignKey(
+            fk["name"].getStr(), fk["column"].getStr(),
+            fk["refTable"].getStr(), refCol))
       let mode = if spec["serial"].getBool(false): pkmSerial else: pkmManual
       ctx.store.createTableIfNotExist(newTable(
         name = name, primaryKey = spec["pk"].getStr(),
-        columns = cols, primaryKeyMode = mode))
+        columns = cols, primaryKeyMode = mode, foreignKeys = fks))
       inc ctx.affected
     initValue(if created: 1'i64 else: 0'i64)
 
@@ -524,6 +555,37 @@ proc makeForeignProcs(ctx: SqlExecCtx): seq[(string, int, bool, ForeignProc)] =
     inc ctx.affected
     initValue(1'i64)
 
+  proc fAlterAddColumn(args: StackView, argc: int): Value =
+    ## Args: tableName, column-spec JSON (same shape as CREATE TABLE cols:
+    ## {"name", "kind", "nullable", "default"? with JSON-text default).
+    let tableName = args[0].stringVal[]
+    if not ctx.store.hasTable(tableName):
+      fail("no such table: " & tableName)
+    let c = args[1].stringVal[].parseJson()
+    var col = newColumn(
+      c["name"].getStr(),
+      parseEnum[DataType](c["kind"].getStr()),
+      c["nullable"].getBool(true))
+    if c.hasKey("default"):
+      col.defaultValue = c["default"].getStr()
+    ctx.store.addColumn(tableName, col)
+    inc ctx.affected
+    initValue(1'i64)
+
+  proc fAlterRenameColumn(args: StackView, argc: int): Value =
+    let tableName = args[0].stringVal[]
+    if not ctx.store.hasTable(tableName):
+      fail("no such table: " & tableName)
+    ctx.store.renameColumn(tableName, args[1].stringVal[],
+      args[2].stringVal[])
+    inc ctx.affected
+    initValue(1'i64)
+
+  proc fAlterRenameTable(args: StackView, argc: int): Value =
+    ctx.store.renameTable(args[0].stringVal[], args[1].stringVal[])
+    inc ctx.affected
+    initValue(1'i64)
+
   @[
     ("sql_null", 0, true, ForeignProc(fNull)),
     ("sql_scan_open", 1, true, ForeignProc(fScanOpen)),
@@ -539,6 +601,9 @@ proc makeForeignProcs(ctx: SqlExecCtx): seq[(string, int, bool, ForeignProc)] =
     ("sql_drop_table", 2, true, ForeignProc(fDropTable)),
     ("sql_create_index", 5, true, ForeignProc(fCreateIndex)),
     ("sql_drop_index", 2, true, ForeignProc(fDropIndex)),
+    ("sql_alter_add_column", 2, true, ForeignProc(fAlterAddColumn)),
+    ("sql_alter_rename_column", 3, true, ForeignProc(fAlterRenameColumn)),
+    ("sql_alter_rename_table", 2, true, ForeignProc(fAlterRenameTable)),
   ]
 
 #
@@ -2344,9 +2409,11 @@ proc compileDdl(l: var Lowerer, root: SqlNode): CompiledStmt =
     var pkCol = ""
     var serial = false
     var colSpecs = newJArray()
+    var fkSpecs = newJArray()
     for child in root.sons[1 ..^ 1]:
       if child.kind != nkColumnDef:
-        continue
+        fail("table-level constraints are not supported yet " &
+          "(use inline REFERENCES)")
       let colName = nodeIdent(child[0])
       let typeName = nodeIdent(child[1])
       let kind = sqlTypeToKind(typeName)
@@ -2360,17 +2427,29 @@ proc compileDdl(l: var Lowerer, root: SqlNode): CompiledStmt =
         of nkNotNull:
           nullable = false
         of nkDefault:
-          case con[0].kind
-          of nkIntegerLit: defaultJson = %*parseBiggestInt(con[0].strVal)
-          of nkNumericLit: defaultJson = %*parseFloat(con[0].strVal)
-          of nkStringLit: defaultJson = %*con[0].strVal
-          of nkIdent:
-            case con[0].strVal.toLowerAscii()
-            of "true": defaultJson = %*true
-            of "false": defaultJson = %*false
-            of "null": defaultJson = newJNull()
-            else: fail("unsupported DEFAULT value")
-          else: fail("unsupported DEFAULT value")
+          if con.len == 0:
+            fail("unsupported DEFAULT value")
+          defaultJson = defaultJsonFromNode(con[0])
+        of nkReferences:
+          # inline REFERENCES table [(col)] [ON DELETE action]
+          if con.len == 0:
+            fail("REFERENCES requires a table name")
+          let refTable = nodeIdent(con[0])
+          if refTable.len == 0:
+            fail("REFERENCES requires a table name")
+          var refCol = ""
+          for rc in con.sons[1 ..^ 1]:
+            if rc.kind == nkColumnList and rc.len > 0:
+              refCol = nodeIdent(rc[0])
+            elif rc.kind == nkOnDelete:
+              if rc.len == 0 or
+                  rc[0].strVal.toLowerAscii() notin ["restrict", "no action"]:
+                fail("only RESTRICT foreign keys are supported")
+            elif rc.kind == nkOnUpdate:
+              fail("only RESTRICT foreign keys are supported")
+          fkSpecs.add(%*{"name": "fk_" & name & "_" & colName,
+            "column": colName, "refTable": refTable,
+            "refColumn": refCol, "onDelete": "fkaRestrict"})
         else: discard
       if hasPk:
         if pkCol.len > 0:
@@ -2381,12 +2460,14 @@ proc compileDdl(l: var Lowerer, root: SqlNode): CompiledStmt =
         nullable = false
       var spec = %*{"name": colName, "kind": $kind, "nullable": nullable}
       if defaultJson != nil:
-        spec["default"] = defaultJson
+        # persisted as JSON text (WAL and snapshot payloads carry strings)
+        spec["default"] = %($defaultJson)
       colSpecs.add(spec)
     if pkCol.len == 0:
       fail("CREATE TABLE requires a PRIMARY KEY column")
     let schemaJson = $(%*{
-      "name": name, "pk": pkCol, "serial": serial, "cols": colSpecs})
+      "name": name, "pk": pkCol, "serial": serial, "cols": colSpecs,
+      "foreignKeys": fkSpecs})
     discard l.pushS(schemaJson)
     l.callF("sql_create_table")
     l.ch.emit(opcDiscard); l.ch.emit(1'u8)
@@ -2474,6 +2555,87 @@ proc compileDdl(l: var Lowerer, root: SqlNode): CompiledStmt =
     l.ch.emit(opcHalt)
     CompiledStmt(
       kind: skDropIndex,
+      script: l.script,
+      chunk: l.ch,
+      placeholders: l.placeholders
+    )
+  of nkAlterTable:
+    # NOTE: the parser silently drops DROP COLUMN clauses (no action node
+    # is attached), so an action-less ALTER fails here instead of
+    # succeeding as a no-op.
+    let tableName = nodeIdent(root[0])
+    discard l.mustTable(tableName)
+    if root.len < 2:
+      fail("ALTER TABLE requires an action (note: DROP COLUMN is not " &
+        "supported by this parser version)")
+    for ai in 1 ..< root.len:
+      let act = root[ai]
+      case act.kind
+      of nkAlterAddColumn:
+        if act.len == 0 or act[0].kind != nkColumnDef:
+          fail("unsupported ALTER TABLE action")
+        let def = act[0]
+        let colName = nodeIdent(def[0])
+        if colName.len == 0:
+          fail("ADD COLUMN requires a column name")
+        var kind = dtText
+        if def.len >= 2 and nodeIdent(def[1]).len > 0:
+          kind = sqlTypeToKind(nodeIdent(def[1]))
+        var nullable = true
+        var defaultJson: JsonNode = nil
+        if def.len > 2:
+          for con in def.sons[2 ..^ 1]:
+            case con.kind
+            of nkNotNull:
+              nullable = false
+            of nkNull:
+              discard
+            of nkDefault:
+              if con.len == 0:
+                fail("unsupported DEFAULT value")
+              defaultJson = defaultJsonFromNode(con[0])
+            of nkPrimaryKey:
+              fail("cannot add a PRIMARY KEY column to an existing table")
+            of nkUnique:
+              fail("UNIQUE in ADD COLUMN is not supported yet " &
+                "(use CREATE UNIQUE INDEX)")
+            else:
+              fail("unsupported column constraint")
+        var spec = %*{"name": colName, "kind": $kind,
+          "nullable": nullable}
+        if defaultJson != nil:
+          spec["default"] = %($defaultJson)
+        discard l.pushS(tableName)
+        discard l.pushS($spec)
+        l.callF("sql_alter_add_column")
+        l.ch.emit(opcDiscard); l.ch.emit(1'u8)
+      of nkAlterRenameColumn:
+        if act.len < 2:
+          fail("unsupported ALTER TABLE action")
+        let oldName = nodeIdent(act[0])
+        let newName = nodeIdent(act[1])
+        if oldName.len == 0 or newName.len == 0:
+          fail("RENAME COLUMN requires old and new names")
+        discard l.pushS(tableName)
+        discard l.pushS(oldName)
+        discard l.pushS(newName)
+        l.callF("sql_alter_rename_column")
+        l.ch.emit(opcDiscard); l.ch.emit(1'u8)
+      of nkAlterRenameTable:
+        if act.len < 1:
+          fail("unsupported ALTER TABLE action")
+        let newName = nodeIdent(act[0])
+        if newName.len == 0:
+          fail("RENAME TO requires a table name")
+        discard l.pushS(tableName)
+        discard l.pushS(newName)
+        l.callF("sql_alter_rename_table")
+        l.ch.emit(opcDiscard); l.ch.emit(1'u8)
+      else:
+        fail("unsupported ALTER TABLE action")
+    l.ch.emit(opcHalt)
+    CompiledStmt(
+      kind: skAlterTable,
       script: l.script,
       chunk: l.ch,
       placeholders: l.placeholders
@@ -4478,7 +4640,8 @@ proc compileRoots(eng: SqlEngine, sqlText: string,
       of nkCreateTable, nkCreateTableIfNotExists,
          nkDropTable, nkDropTableIfExists,
          nkCreateIndex, nkCreateIndexIfNotExists,
-         nkDropIndex, nkDropIndexIfExists: l.compileDdl(r)
+         nkDropIndex, nkDropIndexIfExists,
+         nkAlterTable: l.compileDdl(r)
       else: fail("unsupported SQL statement")
     compiled.add(stmt)
   compiled
@@ -4544,7 +4707,7 @@ proc execSql*(eng: SqlEngine, sqlText: string,
         kind: stmt.kind,
         affected: eng.ctx.affected
       )
-    of skCreateTable, skDropTable, skCreateIndex, skDropIndex:
+    of skCreateTable, skDropTable, skCreateIndex, skDropIndex, skAlterTable:
       result = ExecResult(kind: stmt.kind, affected: eng.ctx.affected)
       # schema changed: cached plans may embed stale projections/column lists
       eng.cache.clear()

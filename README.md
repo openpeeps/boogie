@@ -288,9 +288,11 @@ db.close()
 ```
 
 Supported subset: `CREATE TABLE [IF NOT EXISTS]` (typed columns, PRIMARY KEY,
-NOT NULL, DEFAULT), `DROP TABLE [IF EXISTS]`, `CREATE [UNIQUE] INDEX
-[IF NOT EXISTS]` / `DROP INDEX [IF EXISTS]` (single-column, persisted,
-UNIQUE enforced), multi-row `INSERT` with serial primary keys, `SELECT` with
+NOT NULL, DEFAULT, inline `REFERENCES`), `DROP TABLE [IF EXISTS]`,
+`CREATE [UNIQUE] INDEX [IF NOT EXISTS]` / `DROP INDEX [IF EXISTS]`
+(single-column, persisted, UNIQUE enforced), `ALTER TABLE ... ADD COLUMN` /
+`RENAME COLUMN` / `RENAME TO`, multi-row `INSERT` with serial primary keys,
+`SELECT` with
 `WHERE`/`ORDER BY`/`LIMIT`/`OFFSET`/`DISTINCT`, `GROUP BY` over plain columns
 with `HAVING` (aggregates `COUNT`/`SUM`/`AVG`/`MIN`/`MAX`, `ORDER BY` over
 SELECT outputs), `INNER`/`CROSS JOIN` (aliases, `ON`/`USING`, qualified refs,

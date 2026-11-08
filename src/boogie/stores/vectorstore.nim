@@ -459,6 +459,9 @@ proc applyWalEntry(s: VectorStore, e: WalEntry) =
   of woCreateIndex, woDropIndex:
     # RDBMS-only ops; never emitted by the vector store.
     discard
+  of woAlterAddColumn, woAlterRenameColumn, woAlterRenameTable:
+    # RDBMS-only ALTER ops; never emitted by the vector store.
+    discard
 
 proc recoverFromWal*(s: VectorStore) =
   ## Recovers the vector store state by loading a snapshot from disk (if available) and then

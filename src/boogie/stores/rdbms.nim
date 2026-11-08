@@ -147,6 +147,7 @@ proc insertRowNoWal(t: DbTable, pk: string, data: var RowData): string
 proc maybeAutoCheckpointConcurrent(s: Store)
 proc appendWalIfEnabled(s: Store, op: WalOp, table, pk, payload: string): uint64
 proc markCommitted(s: Store, lsn: uint64)
+proc jsonToStoreValue*(j: JsonNode): Value {.gcsafe.}
 proc deleteRowNoWal(t: DbTable, pk: string): bool
 proc rowToPayload(data: RowData): string
 
@@ -632,6 +633,165 @@ proc dropIndex*(s: Store, indexName: string) =
   s.dropIndexNoWal(indexName)
   s.markCommitted(lsn)
 
+proc checkAddColumn(t: DbTable, col: ColumnDef) =
+  ## Validates ADD COLUMN without mutating (runs before any WAL append).
+  if col.name.len == 0:
+    raise newException(StoreError, "column name cannot be empty")
+  if t.findColumn(col.name).isSome:
+    raise newException(StoreError, fmt"duplicate column: '{col.name}'")
+  if not col.nullable and col.defaultValue.len == 0 and t.rowsByPk.len > 0:
+    raise newException(StoreError,
+      fmt"cannot add NOT NULL column '{col.name}' without a DEFAULT value" &
+      fmt": table '{t.name}' is not empty")
+
+proc addColumnNoWal(t: DbTable, col: ColumnDef) =
+  t.checkAddColumn(col)
+  t.columns.add(col)
+  t.columnsByName[col.name] = col
+  let fill =
+    if col.defaultValue.len > 0:
+      jsonToStoreValue(parseJson(col.defaultValue))
+    else:
+      newNullValue()
+  for _, rec in t.rowsByPk.mpairs:
+    if not rec.cols.hasKey(col.name):
+      rec.cols[col.name] = fill
+  t.orderIndexDirty = true
+
+proc addColumn*(s: Store, tableName: string, col: ColumnDef) =
+  ## Adds a column with WAL + commit (backfills existing rows).
+  s.ensureWritable()
+  if not s.tables.hasKey(tableName):
+    raise newException(StoreError, fmt"table not found: {tableName}")
+  if s.cc != nil:
+    withMetaWrite(s.cc):
+      s.tables[tableName].addColumnNoWal(col)
+    if s.hasWal:
+      let payload = $(%*{"name": col.name, "kind": $col.kind,
+        "nullable": col.nullable, "default": col.defaultValue})
+      s.cc.appendWal(s.wal,
+        WalEntry(op: woAlterAddColumn, table: tableName, pk: "",
+          payload: payload), int(s.walFlushEveryOps))
+    s.maybeAutoCheckpointConcurrent()
+    return
+  s.tables[tableName].checkAddColumn(col)
+  let payload = $(%*{"name": col.name, "kind": $col.kind,
+    "nullable": col.nullable, "default": col.defaultValue})
+  let lsn = s.appendWalIfEnabled(woAlterAddColumn, tableName, "", payload)
+  s.tables[tableName].addColumnNoWal(col)
+  s.markCommitted(lsn)
+
+proc checkRenameColumn(t: DbTable, oldName, newName: string) =
+  ## Validates RENAME COLUMN without mutating.
+  if t.findColumn(oldName).isNone:
+    raise newException(StoreError,
+      fmt"unknown column '{oldName}' in table '{t.name}'")
+  if newName.len == 0:
+    raise newException(StoreError, "column name cannot be empty")
+  if t.findColumn(newName).isSome:
+    raise newException(StoreError, fmt"duplicate column: '{newName}'")
+
+proc renameColumnNoWal(s: Store, tableName, oldName, newName: string) =
+  if not s.tables.hasKey(tableName):
+    raise newException(StoreError, fmt"table not found: {tableName}")
+  let t = s.tables[tableName]
+  t.checkRenameColumn(oldName, newName)
+  # schema (position preserved)
+  for i in 0 ..< t.columns.len:
+    if t.columns[i].name == oldName:
+      t.columns[i].name = newName
+      break
+  let cdef = t.columnsByName[oldName]
+  t.columnsByName.del(oldName)
+  var ncdef = cdef
+  ncdef.name = newName
+  t.columnsByName[newName] = ncdef
+  if t.primaryKey == oldName:
+    t.primaryKey = newName
+  # rows
+  for _, rec in t.rowsByPk.mpairs:
+    if rec.cols.hasKey(oldName):
+      rec.cols[newName] = rec.cols[oldName]
+      rec.cols.del(oldName)
+  # equality indexes keyed by column name
+  if t.indexedCols.contains(oldName):
+    t.indexedCols.excl(oldName)
+    t.indexedCols.incl(newName)
+    t.eqIndex[newName] = t.eqIndex[oldName]
+    t.eqIndex.del(oldName)
+  for _, d in t.indexes.mpairs:
+    for i in 0 ..< d.columns.len:
+      if d.columns[i] == oldName:
+        d.columns[i] = newName
+  # own foreign keys
+  for i in 0 ..< t.foreignKeys.len:
+    if t.foreignKeys[i].column == oldName:
+      t.foreignKeys[i].column = newName
+  # child tables referencing this column (only possible via the PK)
+  for _, other in s.tables.mpairs:
+    for i in 0 ..< other.foreignKeys.len:
+      if other.foreignKeys[i].refTable == tableName and
+          other.foreignKeys[i].refColumn == oldName:
+        other.foreignKeys[i].refColumn = newName
+  t.orderIndexDirty = true
+
+proc renameColumn*(s: Store, tableName, oldName, newName: string) =
+  ## Renames a column with WAL + commit (data, indexes and FKs follow).
+  s.ensureWritable()
+  if not s.tables.hasKey(tableName):
+    raise newException(StoreError, fmt"table not found: {tableName}")
+  if s.cc != nil:
+    withMetaWrite(s.cc):
+      s.renameColumnNoWal(tableName, oldName, newName)
+    if s.hasWal:
+      s.cc.appendWal(s.wal,
+        WalEntry(op: woAlterRenameColumn, table: tableName, pk: oldName,
+          payload: newName), int(s.walFlushEveryOps))
+    s.maybeAutoCheckpointConcurrent()
+    return
+  s.tables[tableName].checkRenameColumn(oldName, newName)
+  let lsn = s.appendWalIfEnabled(woAlterRenameColumn, tableName, oldName,
+    newName)
+  s.renameColumnNoWal(tableName, oldName, newName)
+  s.markCommitted(lsn)
+
+proc checkRenameTable(s: Store, oldName, newName: string) =
+  ## Validates RENAME TO without mutating.
+  if not s.tables.hasKey(oldName):
+    raise newException(StoreError, fmt"table not found: {oldName}")
+  if newName.len == 0:
+    raise newException(StoreError, "table name cannot be empty")
+  if s.tables.hasKey(newName):
+    raise newException(StoreError, fmt"table already exists: {newName}")
+
+proc renameTableNoWal(s: Store, oldName, newName: string) =
+  s.checkRenameTable(oldName, newName)
+  let t = s.tables[oldName]
+  t.name = newName
+  s.tables[newName] = t
+  s.tables.del(oldName)
+  for _, other in s.tables.mpairs:
+    for i in 0 ..< other.foreignKeys.len:
+      if other.foreignKeys[i].refTable == oldName:
+        other.foreignKeys[i].refTable = newName
+
+proc renameTable*(s: Store, oldName, newName: string) =
+  ## Renames a table with WAL + commit (child FK references follow).
+  s.ensureWritable()
+  if s.cc != nil:
+    withMetaWrite(s.cc):
+      s.renameTableNoWal(oldName, newName)
+    if s.hasWal:
+      s.cc.appendWal(s.wal,
+        WalEntry(op: woAlterRenameTable, table: oldName, pk: newName,
+          payload: ""), int(s.walFlushEveryOps))
+    s.maybeAutoCheckpointConcurrent()
+    return
+  s.checkRenameTable(oldName, newName)
+  let lsn = s.appendWalIfEnabled(woAlterRenameTable, oldName, newName, "")
+  s.renameTableNoWal(oldName, newName)
+  s.markCommitted(lsn)
+
 proc checkUniqueOnInsert(t: DbTable, data: RowData, excludePk = "") =
   ## Raises on UNIQUE violation for non-NULL indexed values.
   for _, d in t.indexes.pairs:
@@ -649,9 +809,6 @@ proc checkUniqueOnInsert(t: DbTable, data: RowData, excludePk = "") =
           if pk != excludePk:
             raise newException(StoreError,
               fmt"unique index violation '{d.name}' on table '{t.name}' column '{col}'")
-
-proc jsonToStoreValue*(j: JsonNode): Value {.gcsafe.}
-  ## Converts a JSON literal into a store value. Used for column defaults.
 
 proc effectivePkForInsert(t: DbTable, pk: string): string =
   case t.pkType
@@ -1640,6 +1797,35 @@ proc applyWalEntry(s: Store, e: WalEntry) =
   of woDropIndex:
     # idempotent replay: index may already be gone via snapshot restore
     try: s.dropIndexNoWal(e.pk)
+    except StoreError: discard
+  of woAlterAddColumn:
+    if unlikely(not s.tables.hasKey(e.table)):
+      raise newException(StoreError, "WAL replay: table not found: " & e.table)
+    let n = parseJson(e.payload)
+    let col = ColumnDef(
+      name: n["name"].getStr(),
+      kind: parseEnum[DataType](n["kind"].getStr()),
+      nullable: n["nullable"].getBool(true),
+      defaultValue: if n.hasKey("default"): n["default"].getStr() else: "")
+    let t = s.tables[e.table]
+    if t.findColumn(col.name).isSome:
+      # already restored from the snapshot schema: verify identical
+      let old = t.findColumn(col.name).get()
+      if old.kind != col.kind or old.nullable != col.nullable or
+          old.defaultValue != col.defaultValue:
+        raise newException(StoreError,
+          "WAL replay: conflicting column definition: " & col.name)
+    else:
+      t.addColumnNoWal(col)
+  of woAlterRenameColumn:
+    # idempotent replay: column may already be renamed via snapshot restore
+    if unlikely(not s.tables.hasKey(e.table)):
+      raise newException(StoreError, "WAL replay: table not found: " & e.table)
+    try: s.renameColumnNoWal(e.table, e.pk, e.payload)
+    except StoreError: discard
+  of woAlterRenameTable:
+    # idempotent replay: table may already be renamed via snapshot restore
+    try: s.renameTableNoWal(e.table, e.pk)
     except StoreError: discard
 
 proc recoverFromWal*(s: Store) =

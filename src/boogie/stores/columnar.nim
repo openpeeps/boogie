@@ -528,6 +528,9 @@ proc recoverFromWal(s: var ColumnarStore) =
     of woCreateIndex, woDropIndex:
       # RDBMS-only ops; never emitted by the columnar store.
       discard
+    of woAlterAddColumn, woAlterRenameColumn, woAlterRenameTable:
+      # RDBMS-only ALTER ops; never emitted by the columnar store.
+      discard
 
   # Clear replayed log to prevent reapplication on next open.
   # Read-only opens must never reset the shared WAL, so they skip this.
