@@ -348,12 +348,30 @@ upstream parser), `CASE`, `CHECK` constraints, and `INSERT INTO ... SELECT`.
 > the VM loop. Numeric comparisons follow SQLite column-affinity rules (text
 > operands coerce when they parse) and NULL propagates per SQL semantics.
 
-| Operation | ops/s |
+SQL benchmarks (`tests/test_sqlengine_bench.nim`, `-d:release`, Apple Silicon;
+re-run on your machine — single-threaded, page-cache warm):
+
+| Operation (in-memory) | Throughput |
 |---|---|
-| insert | ~133 K |
-| point query (unindexed scan) | ~3.0 K q/s |
-| ordered scan | ~1.1 M rows/s |
-| update | ~2.7 K |
+| insert | ~136 K ops/s |
+| point query by PK (prepared rebind) | ~300 K q/s |
+| point query (unindexed scan) | ~2.6 K q/s |
+| full scan (`SELECT *`) | ~730 K rows/s |
+| range scan (`ORDER BY` + `LIMIT`) | ~13 K rows/s |
+| `ORDER BY` (full sort) | ~700 K rows/s |
+| update | ~48 K ops/s |
+| delete | ~11 K ops/s |
+| aggregates (`COUNT`/`SUM`/`AVG`/`MIN`/`MAX` over 5 K rows) | ~0.02 s |
+| `DISTINCT` | ~18 K unique/s |
+
+| Operation (disk + WAL) | Throughput |
+|---|---|
+| insert | ~155 K ops/s |
+| point query | ~165 q/s |
+| full scan | ~660 K rows/s |
+| update | ~45 K ops/s |
+| delete | ~11 K ops/s |
+| aggregates (over 5 K rows) | ~0.02 s |
 
 > [!TIP]
 > Run the full test + benchmark suites with `nimble test -d:release` (the `-d:release`
