@@ -5,7 +5,8 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/boogie
 
-import std/[strutils, tables, options, json, algorithm, sequtils, math]
+import std/[strutils, tables, options, json, algorithm, sequtils, math,
+  unicode]
 
 from pkg/openparser/json import toJson
 import pkg/openparser/sql
@@ -47,7 +48,9 @@ export vm.initValue
 ## tables and INNER/CROSS JOINs with ON/USING (incl. GROUP BY/HAVING over
 ## joins), UPDATE ... SET ... WHERE and DELETE FROM ... WHERE. Expressions
 ## support literals, columns, placeholders, comparisons, AND/OR/NOT,
-## IS [NOT] NULL, IN (list) and arithmetic. Subqueries, DROP COLUMN and
+## IS [NOT] NULL, LIKE/ILIKE (`%`/`_` wildcards, no ESCAPE clause), BETWEEN
+## (also `NOT LIKE` / `NOT BETWEEN`; `x IN (v)` single-value only) and
+## arithmetic. Subqueries (incl. `IN (SELECT ...)`), DROP COLUMN and
 ## ALTER COLUMN variants are not supported.
 
 type
@@ -231,6 +234,46 @@ proc cmpCells(a, b: Value): int =
   elif ra == 1: cmp(a.stringVal[], b.stringVal[])
   elif ra == 2: cmp(int(a.boolVal), int(b.boolVal))
   else: 0
+
+proc likeMatchStr(s, pat: string, caseIns: bool): bool =
+  ## SQL LIKE matcher: `%` spans any run (incl. empty), `_` matches exactly
+  ## one character. Rune-based so multibyte text counts characters, not
+  ## bytes. No ESCAPE support (the parser has no ESCAPE clause): `%` and `_`
+  ## are always wildcards.
+  let ss = if caseIns: s.toLower() else: s
+  let pp = if caseIns: pat.toLower() else: pat
+  let sRunes = ss.toRunes()
+  let pRunes = pp.toRunes()
+  var si = 0
+  var pi = 0
+  var star = -1
+  var ssMark = 0
+  while si < sRunes.len:
+    if pi < pRunes.len and
+        (pRunes[pi] == Rune('_') or pRunes[pi] == sRunes[si]):
+      inc si
+      inc pi
+    elif pi < pRunes.len and pRunes[pi] == Rune('%'):
+      star = pi
+      ssMark = si
+      inc pi
+    elif star != -1:
+      pi = star + 1
+      inc ssMark
+      si = ssMark
+    else:
+      return false
+  while pi < pRunes.len and pRunes[pi] == Rune('%'):
+    inc pi
+  pi == pRunes.len
+
+proc sqlLikeImpl(a, b: Value, caseIns: bool): Value =
+  ## Shared LIKE core for every evaluator: NULL on either side yields NULL
+  ## (filtered by WHERE truthiness, preserved by projection); anything else
+  ## stringifies through the display rendering (ints/floats/bools match
+  ## their text form, like SQLite).
+  if a == nil or b == nil: return nil
+  initValue(likeMatchStr(cellToString(a), cellToString(b), caseIns))
 
 #
 # schema helpers used at compile time
@@ -586,6 +629,12 @@ proc makeForeignProcs(ctx: SqlExecCtx): seq[(string, int, bool, ForeignProc)] =
     inc ctx.affected
     initValue(1'i64)
 
+  proc fLike(args: StackView, argc: int): Value =
+    sqlLikeImpl(args[0], args[1], caseIns = false)
+
+  proc fIlike(args: StackView, argc: int): Value =
+    sqlLikeImpl(args[0], args[1], caseIns = true)
+
   @[
     ("sql_null", 0, true, ForeignProc(fNull)),
     ("sql_scan_open", 1, true, ForeignProc(fScanOpen)),
@@ -604,6 +653,8 @@ proc makeForeignProcs(ctx: SqlExecCtx): seq[(string, int, bool, ForeignProc)] =
     ("sql_alter_add_column", 2, true, ForeignProc(fAlterAddColumn)),
     ("sql_alter_rename_column", 3, true, ForeignProc(fAlterRenameColumn)),
     ("sql_alter_rename_table", 2, true, ForeignProc(fAlterRenameTable)),
+    ("sql_like", 2, true, ForeignProc(fLike)),
+    ("sql_ilike", 2, true, ForeignProc(fIlike)),
   ]
 
 #
@@ -710,6 +761,7 @@ proc inferTy(l: Lowerer, n: SqlNode): STy =
     case n[0].strVal.toLowerAscii()
     of "=", "!=", "<>", "<", "<=", ">", ">=", "is": sBool
     of "and", "or": sBool
+    of "like", "not like", "ilike", "not ilike": sBool
     of "+", "-", "*", "/":
       max(inferTy(l, n[1]), inferTy(l, n[2]))
     else: sUnknown
@@ -844,6 +896,17 @@ proc genExpr(l: var Lowerer, n: SqlNode) =
       l.genExpr(rhs)
       l.ch.emit(opcSqlCmp)
       l.ch.emit(cmpMode)
+    of "like", "not like", "ilike", "not ilike":
+      # `ilike` never parses under the generic dialect (pgsql only), but the
+      # engine implements it anyway so behavior stays defined.
+      l.genExpr(n[1])
+      l.genExpr(n[2])
+      l.callF(if op == "ilike" or op == "not ilike": "sql_ilike"
+              else: "sql_like")
+      if op == "not like" or op == "not ilike":
+        # NULL propagates through opcInvB (fixed earlier); only real bools
+        # flip, matching `NOT (x LIKE ...)` three-valued semantics.
+        l.ch.emit(opcInvB)
     of "is":
       if nodeIdent(n[2]).toUpperAscii() != "NULL":
         fail("only IS NULL is supported")
@@ -866,8 +929,6 @@ proc genExpr(l: var Lowerer, n: SqlNode) =
         of "-": SqlArithSub
         of "*": SqlArithMul
         else: SqlArithDiv)
-    of "like", "ilike", "in", "between":
-      fail("'" & op & "' is not supported yet")
     else:
       fail("unsupported operator: " & n[0].strVal)
   of nkCall:
@@ -1015,6 +1076,84 @@ proc groupKeyEncode(v: Value): string =
   of tyString: "t:" & v.stringVal[]
   of tyBool: "b:" & (if v.boolVal: "1" else: "0")
   else: "x:"
+
+proc betweenRange(betw, hi: SqlNode): SqlNode =
+  ## Builds `x>=lo AND x<=hi` (or the `NOT BETWEEN` disjunction) from a
+  ## `between(x,lo)` node plus its upper bound. The value expression is
+  ## shared by both comparisons; repeat visits resolve to the same
+  ## placeholder slot, so bindings stay consistent.
+  let neg = betw[0].strVal.toLowerAscii() == "not between"
+  let x = betw[1]
+  let lo = betw[2]
+  if neg:
+    newNode(nkInfix, @[newNode(nkIdent, "or"),
+      newNode(nkInfix, @[newNode(nkIdent, "<"), x, lo]),
+      newNode(nkInfix, @[newNode(nkIdent, ">"), x, hi])])
+  else:
+    newNode(nkInfix, @[newNode(nkIdent, "and"),
+      newNode(nkInfix, @[newNode(nkIdent, ">="), x, lo]),
+      newNode(nkInfix, @[newNode(nkIdent, "<="), x, hi])])
+
+proc isBetweenOp(n: SqlNode): bool =
+  ## True for a bare parser `between`/`not between` infix: the only
+  ## un-normalized BETWEEN shape. One can only arise from mangled BETWEEN
+  ## syntax, never from valid SQL otherwise.
+  n.kind == nkInfix and n.len >= 3 and n[0].kind == nkIdent and
+    n[0].strVal.toLowerAscii() in ["between", "not between"]
+
+proc normalizePreds(n: SqlNode): SqlNode =
+  ## Rewrites parser-level predicate shapes into plain operators, bottom-up.
+  ## The parser mangles BETWEEN by precedence (`x BETWEEN lo AND hi` arrives
+  ## as `and(between(x,lo),hi)`), and IN only parses single values
+  ## (`in(x,PrGroup(v))`). Both rewrite to comparisons every evaluator
+  ## already handles, so LIKE/BETWEEN work uniformly in WHERE/ON/HAVING,
+  ## joins, grouped queries and DML. Runs once per parse in `splitRoots`.
+  if n.isNil: return n
+  if n.kind == nkInfix and n.len >= 3 and n[0].kind == nkIdent:
+    case n[0].strVal.toLowerAscii()
+    of "between", "not between":
+      # Bare BETWEEN outside the AND slots: its `AND hi` was consumed
+      # elsewhere or is missing. Loud failure beats a silent mistruth.
+      fail("BETWEEN requires lower and upper bounds (`x BETWEEN lo AND hi`)")
+    of "in", "not in":
+      var rhs = n[2]
+      while rhs.kind == nkPrGroup and rhs.len >= 1:
+        rhs = rhs[0]
+      if rhs.kind == nkSelect:
+        fail("subqueries are not supported yet")
+      return newNode(nkInfix, @[newNode(nkIdent,
+        if n[0].strVal.toLowerAscii() == "in": "=" else: "!="),
+        normalizePreds(n[1]), normalizePreds(rhs)])
+    of "and":
+      # Canonical BETWEEN: `and(between(x,lo),hi)`. The `between` child is
+      # finished HERE: recursing into it directly would misreport it as a
+      # malformed bare BETWEEN.
+      if isBetweenOp(n[1]):
+        let b = n[1]
+        return betweenRange(newNode(nkInfix,
+          @[b[0], normalizePreds(b[1]), normalizePreds(b[2])]),
+          normalizePreds(n[2]))
+      if n[1].kind == nkInfix and n[1].len >= 3 and
+          n[1][0].kind == nkIdent and
+          n[1][0].strVal.toLowerAscii() == "and" and isBetweenOp(n[1][2]):
+        # Right-of-AND recovery (`A AND x BETWEEN lo AND hi` parses as
+        # `and(and(A,between(x,lo)),hi)`): the outer right operand is the
+        # missing upper bound. A bare `between` can only come from mangled
+        # BETWEEN, so this recovery is unambiguous.
+        let l = n[1]
+        let b = l[2]
+        n.sons[1] = normalizePreds(l[1])
+        n.sons[2] = betweenRange(newNode(nkInfix,
+          @[b[0], normalizePreds(b[1]), normalizePreds(b[2])]),
+          normalizePreds(n[2]))
+        return n
+      n.sons[1] = normalizePreds(n[1])
+      n.sons[2] = normalizePreds(n[2])
+      return n
+    else: discard
+  for i in 0 ..< n.len:
+    n.sons[i] = normalizePreds(n.sons[i])
+  n
 
 proc collectHavingAggs(having: SqlNode, tbl: DbTable,
     outAggs: var seq[tuple[fn: string, arg: string]]) =
@@ -1442,11 +1581,9 @@ proc checkJoinExpr(n: SqlNode, scope: seq[JoinScopeEntry]) =
       fail("unsupported expression")
     case n[0].strVal.toLowerAscii()
     of "=", "!=", "<>", "<", "<=", ">", ">=", "is", "is not", "and", "or",
-        "+", "-", "*", "/":
+        "+", "-", "*", "/", "like", "not like", "ilike", "not ilike":
       checkJoinExpr(n[1], scope)
       checkJoinExpr(n[2], scope)
-    of "like", "ilike", "in", "between":
-      fail("'" & n[0].strVal.toLowerAscii() & "' is not supported yet")
     else: fail("unsupported operator: " & n[0].strVal)
   of nkCall:
     fail("function calls are not supported yet")
@@ -2749,7 +2886,7 @@ proc staticTyFast(n: SqlNode, tbl: DbTable): char =
       let op = n[0].strVal.toLowerAscii()
       case op
       of "=", "!=", "<>", "<", "<=", ">", ">=", "is", "is not",
-         "and", "or": 'b'
+         "and", "or", "like", "not like", "ilike", "not ilike": 'b'
       of "+", "-", "*", "/":
         let a = staticTyFast(n[1], tbl)
         let b = staticTyFast(n[2], tbl)
@@ -2804,6 +2941,9 @@ proc checkExprFast(n: SqlNode, tbl: DbTable, allowStar = false) =
       checkExprFast(lhs, tbl)
       checkExprFast(rhs, tbl)
     of "and", "or", "+", "-", "*", "/":
+      checkExprFast(n[1], tbl)
+      checkExprFast(n[2], tbl)
+    of "like", "not like", "ilike", "not ilike":
       checkExprFast(n[1], tbl)
       checkExprFast(n[2], tbl)
     of "is", "is not":
@@ -2991,6 +3131,14 @@ proc evalCellFast(cx: FastCx, n: SqlNode, row: RowData,
       let (okR, b) = evalCellFast(cx, n[2], row, hasRow)
       if not okR: return (false, nil)
       (true, initValue(vmTruthFast(b)))
+    of "like", "not like", "ilike", "not ilike":
+      let (okL, a) = evalCellFast(cx, n[1], row, hasRow)
+      let (okR, b) = evalCellFast(cx, n[2], row, hasRow)
+      if not okL or not okR: return (false, nil)
+      let v = sqlLikeImpl(a, b, op == "ilike" or op == "not ilike")
+      if v == nil: return (true, nil)
+      (true, initValue(v.boolVal != (op == "not like" or
+        op == "not ilike")))
     of "+", "-", "*", "/":
       let (okL, a) = evalCellFast(cx, n[1], row, hasRow)
       let (okR, b) = evalCellFast(cx, n[2], row, hasRow)
@@ -3548,6 +3696,16 @@ proc evalGroupHaving(cx: FastCx, n: SqlNode, keyVals: seq[Value],
         aggVals, allAggs)
       if not okR: return (false, nil)
       (true, initValue(vmTruthFast(b)))
+    of "like", "not like", "ilike", "not ilike":
+      let (okL, a) = evalGroupHaving(cx, n[1], keyVals, groupCols, aliases,
+        aggVals, allAggs)
+      let (okR, b) = evalGroupHaving(cx, n[2], keyVals, groupCols, aliases,
+        aggVals, allAggs)
+      if not okL or not okR: return (false, nil)
+      let v = sqlLikeImpl(a, b, op == "ilike" or op == "not ilike")
+      if v == nil: return (true, nil)
+      (true, initValue(v.boolVal != (op == "not like" or
+        op == "not ilike")))
     of "+", "-", "*", "/":
       let (okL, a) = evalGroupHaving(cx, n[1], keyVals, groupCols, aliases,
         aggVals, allAggs)
@@ -3839,6 +3997,14 @@ proc evalJoinCell(cx: FastCx, n: SqlNode, mrow: RowData,
       let (okR, b) = evalJoinCell(cx, n[2], mrow, scope)
       if not okR: return (false, nil)
       (true, initValue(vmTruthFast(b)))
+    of "like", "not like", "ilike", "not ilike":
+      let (okL, a) = evalJoinCell(cx, n[1], mrow, scope)
+      let (okR, b) = evalJoinCell(cx, n[2], mrow, scope)
+      if not okL or not okR: return (false, nil)
+      let v = sqlLikeImpl(a, b, op == "ilike" or op == "not ilike")
+      if v == nil: return (true, nil)
+      (true, initValue(v.boolVal != (op == "not like" or
+        op == "not ilike")))
     of "+", "-", "*", "/":
       let (okL, a) = evalJoinCell(cx, n[1], mrow, scope)
       let (okR, b) = evalJoinCell(cx, n[2], mrow, scope)
@@ -4140,6 +4306,16 @@ proc evalJoinHaving(cx: FastCx, n: SqlNode, keyVals: seq[Value],
         aggVals, allAggs, scope)
       if not okR: return (false, nil)
       (true, initValue(vmTruthFast(b)))
+    of "like", "not like", "ilike", "not ilike":
+      let (okL, a) = evalJoinHaving(cx, n[1], keyVals, groupExprs, aliases,
+        aggVals, allAggs, scope)
+      let (okR, b) = evalJoinHaving(cx, n[2], keyVals, groupExprs, aliases,
+        aggVals, allAggs, scope)
+      if not okL or not okR: return (false, nil)
+      let v = sqlLikeImpl(a, b, op == "ilike" or op == "not ilike")
+      if v == nil: return (true, nil)
+      (true, initValue(v.boolVal != (op == "not like" or
+        op == "not ilike")))
     of "+", "-", "*", "/":
       let (okL, a) = evalJoinHaving(cx, n[1], keyVals, groupExprs, aliases,
         aggVals, allAggs, scope)
@@ -4620,6 +4796,7 @@ proc splitRoots(sqlText: string): seq[SqlNode] =
   let root = parseSql(sqlText)
   when defined(boogieSqlDebug):
     echo "[compile] root kind=", $root.kind, " sons=", root.sons.len
+  discard normalizePreds(root)
   if root.kind == nkStmtList: root.sons
   else: @[root]
 

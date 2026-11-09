@@ -299,7 +299,9 @@ SELECT outputs), `INNER`/`CROSS JOIN` (aliases, `ON`/`USING`, qualified refs,
 aggregates and `GROUP BY`/`HAVING` over joins), `UPDATE ... SET ... WHERE`,
 `DELETE FROM ... WHERE`,
 aggregates without GROUP BY, and expressions with comparisons, `AND`/`OR`/
-`NOT`, arithmetic, `IS [NOT] NULL` and `?`/`$n` placeholders. Subqueries
+`NOT`, arithmetic, `IS [NOT] NULL`, `LIKE`/`ILIKE` (`%`/`_` wildcards),
+`BETWEEN`, single-value `IN (v)` and `?`/`$n` placeholders. Subqueries
+(incl. `IN (SELECT ...)` and multi-value `IN (a, b)`, which cannot parse)
 are not supported yet.
 
 > Statements are parsed once per connection and cached; `exec()` binds its
