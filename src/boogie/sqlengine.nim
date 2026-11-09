@@ -678,6 +678,8 @@ type
     tbl: Option[DbTable]
     placeholders: seq[string]
       ## positional global names ("?1") in first-appearance order
+    phSeen: Table[pointer, string]
+      ## placeholder node -> global name (shared subtrees bind once)
 
 proc initLowerer(eng: SqlEngine, chunkName: string): Lowerer =
   var ch = newChunk(chunkName)
@@ -839,7 +841,13 @@ proc genExpr(l: var Lowerer, n: SqlNode) =
   of nkPrGroup:
     l.genExpr(n[0])
   of nkPlaceholder:
-    let g = phNameFast(n.strVal, l.placeholders)
+    let p = cast[pointer](n)
+    let g =
+      if p in l.phSeen: l.phSeen[p]
+      else:
+        let g = phNameFast(n.strVal, l.placeholders)
+        l.phSeen[p] = g
+        g
     let sid = l.ch.getString(g)
     l.ch.emit(opcPushG)
     l.ch.emit(sid)
@@ -1045,29 +1053,34 @@ proc groupColName(n: SqlNode): string =
     if n.len >= 2: groupColName(n[1]) else: ""
   else: ""
 
-proc collectGroupedPh(n: SqlNode, phs: var seq[string]) =
+proc collectGroupedPh(n: SqlNode, phs: var seq[string],
+    seen: var Table[pointer, bool]) =
   ## Placeholder names in first-appearance order. Mirrors `walkPhFast`
   ## recursion so the Lowerer list and the executor mapping agree; node visit
   ## order is fixed by the caller (WHERE, GROUP BY, SELECT, HAVING).
+  ## Shared subtrees (BETWEEN normalization) bind once, by node identity.
   if n.isNil: return
   case n.kind
   of nkPlaceholder:
+    let p = cast[pointer](n)
+    if p in seen: return
+    seen[p] = true
     discard phNameFast(n.strVal, phs)
   of nkInfix:
     if n.len >= 3:
-      collectGroupedPh(n[1], phs)
-      collectGroupedPh(n[2], phs)
+      collectGroupedPh(n[1], phs, seen)
+      collectGroupedPh(n[2], phs, seen)
   of nkPrefix:
-    if n.len >= 2: collectGroupedPh(n[1], phs)
+    if n.len >= 2: collectGroupedPh(n[1], phs, seen)
   of nkDot, nkSelectPair, nkPrGroup:
-    if n.len >= 1: collectGroupedPh(n[0], phs)
+    if n.len >= 1: collectGroupedPh(n[0], phs, seen)
   of nkCall:
-    for i in 1 ..< n.len: collectGroupedPh(n[i], phs)
+    for i in 1 ..< n.len: collectGroupedPh(n[i], phs, seen)
   of nkCase, nkWhen, nkElse, nkCast:
-    for c in n.sons: collectGroupedPh(c, phs)
+    for c in n.sons: collectGroupedPh(c, phs, seen)
   of nkGroup, nkOrder, nkSelectColumns, nkWhere, nkHaving, nkColumnList,
      nkValueList, nkLimit, nkOffset, nkFrom, nkStmtList:
-    for c in n.sons: collectGroupedPh(c, phs)
+    for c in n.sons: collectGroupedPh(c, phs, seen)
   else: discard
 
 proc groupKeyEncode(v: Value): string =
@@ -1422,10 +1435,11 @@ proc planGroupedSelect(tbl: DbTable, root: SqlNode, isDistinct: bool,
   except ValueError:
     fail("LIMIT/OFFSET must be integer literals")
   # placeholders in fixed order
-  if not whereNode.isNil: collectGroupedPh(whereNode, phs)
-  if not groupNode.isNil: collectGroupedPh(groupNode, phs)
-  collectGroupedPh(colsNode, phs)
-  if not havingNode.isNil: collectGroupedPh(havingNode, phs)
+  var seenPh = initTable[pointer, bool]()
+  if not whereNode.isNil: collectGroupedPh(whereNode, phs, seenPh)
+  if not groupNode.isNil: collectGroupedPh(groupNode, phs, seenPh)
+  collectGroupedPh(colsNode, phs, seenPh)
+  if not havingNode.isNil: collectGroupedPh(havingNode, phs, seenPh)
   stmt.isGrouped = true
   stmt.groupTable = tableName
   stmt.groupCols = groupCols
@@ -1597,27 +1611,32 @@ proc checkJoinExpr(n: SqlNode, scope: seq[JoinScopeEntry]) =
     if n.len >= 1: checkJoinExpr(n[0], scope)
   else: fail("unsupported expression")
 
-proc collectJoinPh(n: SqlNode, phs: var seq[string]) =
+proc collectJoinPh(n: SqlNode, phs: var seq[string],
+    seen: var Table[pointer, bool]) =
   ## Placeholder names in first-appearance order; recursion mirrors
-  ## `walkPhFast` exactly so lowering and execution agree.
+  ## `walkPhFast` exactly so lowering and execution agree. Shared
+  ## subtrees bind once, by node identity.
   if n.isNil: return
   case n.kind
   of nkPlaceholder:
+    let p = cast[pointer](n)
+    if p in seen: return
+    seen[p] = true
     discard phNameFast(n.strVal, phs)
   of nkInfix:
     if n.len >= 3:
-      collectJoinPh(n[1], phs)
-      collectJoinPh(n[2], phs)
+      collectJoinPh(n[1], phs, seen)
+      collectJoinPh(n[2], phs, seen)
   of nkPrefix:
-    if n.len >= 2: collectJoinPh(n[1], phs)
+    if n.len >= 2: collectJoinPh(n[1], phs, seen)
   of nkDot:
-    if n.len >= 2: collectJoinPh(n[1], phs)
+    if n.len >= 2: collectJoinPh(n[1], phs, seen)
   of nkSelectPair, nkPrGroup:
-    if n.len >= 1: collectJoinPh(n[0], phs)
+    if n.len >= 1: collectJoinPh(n[0], phs, seen)
   of nkCall:
-    for i in 1 ..< n.len: collectJoinPh(n[i], phs)
+    for i in 1 ..< n.len: collectJoinPh(n[i], phs, seen)
   of nkCase, nkWhen, nkElse, nkCast:
-    for c in n.sons: collectJoinPh(c, phs)
+    for c in n.sons: collectJoinPh(c, phs, seen)
   else: discard
 
 proc sameJoinRef(a, b: SqlNode): bool =
@@ -2056,14 +2075,15 @@ proc planJoinSelect(eng: SqlEngine, root: SqlNode, isDistinct: bool,
   except ValueError:
     fail("LIMIT/OFFSET must be integer literals")
   # placeholders in fixed order: ONs, WHERE, GROUP BY, SELECT, HAVING
+  var seenPh = initTable[pointer, bool]()
   for on in ons:
-    if not on.isNil: collectJoinPh(on, phs)
-  if not whereNode.isNil: collectJoinPh(whereNode, phs)
+    if not on.isNil: collectJoinPh(on, phs, seenPh)
+  if not whereNode.isNil: collectJoinPh(whereNode, phs, seenPh)
   if grouped and not groupNode.isNil:
-    for g in groupNode.sons: collectJoinPh(g, phs)
+    for g in groupNode.sons: collectJoinPh(g, phs, seenPh)
   for rawEntry in colsNode.sons:
-    collectJoinPh(rawEntry, phs)
-  if grouped and not havingNode.isNil: collectJoinPh(havingNode, phs)
+    collectJoinPh(rawEntry, phs, seenPh)
+  if grouped and not havingNode.isNil: collectJoinPh(havingNode, phs, seenPh)
   stmt.isJoin = true
   stmt.joinTables = tables
   stmt.joinScopes = scopes
@@ -2860,8 +2880,10 @@ proc walkPhFast(n: SqlNode, cx: var FastCx) =
   if n.isNil: return
   case n.kind
   of nkPlaceholder:
+    let p = cast[pointer](n)
+    if p in cx.phIdx: return # shared subtree (e.g. BETWEEN value): one slot
     let g = phNameFast(n.strVal, cx.phs)
-    cx.phIdx[cast[pointer](n)] = cx.phs.find(g)
+    cx.phIdx[p] = cx.phs.find(g)
   of nkInfix:
     if n.len >= 3:
       walkPhFast(n[1], cx)

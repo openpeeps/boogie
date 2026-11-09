@@ -210,6 +210,8 @@ suite "BETWEEN":
     db.exec(sql"INSERT INTO t (age) VALUES (20), (25), (30)")
     check db.getValue(sql"SELECT COUNT(*) FROM t WHERE age BETWEEN ? AND ?", "20", "25") == "2"
     check db.getValue(sql"SELECT COUNT(*) FROM t WHERE age BETWEEN ? AND ?", "25", "25") == "1"
+    # placeholder as the BETWEEN value binds once (shared normalized subtree)
+    check db.getValue(sql"SELECT COUNT(*) FROM t WHERE ? BETWEEN 20 AND 30", "25") == "3"
     db.close()
 
   test "BETWEEN combined with AND/OR":
