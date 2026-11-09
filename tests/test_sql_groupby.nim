@@ -205,6 +205,27 @@ suite "secondary indexes":
       db.exec(sql"DROP INDEX idx_v")
     db.close()
 
+  test "index stays consistent across post-index writes":
+    let db = open(":memory:", "", "", "")
+    db.exec(sql"CREATE TABLE t (id INTEGER PRIMARY KEY, v INT)")
+    db.exec(sql"INSERT INTO t (v) VALUES (1), (2), (3)")
+    db.exec(sql"CREATE INDEX idx_v ON t (v)")
+    # inserts after the index build are visible through it
+    for i in 4 .. 200:
+      db.exec(sql"INSERT INTO t (v) VALUES (?)", $i)
+    check db.getValue(sql"SELECT id FROM t WHERE v = 150") == "150"
+    # deletes drop the pk from the index
+    db.exec(sql"DELETE FROM t WHERE v = 150")
+    check db.getValue(sql"SELECT COUNT(*) FROM t WHERE v = 150") == "0"
+    # updates move the pk between index buckets
+    db.exec(sql"UPDATE t SET v = 999 WHERE v = 151")
+    check db.getValue(sql"SELECT COUNT(*) FROM t WHERE v = 151") == "0"
+    check db.getValue(sql"SELECT COUNT(*) FROM t WHERE v = 999") == "1"
+    # rename of the indexed column keeps the index usable
+    db.exec(sql"ALTER TABLE t RENAME COLUMN v TO w")
+    check db.getValue(sql"SELECT COUNT(*) FROM t WHERE w = 999") == "1"
+    db.close()
+
   test "duplicate index names and composite rejection":
     let db = open(":memory:", "", "", "")
     db.exec(sql"CREATE TABLE t (id INTEGER PRIMARY KEY, a INT, b INT)")

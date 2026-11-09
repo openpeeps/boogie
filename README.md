@@ -355,6 +355,7 @@ re-run on your machine — single-threaded, page-cache warm):
 |---|---|
 | insert | ~136 K ops/s |
 | point query by PK (prepared rebind) | ~300 K q/s |
+| point query (indexed equality) | ~187 K q/s |
 | point query (unindexed scan) | ~2.6 K q/s |
 | full scan (`SELECT *`) | ~730 K rows/s |
 | range scan (`ORDER BY` + `LIMIT`) | ~13 K rows/s |

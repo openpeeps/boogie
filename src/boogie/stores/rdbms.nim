@@ -45,6 +45,11 @@ type
     ## An ordered index of rows in a table, keyed by primary key value. This allows for efficient
     ## ordered iteration and range queries.
 
+  EqColIndex = ref Table[string, HashSet[string]]
+    ## One column's equality index: cell-value key -> primary keys.
+    ## Boxed by ref so readers borrow the map O(1); a `let` bind of a
+    ## Table value would deep-copy all N entries on every lookup.
+
   DbTable* = ref object
     ## Represents a table in the store, including its schema and data.
     name*: string
@@ -69,8 +74,10 @@ type
       # This is set to true on mutations and cleared when the index is rebuilt.
     indexedCols: HashSet[string]
       # set of column names that have equality indexes built
-    eqIndex: Table[string, Table[string, HashSet[string]]]
+    eqIndex: Table[string, EqColIndex]
       # equality indexes for columns. Maps column name to a mapping of cell value keys to sets of primary keys.
+      # The inner map is boxed by ref so reads borrow it O(1) instead of
+      # copying the whole per-column table on every lookup.
     indexes*: Table[string, IndexDef]
       ## Named secondary indexes by index name (single-column for now).
       ## The key set mirrors `indexedCols`/`eqIndex`; UNIQUE indexes also
@@ -357,7 +364,7 @@ proc newTable*(name: string, primaryKey: string, columns: openArray[ColumnDef],
       rows: initSortedTable[RowRecord, string](),
       rowsByPk: initOrderedTable[string, RowRecord](),
       indexedCols: initHashSet[string](),
-      eqIndex: initTable[string, Table[string, HashSet[string]]](),
+      eqIndex: initTable[string, EqColIndex](),
       indexes: initTable[string, IndexDef](),
       foreignKeys: @foreignKeys,
     )
@@ -371,7 +378,7 @@ proc newTable*(name: string, primaryKey: string, columns: openArray[ColumnDef],
       rows: initSortedTable[RowRecord, string](),
       rowsByPk: initOrderedTable[string, RowRecord](),
       indexedCols: initHashSet[string](),
-      eqIndex: initTable[string, Table[string, HashSet[string]]](),
+      eqIndex: initTable[string, EqColIndex](),
       indexes: initTable[string, IndexDef](),
       foreignKeys: @foreignKeys,
     )
@@ -430,6 +437,11 @@ proc cellIndexKey(v: Value): string =
   of dtText: "t:" & v.strVal
   of dtJson: "j:" & v.jsonVal
 
+proc newColIndex(): EqColIndex =
+  ## Allocates an empty per-column equality map.
+  new(result)
+  result[] = initTable[string, HashSet[string]]()
+
 proc addToEqIndexes(t: DbTable, pk: string, data: RowData) =
   # Update equality indexes for the given row data.
   for col in t.indexedCols.items:
@@ -438,11 +450,11 @@ proc addToEqIndexes(t: DbTable, pk: string, data: RowData) =
     let k = cellIndexKey(data[col])
 
     if not t.eqIndex.hasKey(col):
-      t.eqIndex[col] = initTable[string, HashSet[string]]()
-    if not t.eqIndex[col].hasKey(k):
-      t.eqIndex[col][k] = initHashSet[string]()
+      t.eqIndex[col] = newColIndex()
+    if not t.eqIndex[col][].hasKey(k):
+      t.eqIndex[col][][k] = initHashSet[string]()
 
-    t.eqIndex[col][k].incl(pk)
+    t.eqIndex[col][][k].incl(pk)
 
 proc removeFromEqIndexes(t: DbTable, pk: string, data: RowData) =
   for col in t.indexedCols.items:
@@ -452,12 +464,12 @@ proc removeFromEqIndexes(t: DbTable, pk: string, data: RowData) =
       continue
 
     let k = cellIndexKey(data[col])
-    if t.eqIndex[col].hasKey(k):
-      t.eqIndex[col][k].excl(pk)
-      if t.eqIndex[col][k].len == 0:
-        t.eqIndex[col].del(k)
+    if t.eqIndex[col][].hasKey(k):
+      t.eqIndex[col][][k].excl(pk)
+      if t.eqIndex[col][][k].len == 0:
+        t.eqIndex[col][].del(k)
 
-    if t.eqIndex[col].len == 0:
+    if t.eqIndex[col][].len == 0:
       t.eqIndex.del(col)
 
 proc createIndex*(t: DbTable, column: string) =
@@ -475,7 +487,9 @@ proc createIndex*(t: DbTable, column: string) =
       let k = cellIndexKey(rec.cols[column])
       colMap.mgetOrPut(k, initHashSet[string]()).incl(pk)
 
-  t.eqIndex[column] = colMap
+  var boxed = newColIndex()
+  boxed[] = colMap
+  t.eqIndex[column] = boxed
   t.indexedCols.incl(column)
   let autoName = "auto_idx_" & t.name & "_" & column
   if not t.indexes.hasKey(autoName):
@@ -501,7 +515,9 @@ proc buildEqIndexFor(t: DbTable, column: string) =
     if rec.cols.hasKey(column):
       let k = cellIndexKey(rec.cols[column])
       colMap.mgetOrPut(k, initHashSet[string]()).incl(pk)
-  t.eqIndex[column] = colMap
+  var boxed = newColIndex()
+  boxed[] = colMap
+  t.eqIndex[column] = boxed
   t.indexedCols.incl(column)
 
 proc findIndexTable*(s: Store, indexName: string): tuple[found: bool,
@@ -804,8 +820,8 @@ proc checkUniqueOnInsert(t: DbTable, data: RowData, excludePk = "") =
       if v.kind == dtNull:
         continue
       let k = cellIndexKey(v)
-      if t.eqIndex.hasKey(col) and t.eqIndex[col].hasKey(k):
-        for pk in t.eqIndex[col][k].items:
+      if t.eqIndex.hasKey(col) and t.eqIndex[col][].hasKey(k):
+        for pk in t.eqIndex[col][][k].items:
           if pk != excludePk:
             raise newException(StoreError,
               fmt"unique index violation '{d.name}' on table '{t.name}' column '{col}'")
@@ -1727,8 +1743,8 @@ proc whereScan(t: DbTable, column: string, value: Value): seq[(string, RowData)]
   if t.indexedCols.contains(column) and t.eqIndex.hasKey(column):
     let k = cellIndexKey(value)
     let colMap = t.eqIndex[column]
-    if colMap.hasKey(k):
-      for pk in colMap[k].items:
+    if colMap[].hasKey(k):
+      for pk in colMap[][k].items:
         if t.rowsByPk.hasKey(pk):
           result.add((pk, t.rowsByPk[pk].cols))
     return

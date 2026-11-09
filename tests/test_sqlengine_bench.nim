@@ -47,6 +47,21 @@ suite "benchmarks (in-memory)":
     echo fmt"[bench][sqlvm][mem] pointQuery={float(QueryN) / secs:>9.0f} q/s"
     db.close()
 
+  test "point query (indexed)":
+    let db = open(":memory:", "", "", "")
+    db.exec(sql"CREATE TABLE b (id INTEGER PRIMARY KEY, v TEXT, n INT)")
+    for i in 1 .. QueryN:
+      db.exec(sql"INSERT INTO b (v, n) VALUES (?, ?)", "v" & $i, $i)
+    db.exec(sql"CREATE INDEX idx_b_v ON b (v)")
+    var found = 0
+    let secs = timeIt:
+      for i in 1 .. QueryN:
+        let v = db.getValue(sql"SELECT id FROM b WHERE v = ?", "v" & $i)
+        if v.len > 0: inc found
+    check found == QueryN
+    echo fmt"[bench][sqlvm][mem] pointQueryIdx={float(QueryN) / secs:>9.0f} q/s"
+    db.close()
+
   test "range scan (ORDER BY + LIMIT)":
     let db = open(":memory:", "", "", "")
     db.exec(sql"CREATE TABLE b (id INTEGER PRIMARY KEY, v TEXT, n INT)")
