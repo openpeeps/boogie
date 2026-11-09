@@ -171,13 +171,12 @@ suite "join errors":
       discard db.getAllRows(sql"SELECT a.name FROM a JOIN b ON a.name = z.y")
     db.close()
 
-  test "LEFT JOIN is rejected clearly":
+  test "LEFT JOIN is supported (see test_sql_join_outer)":
+    # Outer-join coverage lives in test_sql_join_outer.nim; this pins the
+    # basic LEFT shape against the original seed tables here.
     let db = open(":memory:", "", "", "")
     seedAB(db)
-    expect DbError:
-      discard db.getAllRows(sql"SELECT a.name FROM a LEFT JOIN b ON a.id = b.aid")
-    expect DbError:
-      discard db.getAllRows(sql"SELECT a.name FROM a LEFT OUTER JOIN b ON a.id = b.aid")
+    check db.getValue(sql"SELECT COUNT(*) FROM a LEFT JOIN b ON b.aid = a.id") == "4"
     db.close()
 
   test "UPDATE and DELETE with JOIN are rejected clearly":

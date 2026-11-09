@@ -45,8 +45,9 @@ export vm.initValue
 ## CREATE [UNIQUE] INDEX [IF NOT EXISTS] / DROP INDEX [IF EXISTS]
 ## (single-column), INSERT with multiple rows and serial primary keys, SELECT
 ## with WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT over single
-## tables and INNER/CROSS JOINs with ON/USING (incl. GROUP BY/HAVING over
-## joins), UPDATE ... SET ... WHERE and DELETE FROM ... WHERE. Expressions
+## tables and INNER/CROSS/LEFT/RIGHT/FULL JOINs with ON/USING (incl.
+## GROUP BY/HAVING over joins), UPDATE ... SET ... WHERE and DELETE FROM
+## ... WHERE. Expressions
 ## support literals, columns, placeholders, comparisons, AND/OR/NOT,
 ## IS [NOT] NULL, LIKE/ILIKE (`%`/`_` wildcards, no ESCAPE clause), BETWEEN
 ## (also `NOT LIKE` / `NOT BETWEEN`; `x IN (v)` single-value only) and
@@ -150,6 +151,8 @@ type
     joinOns: seq[SqlNode]
       ## ON/USING expression per join step, aligned with tables[1..]
       ## (nil entries = cross/comma steps with no condition)
+    joinKinds: seq[JoinKind]
+      ## join kind per step, aligned with `joinOns`
     joinWhere: SqlNode
     joinOrder: seq[string]
       ## SELECT output order: "k<idx>" for plain items, "a<idx>" for aggs
@@ -172,6 +175,9 @@ type
     roots: Table[string, seq[SqlNode]]
       ## parsed statement roots per SQL text, shared by the fast path
       ## (no re-parse per execution) and the VM compile path
+
+  JoinKind = enum
+    jkInner, jkCross, jkLeft, jkRight, jkFull
 
 proc fail(msg: string) {.noreturn.} =
   raise newException(SqlEngineError, msg)
@@ -1702,6 +1708,7 @@ proc planJoinSelect(eng: SqlEngine, root: SqlNode, isDistinct: bool,
   var tables: seq[string] = @[]
   var scopes: seq[string] = @[]
   var ons: seq[SqlNode] = @[]
+  var kinds: seq[JoinKind] = @[]
   var first = true
   for child in fromNode.sons:
     case child.kind
@@ -1709,13 +1716,24 @@ proc planJoinSelect(eng: SqlEngine, root: SqlNode, isDistinct: bool,
       let (t, a) = parseJoinItem(child)
       if not first:
         ons.add(nil)
+        kinds.add(jkCross)
       tables.add(t)
       scopes.add(if a.len > 0: a else: t)
       first = false
     of nkJoin:
-      let kind = child[0].strVal.toLowerAscii()
-      if kind notin ["join", "inner join", "cross join"]:
-        fail("only INNER and CROSS joins are supported (got '" & kind & "')")
+      let rawKind = child[0].strVal.toLowerAscii()
+      # "left outer join" normalizes to "left join" (same for right/full)
+      let kind = rawKind.replace(" outer", "")
+      var jk: JoinKind
+      case kind
+      of "join", "inner join": jk = jkInner
+      of "cross join": jk = jkCross
+      of "left join": jk = jkLeft
+      of "right join": jk = jkRight
+      of "full join": jk = jkFull
+      else:
+        fail("unsupported JOIN type '" & rawKind & "' (supported: INNER, " &
+          "CROSS, LEFT [OUTER], RIGHT [OUTER], FULL [OUTER] JOIN)")
       let (t, a) = parseJoinItem(child[1])
       let scopeName = if a.len > 0: a else: t
       var on: SqlNode = nil
@@ -1764,7 +1782,10 @@ proc planJoinSelect(eng: SqlEngine, root: SqlNode, isDistinct: bool,
           fail("unsupported JOIN condition")
       tables.add(t)
       scopes.add(scopeName)
+      if jk != jkCross and jk != jkInner and on.isNil:
+        fail(rawKind.toUpperAscii & " requires ON or USING")
       ons.add(on)
+      kinds.add(jk)
       first = false
     else: fail("unsupported FROM item")
   # validate filter expressions against the full scope (forward refs in ON
@@ -2047,6 +2068,7 @@ proc planJoinSelect(eng: SqlEngine, root: SqlNode, isDistinct: bool,
   stmt.joinTables = tables
   stmt.joinScopes = scopes
   stmt.joinOns = ons
+  stmt.joinKinds = kinds
   stmt.joinWhere = whereNode
   stmt.joinOrder = order
   var jkeys: seq[tuple[expr: SqlNode, outName: string]] = @[]
@@ -4021,11 +4043,75 @@ proc evalJoinCell(cx: FastCx, n: SqlNode, mrow: RowData,
     else: (false, nil)
   else: (false, nil)
 
+proc joinOnMatches(cx: FastCx, on: SqlNode, m: RowData,
+    scope: seq[JoinScopeEntry]): bool =
+  ## Single ON/USING predicate over a combined joined row. Nil (cross/comma
+  ## steps) always matches; anything else follows WHERE truthiness (NULL
+  ## never matches, which is what keeps NULL-supplied rows from re-matching
+  ## in later steps).
+  if on.isNil: return true
+  let (ok, fv) = evalJoinCell(cx, on, m, scope)
+  if not ok:
+    fail("JOIN with this expression shape is not supported yet")
+  vmTruthFast(fv)
+
+proc joinRowSource(cx: FastCx, scope: seq[JoinScopeEntry],
+    kinds: seq[JoinKind], ons: seq[SqlNode]): seq[RowData] =
+  ## Left-deep join row source shared by all join executors. Each step
+  ## applies only its own ON: INNER/CROSS keep matches, LEFT/FULL
+  ## NULL-extend left rows with no match, RIGHT/FULL additionally emit
+  ## right rows that matched nothing (NULL-extended on the left). WHERE
+  ## stays a post-filter in the callers — identical to the old combined
+  ## filter for inner joins, required for outer-join correctness.
+  let N = scope.len
+  var snaps = newSeq[seq[RowData]](N)
+  for i in 0 ..< N:
+    for _, rec in scope[i].tbl.allRowsByPk:
+      snaps[i].add(rec)
+  result = @[]
+  for rec in snaps[0]:
+    var m = initOrderedTable[string, rdbms.Value]()
+    for col, v in rec.pairs:
+      m[scope[0].scopeName & "." & col] = v
+    result.add(m)
+  for step in 1 ..< N:
+    let kind = kinds[step - 1]
+    let on = ons[step - 1]
+    var next: seq[RowData] = @[]
+    var matched = newSeq[bool](snaps[step].len)
+    for m in result:
+      var any = false
+      for ri in 0 ..< snaps[step].len:
+        var combined = m
+        for col, v in snaps[step][ri].pairs:
+          combined[scope[step].scopeName & "." & col] = v
+        if kind == jkCross or joinOnMatches(cx, on, combined, scope):
+          next.add(combined)
+          matched[ri] = true
+          any = true
+      if (kind == jkLeft or kind == jkFull) and not any:
+        var ext = m
+        for c in scope[step].tbl.columns:
+          ext[scope[step].scopeName & "." & c.name] = newNullValue()
+        next.add(ext)
+    if kind == jkRight or kind == jkFull:
+      for ri in 0 ..< snaps[step].len:
+        if not matched[ri]:
+          var ext = initOrderedTable[string, rdbms.Value]()
+          for i in 0 ..< step:
+            for c in scope[i].tbl.columns:
+              ext[scope[i].scopeName & "." & c.name] = newNullValue()
+          for col, v in snaps[step][ri].pairs:
+            ext[scope[step].scopeName & "." & col] = v
+          next.add(ext)
+    result = next
+    if result.len == 0: break
+
 proc execJoinStmt(eng: SqlEngine, stmt: CompiledStmt,
     params: openArray[Value]): Value =
-  ## Nested-loop INNER/CROSS join: snapshot per-table rows, combine into
-  ## merged qualified rows, apply the single AND of all ONs + WHERE, then
-  ## project or group-less aggregate into `ctx.results`.
+  ## Left-deep nested-loop join over the shared row source (per-step ON
+  ## matching with NULL-supply for outer joins), WHERE as post-filter, then
+  ## plain projection or group-less aggregation into `ctx.results`.
   var tbls: seq[DbTable] = @[]
   for i, tn in stmt.joinTables:
     if not eng.ctx.store.hasTable(tn):
@@ -4041,29 +4127,9 @@ proc execJoinStmt(eng: SqlEngine, stmt: CompiledStmt,
   if not stmt.joinWhere.isNil: walkPhFast(stmt.joinWhere, cx)
   for k in stmt.joinKeys:
     walkPhFast(k.expr, cx)
-  # snapshots first (hash order like the single-table scan)
-  var snaps = newSeq[seq[RowData]](N)
-  for i in 0 ..< N:
-    for _, rec in tbls[i].allRowsByPk:
-      snaps[i].add(rec)
-    if snaps[i].len == 0:
-      eng.ctx.results.setLen(0)
-      eng.ctx.affected = 0
-      return nil
-  var conds: seq[SqlNode] = @[]
-  for on in stmt.joinOns:
-    if not on.isNil: conds.add(on)
-  if not stmt.joinWhere.isNil: conds.add(stmt.joinWhere)
-  template rowMatches(m: RowData): bool =
-    var okAll = true
-    for cond in conds:
-      let (ok, fv) = evalJoinCell(cx, cond, m, scope)
-      if not ok:
-        fail("JOIN with this expression shape is not supported yet")
-      if not vmTruthFast(fv):
-        okAll = false
-        break
-    okAll
+  let rows = joinRowSource(cx, scope, stmt.joinKinds, stmt.joinOns)
+  template whereOk(m: RowData): bool =
+    joinOnMatches(cx, stmt.joinWhere, m, scope)
   eng.ctx.results.setLen(0)
   if stmt.joinAggs.len > 0:
     var countStar = 0'i64
@@ -4074,15 +4140,8 @@ proc execJoinStmt(eng: SqlEngine, stmt: CompiledStmt,
     var maxAcc = newSeq[Value](stmt.joinAggs.len)
     for i in 0 ..< stmt.joinAggs.len:
       sumAcc[i] = initValue(0'i64)
-    var idxs = newSeq[int](N)
-    var cur = newSeq[RowData](N)
-    while true:
-      for i in 0 ..< N: cur[i] = snaps[i][idxs[i]]
-      var m = initOrderedTable[string, rdbms.Value]()
-      for i in 0 ..< N:
-        for col, v in cur[i].pairs:
-          m[scope[i].scopeName & "." & col] = v
-      if rowMatches(m):
+    for m in rows:
+      if whereOk(m):
         inc countStar
         for ai in 0 ..< stmt.joinAggs.len:
           let a = stmt.joinAggs[ai]
@@ -4127,13 +4186,6 @@ proc execJoinStmt(eng: SqlEngine, stmt: CompiledStmt,
               else:
                 if lessThan(cur2, v): maxAcc[ai] = v
           else: discard
-      var p = N - 1
-      while p >= 0:
-        inc idxs[p]
-        if idxs[p] < snaps[p].len: break
-        idxs[p] = 0
-        dec p
-      if p < 0: break
     var cells: seq[Value] = @[]
     for ai in 0 ..< stmt.joinAggs.len:
       let a = stmt.joinAggs[ai]
@@ -4148,15 +4200,8 @@ proc execJoinStmt(eng: SqlEngine, stmt: CompiledStmt,
       else: cells.add(maxAcc[ai])
     eng.ctx.results.add(cells)
   else:
-    var idxs = newSeq[int](N)
-    var cur = newSeq[RowData](N)
-    while true:
-      for i in 0 ..< N: cur[i] = snaps[i][idxs[i]]
-      var m = initOrderedTable[string, rdbms.Value]()
-      for i in 0 ..< N:
-        for col, v in cur[i].pairs:
-          m[scope[i].scopeName & "." & col] = v
-      if rowMatches(m):
+    for m in rows:
+      if whereOk(m):
         var cells = newSeqOfCap[Value](stmt.joinKeys.len)
         for k in stmt.joinKeys:
           let (ok, v) = evalJoinCell(cx, k.expr, m, scope)
@@ -4164,13 +4209,6 @@ proc execJoinStmt(eng: SqlEngine, stmt: CompiledStmt,
             fail("JOIN with this expression shape is not supported yet")
           cells.add(v)
         eng.ctx.results.add(cells)
-      var p = N - 1
-      while p >= 0:
-        inc idxs[p]
-        if idxs[p] < snaps[p].len: break
-        idxs[p] = 0
-        dec p
-      if p < 0: break
   eng.ctx.affected = int64(eng.ctx.results.len)
   nil
 
@@ -4350,24 +4388,9 @@ proc execJoinGroupedStmt(eng: SqlEngine, stmt: CompiledStmt,
   for g in stmt.joinGroupExprs: walkPhFast(g, cx)
   for k in stmt.joinKeys: walkPhFast(k.expr, cx)
   if not stmt.joinGroupHaving.isNil: walkPhFast(stmt.joinGroupHaving, cx)
-  var snaps = newSeq[seq[RowData]](N)
-  for i in 0 ..< N:
-    for _, rec in scope[i].tbl.allRowsByPk:
-      snaps[i].add(rec)
-  var conds: seq[SqlNode] = @[]
-  for on in stmt.joinOns:
-    if not on.isNil: conds.add(on)
-  if not stmt.joinWhere.isNil: conds.add(stmt.joinWhere)
-  template rowMatches(m: RowData): bool =
-    var okAll = true
-    for cond in conds:
-      let (ok, fv) = evalJoinCell(cx, cond, m, scope)
-      if not ok:
-        fail("JOIN with this expression shape is not supported yet")
-      if not vmTruthFast(fv):
-        okAll = false
-        break
-    okAll
+  let rows = joinRowSource(cx, scope, stmt.joinKinds, stmt.joinOns)
+  template whereOk(m: RowData): bool =
+    joinOnMatches(cx, stmt.joinWhere, m, scope)
   let nAggs = stmt.joinGroupAllAggs.len
   var keyIndex = initTable[string, int]()
   var gKeys: seq[seq[Value]] = @[]
@@ -4443,24 +4466,9 @@ proc execJoinGroupedStmt(eng: SqlEngine, stmt: CompiledStmt,
           else:
             if lessThan(cur, v): gAccs[gi][ai].maxAcc = v
       else: discard
-  if N > 0 and snaps.allIt(it.len > 0):
-    var idxs = newSeq[int](N)
-    var cur = newSeq[RowData](N)
-    while true:
-      for i in 0 ..< N: cur[i] = snaps[i][idxs[i]]
-      var m = initOrderedTable[string, rdbms.Value]()
-      for i in 0 ..< N:
-        for col, v in cur[i].pairs:
-          m[scope[i].scopeName & "." & col] = v
-      if rowMatches(m):
-        visitRow(m)
-      var p = N - 1
-      while p >= 0:
-        inc idxs[p]
-        if idxs[p] < snaps[p].len: break
-        idxs[p] = 0
-        dec p
-      if p < 0: break
+  for m in rows:
+    if whereOk(m):
+      visitRow(m)
   eng.ctx.results.setLen(0)
   if stmt.joinGroupExprs.len == 0 and gKeys.len == 0:
     # global aggregation (HAVING without GROUP BY): a single empty group

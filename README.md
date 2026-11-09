@@ -295,8 +295,9 @@ NOT NULL, DEFAULT, inline `REFERENCES`), `DROP TABLE [IF EXISTS]`,
 `SELECT` with
 `WHERE`/`ORDER BY`/`LIMIT`/`OFFSET`/`DISTINCT`, `GROUP BY` over plain columns
 with `HAVING` (aggregates `COUNT`/`SUM`/`AVG`/`MIN`/`MAX`, `ORDER BY` over
-SELECT outputs), `INNER`/`CROSS JOIN` (aliases, `ON`/`USING`, qualified refs,
-aggregates and `GROUP BY`/`HAVING` over joins), `UPDATE ... SET ... WHERE`,
+SELECT outputs), `INNER`/`CROSS`/`LEFT`/`RIGHT`/`FULL JOIN` (aliases,
+`ON`/`USING`, qualified refs, aggregates and `GROUP BY`/`HAVING` over
+joins), `UPDATE ... SET ... WHERE`,
 `DELETE FROM ... WHERE`,
 aggregates without GROUP BY, and expressions with comparisons, `AND`/`OR`/
 `NOT`, arithmetic, `IS [NOT] NULL`, `LIKE`/`ILIKE` (`%`/`_` wildcards),
