@@ -287,24 +287,57 @@ echo db.getValue(sql"SELECT COUNT(*) FROM users")
 db.close()
 ```
 
-Supported subset: `CREATE TABLE [IF NOT EXISTS]` (typed columns, PRIMARY KEY,
-NOT NULL, DEFAULT, inline `REFERENCES`), `DROP TABLE [IF EXISTS]`,
-`CREATE [UNIQUE] INDEX [IF NOT EXISTS]` / `DROP INDEX [IF EXISTS]`
-(single-column, persisted, UNIQUE enforced), `ALTER TABLE ... ADD COLUMN` /
-`RENAME COLUMN` / `RENAME TO`, multi-row `INSERT` with serial primary keys,
-`SELECT` with
-`WHERE`/`ORDER BY`/`LIMIT`/`OFFSET`/`DISTINCT`, `GROUP BY` over plain columns
-with `HAVING` (aggregates `COUNT`/`SUM`/`AVG`/`MIN`/`MAX`, `ORDER BY` over
-SELECT outputs), `INNER`/`CROSS`/`LEFT`/`RIGHT`/`FULL JOIN` (aliases,
-`ON`/`USING`, qualified refs, aggregates and `GROUP BY`/`HAVING` over
-joins), `UNION`/`UNION ALL` (typed DISTINCT, trailing `ORDER BY`/`LIMIT`
-apply to the whole union), `UPDATE ... SET ... WHERE`,
-`DELETE FROM ... WHERE`,
-aggregates without GROUP BY, and expressions with comparisons, `AND`/`OR`/
-`NOT`, arithmetic, `IS [NOT] NULL`, `LIKE`/`ILIKE` (`%`/`_` wildcards),
-`BETWEEN`, single-value `IN (v)` and `?`/`$n` placeholders. Subqueries
-(incl. `IN (SELECT ...)` and multi-value `IN (a, b)`, which cannot parse)
-are not supported yet.
+Supported SQL, by example:
+
+```sql
+-- tables: typed columns, PRIMARY KEY, NOT NULL, DEFAULT, inline REFERENCES
+CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL, age INT DEFAULT 0);
+CREATE TABLE posts (id INTEGER PRIMARY KEY, author INT REFERENCES users (id), body TEXT);
+DROP TABLE IF EXISTS posts;
+
+-- secondary indexes (single-column, persisted; UNIQUE is enforced)
+CREATE UNIQUE INDEX idx_user_name ON users (name);
+DROP INDEX idx_user_name;
+
+-- schema evolution
+ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT '';
+ALTER TABLE users RENAME COLUMN email TO mail;
+ALTER TABLE users RENAME TO accounts;
+
+-- inserts: multi-row, serial PKs, placeholders
+INSERT INTO users (name, age) VALUES ('alice', 30), ('bob', 25);
+INSERT INTO users (name) VALUES (?);
+
+-- filtering, ordering, paging
+SELECT id, name FROM users WHERE age BETWEEN 18 AND 65 ORDER BY name LIMIT 10 OFFSET 5;
+SELECT DISTINCT age FROM users WHERE name LIKE 'a%' AND age IS NOT NULL;
+
+-- aggregates, grouping, having
+SELECT COUNT(*) FROM users;
+SELECT age, COUNT(*), AVG(age) FROM users GROUP BY age HAVING COUNT(*) > 1;
+
+-- joins (INNER/CROSS/LEFT/RIGHT/FULL, aliases, ON/USING, outer joins keep
+-- unmatched rows with NULLs); aggregates and GROUP BY work over joins too
+SELECT u.name, p.body FROM users u JOIN posts p ON p.author = u.id;
+SELECT u.name, p.body FROM users u LEFT JOIN posts p ON p.author = u.id;
+SELECT a.id, b.id FROM a FULL JOIN b USING (id);
+
+-- set operations (trailing ORDER BY/LIMIT applies to the whole union)
+SELECT name FROM users UNION ALL SELECT name FROM admins ORDER BY name LIMIT 5;
+SELECT name FROM users UNION SELECT name FROM admins;
+
+-- updates and deletes
+UPDATE users SET age = age + 1 WHERE id = ?;
+DELETE FROM users WHERE age < 18;
+```
+
+Expressions support comparisons, `AND`/`OR`/`NOT`, arithmetic,
+`IS [NOT] NULL`, `LIKE`/`ILIKE` (`%`/`_` wildcards), `BETWEEN`,
+single-value `IN (v)`, and `?`/`$n`/`:name` placeholders.
+
+Not supported yet: subqueries (incl. `IN (SELECT ...)`), multi-value
+`IN (a, b)` (cannot parse upstream), `DROP COLUMN` (dropped by the
+upstream parser), `CASE`, `CHECK` constraints, and `INSERT INTO ... SELECT`.
 
 > Statements are parsed once per connection and cached; `exec()` binds its
 > arguments as typed values so repeated calls hit the plan cache.
