@@ -297,7 +297,8 @@ NOT NULL, DEFAULT, inline `REFERENCES`), `DROP TABLE [IF EXISTS]`,
 with `HAVING` (aggregates `COUNT`/`SUM`/`AVG`/`MIN`/`MAX`, `ORDER BY` over
 SELECT outputs), `INNER`/`CROSS`/`LEFT`/`RIGHT`/`FULL JOIN` (aliases,
 `ON`/`USING`, qualified refs, aggregates and `GROUP BY`/`HAVING` over
-joins), `UPDATE ... SET ... WHERE`,
+joins), `UNION`/`UNION ALL` (typed DISTINCT, trailing `ORDER BY`/`LIMIT`
+apply to the whole union), `UPDATE ... SET ... WHERE`,
 `DELETE FROM ... WHERE`,
 aggregates without GROUP BY, and expressions with comparisons, `AND`/`OR`/
 `NOT`, arithmetic, `IS [NOT] NULL`, `LIKE`/`ILIKE` (`%`/`_` wildcards),

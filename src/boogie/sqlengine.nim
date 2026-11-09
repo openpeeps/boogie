@@ -46,8 +46,8 @@ export vm.initValue
 ## (single-column), INSERT with multiple rows and serial primary keys, SELECT
 ## with WHERE/GROUP BY/HAVING/ORDER BY/LIMIT/OFFSET/DISTINCT over single
 ## tables and INNER/CROSS/LEFT/RIGHT/FULL JOINs with ON/USING (incl.
-## GROUP BY/HAVING over joins), UPDATE ... SET ... WHERE and DELETE FROM
-## ... WHERE. Expressions
+## GROUP BY/HAVING over joins), UNION/UNION ALL over SELECT branches,
+## UPDATE ... SET ... WHERE and DELETE FROM ... WHERE. Expressions
 ## support literals, columns, placeholders, comparisons, AND/OR/NOT,
 ## IS [NOT] NULL, LIKE/ILIKE (`%`/`_` wildcards, no ESCAPE clause), BETWEEN
 ## (also `NOT LIKE` / `NOT BETWEEN`; `x IN (v)` single-value only) and
@@ -165,6 +165,25 @@ type
     joinGroupAllAggs: seq[tuple[fn: string, argKey: string]]
       ## union of SELECT + HAVING-only aggregates (`"*"` or `"scope.col"`)
       ## for GROUP BY over joins
+    isUnion: bool
+      ## true for UNION/UNION ALL: branches execute in Nim (no VM chunk)
+      ## and fold into `ctx.results` for `postProcessSelect`
+    unionBranches: seq[UnionBranch]
+    unionAll: seq[bool]
+      ## per-junction flags aligned with branches[1..] (true = ALL)
+    unionPhGlobal: seq[string]
+      ## union-wide placeholder names in first-appearance order
+    unionPhOff: seq[int]
+      ## per-branch offsets into `unionPhGlobal` (exec seeds `cx.phs`)
+
+  UnionBranchKind = enum ubPlainChunk, ubGrouped, ubJoin, ubJoinGrouped
+
+  UnionBranch = object
+    kind: UnionBranchKind
+    stmt: CompiledStmt
+      ## branch plan: chunk for plain branches, Nim plan for grouped/joins
+    branchDistinct: bool
+      ## SELECT DISTINCT branch: dedupe branch rows before folding
 
   SqlEngine* = ref object
     ## Compiles and executes SQL against one store. One instance per
@@ -2823,6 +2842,201 @@ proc compileDdl(l: var Lowerer, root: SqlNode): CompiledStmt =
     fail("unsupported DDL statement")
 
 #
+# UNION / UNION ALL (P1)
+#
+# Set operations over full SELECT branches (plain, grouped, joins). Branches
+# execute through the same machinery as standalone SELECTs (chunks for plain
+# branches, Nim executors for grouped/joins) and fold left into typed rows;
+# the union statement then post-processes (sort/limit/stringify).
+
+proc flattenUnion(n: SqlNode): seq[tuple[br: SqlNode, all: bool]] =
+  ## Flattens right-nested `nkUnion` into branches in order, each with the
+  ## ALL flag of the junction BEFORE it (first = false). Folding the result
+  ## left matches SQL associativity (`(a UNION b) UNION ALL c`). A leading
+  ## ALL is consumed by the next junction, so it carries across nesting
+  ## into the first branch of a nested group.
+  var pendingAll = false
+  for child in n.sons:
+    if child.kind == nkIdent and child.strVal.toLowerAscii() == "all":
+      pendingAll = true
+    elif child.kind in {nkSelect, nkSelectDistinct}:
+      if result.len > 0:
+        result.add((child, pendingAll))
+        pendingAll = false
+      else:
+        result.add((child, false))
+    elif child.kind == nkUnion:
+      for i, sub in flattenUnion(child):
+        if i == 0:
+          if result.len > 0:
+            result.add((sub.br, pendingAll))
+            pendingAll = false
+          else:
+            result.add((sub.br, false))
+        else:
+          result.add(sub)
+    elif child.kind == nkPrGroup and child.len >= 1 and
+        child[0].kind in {nkSelect, nkSelectDistinct}:
+      if result.len > 0:
+        result.add((child[0], pendingAll))
+        pendingAll = false
+      else:
+        result.add((child[0], false))
+    else:
+      fail("unsupported UNION branch")
+
+proc branchUnionKind(root: SqlNode): tuple[kind: UnionBranchKind,
+    tableName: string] =
+  ## Classifies one UNION branch like `fastSelect` does (plain vs grouped
+  ## vs join), without executing anything.
+  var tableName = ""
+  var hasGroup = false
+  var fromNode: SqlNode = nil
+  for child in root.sons:
+    case child.kind
+    of nkFrom:
+      fromNode = child
+      if child.len > 0:
+        tableName = nodeIdent(child[0][0])
+    of nkGroup, nkHaving: hasGroup = true
+    else: discard
+  if not fromNode.isNil and fromMultiTable(fromNode):
+    if hasGroup:
+      return (ubJoinGrouped, tableName)
+    return (ubJoin, tableName)
+  if tableName.len == 0:
+    fail("SELECT requires a FROM clause")
+  if hasGroup:
+    return (ubGrouped, tableName)
+  (ubPlainChunk, tableName)
+
+proc planUnionSelect(eng: SqlEngine, root: SqlNode, phs: var seq[string],
+    stmt: var CompiledStmt) =
+  ## Plans a UNION/UNION ALL statement: flatten branches, hoist trailing
+  ## ORDER BY/LIMIT/OFFSET to union level, plan each branch with chained
+  ## placeholder namespaces, check column widths.
+  let flat = flattenUnion(root)
+  if flat.len < 2:
+    fail("UNION requires at least two SELECT branches")
+  var branches: seq[SqlNode] = @[]
+  var allOps: seq[bool] = @[]
+  for i, f in flat:
+    branches.add(f.br)
+    if i > 0: allOps.add(f.all)
+  # trailing ORDER BY/LIMIT/OFFSET belong to the whole union: hoist from
+  # the last branch, reject on earlier ones (ambiguous). The strip works on
+  # a shallow copy — cached roots must stay intact, since `placeholderCount`
+  # may compile (and re-plan) before execution does.
+  var orderNode, limitNode, offsetNode: SqlNode = nil
+  for bi in 0 ..< branches.len:
+    let b = branches[bi]
+    var hasPost = false
+    for child in b.sons:
+      if child.kind in {nkOrder, nkLimit, nkOffset}:
+        hasPost = true
+        break
+    if hasPost:
+      if bi < branches.len - 1:
+        fail("ORDER BY/LIMIT apply to the whole UNION, not one branch")
+      var kept: seq[SqlNode] = @[]
+      for child in b.sons:
+        case child.kind
+        of nkOrder: orderNode = child
+        of nkLimit: limitNode = child[0]
+        of nkOffset: offsetNode = child[0]
+        else: kept.add(child)
+      var bcopy = new(SqlNode)
+      bcopy[] = b[]
+      bcopy.sons = kept
+      branches[bi] = bcopy
+  var ubranches: seq[UnionBranch] = @[]
+  var uoffs: seq[int] = @[]
+  var width = -1
+  var firstNames: seq[string] = @[]
+  for b in branches:
+    uoffs.add(phs.len)
+    let (bkind, tableName) = branchUnionKind(b)
+    let bdistinct = b.kind == nkSelectDistinct
+    case bkind
+    of ubPlainChunk:
+      var l = initLowerer(eng, "union_branch")
+      l.placeholders = phs
+      var bst = l.compileSelect(b)
+      phs = l.placeholders
+      if width < 0:
+        width = bst.projCols.len
+        firstNames = bst.projCols
+      elif bst.projCols.len != width:
+        fail("UNION branches must return the same number of columns")
+      ubranches.add(UnionBranch(kind: ubPlainChunk, stmt: bst,
+        branchDistinct: bdistinct))
+    of ubGrouped:
+      if not eng.ctx.store.hasTable(tableName):
+        fail("no such table: '" & tableName & "'")
+      let tbl = eng.ctx.store.getTable(tableName).get()
+      var bst = CompiledStmt(kind: skSelect)
+      planGroupedSelect(tbl, b, bdistinct, phs, bst)
+      if width < 0:
+        width = bst.projCols.len
+        firstNames = bst.projCols
+      elif bst.projCols.len != width:
+        fail("UNION branches must return the same number of columns")
+      ubranches.add(UnionBranch(kind: ubGrouped, stmt: bst,
+        branchDistinct: bdistinct))
+    of ubJoin, ubJoinGrouped:
+      var bst = CompiledStmt(kind: skSelect)
+      planJoinSelect(eng, b, bdistinct, phs, bst)
+      if width < 0:
+        width = bst.projCols.len
+        firstNames = bst.projCols
+      elif bst.projCols.len != width:
+        fail("UNION branches must return the same number of columns")
+      ubranches.add(UnionBranch(kind: bkind, stmt: bst, branchDistinct: bdistinct))
+  # union-level ORDER BY resolves against first-branch outputs only
+  var orderKeys: seq[(int, bool)] = @[]
+  if not orderNode.isNil:
+    for key in orderNode.sons:
+      var desc = false
+      var colNode = key
+      if key.kind == nkDesc:
+        desc = true
+        colNode = key[0]
+      let colName = colNode.nodeIdent()
+      if colName.len == 0:
+        fail("unsupported ORDER BY expression")
+      var idx = -1
+      for i, p in firstNames:
+        if p.toLowerAscii() == colName.toLowerAscii():
+          idx = i
+          break
+      if idx < 0:
+        fail("ORDER BY on UNION must reference a SELECT output")
+      orderKeys.add((idx, desc))
+  var limitVal = -1'i64
+  var offsetVal = 0'i64
+  try:
+    if not limitNode.isNil: limitVal = limitNode.strVal.parseBiggestInt.int64
+    if not offsetNode.isNil: offsetVal = offsetNode.strVal.parseBiggestInt.int64
+  except ValueError:
+    fail("LIMIT/OFFSET must be integer literals")
+  stmt.isUnion = true
+  stmt.kind = skSelect
+  stmt.unionBranches = ubranches
+  stmt.unionAll = allOps
+  stmt.unionPhGlobal = phs
+  stmt.unionPhOff = uoffs
+  stmt.projCols = firstNames
+  stmt.orderKeys = orderKeys
+  stmt.isDistinct = false
+  stmt.deferredRange = orderKeys.len > 0
+  stmt.deferLimit = if orderKeys.len > 0: limitVal else: -1'i64
+  stmt.deferOffset = if orderKeys.len > 0: offsetVal else: 0'i64
+  stmt.placeholders = phs
+  if orderKeys.len == 0:
+    stmt.deferLimit = limitVal
+    stmt.deferOffset = offsetVal
+
+#
 # native fast paths
 #
 # The VM loop costs several foreign calls per row (scan_next, one col lookup
@@ -2845,22 +3059,16 @@ proc postProcessSelect(eng: SqlEngine, stmt: CompiledStmt): ExecResult
   ## post-processing (sort/distinct/limit/stringify).
 
 proc execGroupedStmt(eng: SqlEngine, stmt: CompiledStmt,
-    params: openArray[Value]): Value
+    params: openArray[Value], seedPhs: seq[string] = @[]): Value
   ## Forward declaration: grouped execution shared by fast and VM paths.
-  ## Runs the WHERE filter, hash-groups by typed keys, finalizes aggregates,
-  ## applies HAVING, then fills `ctx.results` for `postProcessSelect`.
 
 proc execJoinStmt(eng: SqlEngine, stmt: CompiledStmt,
-    params: openArray[Value]): Value
+    params: openArray[Value], seedPhs: seq[string] = @[]): Value
   ## Forward declaration: join execution shared by fast and VM paths.
-  ## Nested-loop over table snapshots, one combined ON/WHERE filter per
-  ## joined row, then plain projection or group-less aggregation into
-  ## `ctx.results` for `postProcessSelect`.
 
 proc execJoinGroupedStmt(eng: SqlEngine, stmt: CompiledStmt,
-    params: openArray[Value]): Value
-  ## Forward declaration: GROUP BY over joins. Same nested-loop row source
-  ## as `execJoinStmt`, then hash-grouping, per-group aggregates, HAVING.
+    params: openArray[Value], seedPhs: seq[string] = @[]): Value
+  ## Forward declaration: GROUP BY over joins.
 
 type FastCx = object
   tbl: DbTable
@@ -3449,6 +3657,16 @@ proc fastSelectProj(eng: SqlEngine, root: SqlNode, tbl: DbTable,
     declineFast()
   (proj, orderKeys, hidden, limitVal, offsetVal, aggs)
 
+proc execPlainSelect(eng: SqlEngine, root: SqlNode, tbl: DbTable,
+    cx: FastCx): CompiledStmt
+  ## Forward declaration: single-table non-grouped SELECT core. Fills
+  ## `ctx.results` with typed rows and returns the post-processing stmt.
+
+proc runCompiled(eng: SqlEngine, stmt: CompiledStmt,
+    params: openArray[Value]): Value
+  ## Forward declaration: executes one planned statement (chunk, grouped,
+  ## join or union) against the store.
+
 proc fastSelect(eng: SqlEngine, root: SqlNode, cx: FastCx): ExecResult =
   let isDistinct = root.kind == nkSelectDistinct
   var tableName = ""
@@ -3482,6 +3700,18 @@ proc fastSelect(eng: SqlEngine, root: SqlNode, cx: FastCx): ExecResult =
     planGroupedSelect(tbl, root, isDistinct, dummyPhs, stmt)
     discard eng.execGroupedStmt(stmt, cx.params)
     return eng.postProcessSelect(stmt)
+  eng.postProcessSelect(eng.execPlainSelect(root, tbl, cx))
+
+proc execPlainSelect(eng: SqlEngine, root: SqlNode, tbl: DbTable,
+    cx: FastCx): CompiledStmt =
+  ## Single-table non-grouped SELECT core shared by `fastSelect` and UNION
+  ## branches: fills `ctx.results` with typed rows and returns the
+  ## post-processing stmt (the caller runs `postProcessSelect`). The caller
+  ## must have walked placeholders into `cx` already.
+  let isDistinct = root.kind == nkSelectDistinct
+  var whereNode: SqlNode = nil
+  for child in root.sons:
+    if child.kind == nkWhere: whereNode = child[0]
   let (proj, orderKeys, hidden, limitVal, offsetVal, aggs) =
     eng.fastSelectProj(root, tbl, cx)
   if aggs.len > 0:
@@ -3570,9 +3800,9 @@ proc fastSelect(eng: SqlEngine, root: SqlNode, cx: FastCx): ExecResult =
       else: cells.add(maxAcc)
     eng.ctx.results.add(cells)
     let projCols = aggs.mapIt(it[2])
-    return eng.postProcessSelect(CompiledStmt(
+    return CompiledStmt(
       kind: skSelect, projCols: projCols, placeholders: cx.phs,
-      deferLimit: -1'i64))
+      deferLimit: -1'i64)
   # plain projection
   let limited = orderKeys.len == 0
   var scanned = 0'i64
@@ -3617,7 +3847,7 @@ proc fastSelect(eng: SqlEngine, root: SqlNode, cx: FastCx): ExecResult =
     if limitVal >= 0 and limitVal < rows.len.int64:
       rows = rows[0 ..< int(limitVal)]
     eng.ctx.results = rows
-  eng.postProcessSelect(stmt)
+  stmt
 
 type GroupAggAcc = object
   countNonNull: int64
@@ -3770,14 +4000,16 @@ proc evalGroupHaving(cx: FastCx, n: SqlNode, keyVals: seq[Value],
   else: (false, nil)
 
 proc execGroupedStmt(eng: SqlEngine, stmt: CompiledStmt,
-    params: openArray[Value]): Value =
+    params: openArray[Value], seedPhs: seq[string] = @[]): Value =
   ## Shared GROUP BY executor: filters rows, hash-groups by typed keys,
   ## finalizes aggregates with group-less NULL semantics, applies HAVING,
-  ## and fills `ctx.results` for `postProcessSelect`.
+  ## and fills `ctx.results` for `postProcessSelect`. `seedPhs` carries the
+  ## union-wide placeholder prefix so numbering continues across branches.
   if not eng.ctx.store.hasTable(stmt.groupTable):
     fail("no such table: " & stmt.groupTable)
   let tbl = eng.ctx.store.getTable(stmt.groupTable).get()
   var cx = FastCx(tbl: tbl, params: @params)
+  cx.phs = seedPhs
   if not stmt.groupWhere.isNil: walkPhFast(stmt.groupWhere, cx)
   if not stmt.groupHaving.isNil: walkPhFast(stmt.groupHaving, cx)
   if not stmt.groupWhere.isNil:
@@ -4130,10 +4362,11 @@ proc joinRowSource(cx: FastCx, scope: seq[JoinScopeEntry],
     if result.len == 0: break
 
 proc execJoinStmt(eng: SqlEngine, stmt: CompiledStmt,
-    params: openArray[Value]): Value =
+    params: openArray[Value], seedPhs: seq[string] = @[]): Value =
   ## Left-deep nested-loop join over the shared row source (per-step ON
   ## matching with NULL-supply for outer joins), WHERE as post-filter, then
   ## plain projection or group-less aggregation into `ctx.results`.
+  ## `seedPhs` carries the union-wide placeholder prefix.
   var tbls: seq[DbTable] = @[]
   for i, tn in stmt.joinTables:
     if not eng.ctx.store.hasTable(tn):
@@ -4144,6 +4377,7 @@ proc execJoinStmt(eng: SqlEngine, stmt: CompiledStmt,
   for i in 0 ..< N:
     scope.add((stmt.joinScopes[i], stmt.joinTables[i], tbls[i]))
   var cx = FastCx(tbl: tbls[0], params: @params)
+  cx.phs = seedPhs
   for on in stmt.joinOns:
     if not on.isNil: walkPhFast(on, cx)
   if not stmt.joinWhere.isNil: walkPhFast(stmt.joinWhere, cx)
@@ -4397,13 +4631,15 @@ proc evalJoinHaving(cx: FastCx, n: SqlNode, keyVals: seq[Value],
   else: (false, nil)
 
 proc execJoinGroupedStmt(eng: SqlEngine, stmt: CompiledStmt,
-    params: openArray[Value]): Value =
+    params: openArray[Value], seedPhs: seq[string] = @[]): Value =
   ## GROUP BY over joins: nested-loop over table snapshots, combined
   ## ON/WHERE filter, hash-grouping by typed keys, per-group aggregates
   ## with group-less NULL semantics, HAVING, then projection.
+  ## `seedPhs` carries the union-wide placeholder prefix.
   let scope = rebuildJoinScope(eng, stmt)
   let N = scope.len
   var cx = FastCx(tbl: scope[0].tbl, params: @params)
+  cx.phs = seedPhs
   for on in stmt.joinOns:
     if not on.isNil: walkPhFast(on, cx)
   if not stmt.joinWhere.isNil: walkPhFast(stmt.joinWhere, cx)
@@ -4561,6 +4797,62 @@ proc execJoinGroupedStmt(eng: SqlEngine, stmt: CompiledStmt,
   eng.ctx.affected = int64(eng.ctx.results.len)
   nil
 
+proc dedupeTypedRows(rows: seq[seq[Value]]): seq[seq[Value]] =
+  ## UNION DISTINCT dedupe over typed cells (numeric affinity: 1 == 1.0;
+  ## NULLs dedupe together), mirroring GROUP BY key semantics.
+  var seen = initTable[string, bool]()
+  for r in rows:
+    var key = ""
+    for v in r: key.add(groupKeyEncode(v) & "\x1f")
+    if key notin seen:
+      seen[key] = true
+      result.add(r)
+
+proc execUnionStmt(eng: SqlEngine, stmt: CompiledStmt,
+    params: openArray[Value]): Value =
+  ## UNION/UNION ALL: runs each branch through its own machinery (chunks
+  ## for plain branches, Nim executors for grouped/joins) and folds left
+  ## into typed rows — per-junction DISTINCT when the junction is not ALL.
+  ## Branch placeholders share one namespace via `unionPhOff` seeds.
+  ## The caller post-processes (union-level ORDER BY/LIMIT).
+  var acc: seq[seq[Value]] = @[]
+  for bi in 0 ..< stmt.unionBranches.len:
+    let br = stmt.unionBranches[bi]
+    let seed =
+      if bi < stmt.unionPhOff.len:
+        stmt.unionPhGlobal[0 ..< stmt.unionPhOff[bi]]
+      else: newSeq[string]()
+    case br.kind
+    of ubPlainChunk:
+      discard eng.runCompiled(br.stmt, params)
+      if br.branchDistinct:
+        acc.add(dedupeTypedRows(eng.ctx.results))
+      else:
+        for r in eng.ctx.results: acc.add(r)
+    of ubGrouped:
+      discard eng.execGroupedStmt(br.stmt, params, seed)
+      if br.branchDistinct:
+        acc.add(dedupeTypedRows(eng.ctx.results))
+      else:
+        for r in eng.ctx.results: acc.add(r)
+    of ubJoin:
+      discard eng.execJoinStmt(br.stmt, params, seed)
+      if br.branchDistinct:
+        acc.add(dedupeTypedRows(eng.ctx.results))
+      else:
+        for r in eng.ctx.results: acc.add(r)
+    of ubJoinGrouped:
+      discard eng.execJoinGroupedStmt(br.stmt, params, seed)
+      if br.branchDistinct:
+        acc.add(dedupeTypedRows(eng.ctx.results))
+      else:
+        for r in eng.ctx.results: acc.add(r)
+    if bi > 0 and bi - 1 < stmt.unionAll.len and not stmt.unionAll[bi - 1]:
+      acc = dedupeTypedRows(acc)
+  eng.ctx.results = acc
+  eng.ctx.affected = int64(acc.len)
+  nil
+
 proc fastUpdate(eng: SqlEngine, root: SqlNode, cx: FastCx): ExecResult =
   checkNoJoin(root, "UPDATE")
   let tableName = nodeIdent(root[0])
@@ -4704,6 +4996,12 @@ proc tryFastExec(eng: SqlEngine, root: SqlNode,
       fail("SELECT requires a FROM clause")
     cx.tbl = eng.fastTable(tableName)
     eng.fastSelect(root, cx)
+  of nkUnion:
+    var uphs: seq[string] = @[]
+    var ustmt = CompiledStmt(kind: skSelect)
+    planUnionSelect(eng, root, uphs, ustmt)
+    discard eng.execUnionStmt(ustmt, params)
+    return eng.postProcessSelect(ustmt)
   else: declineFast()
 
 #
@@ -4745,6 +5043,8 @@ proc runCompiled(eng: SqlEngine, stmt: CompiledStmt,
   eng.ctx.results.setLen(0)
   eng.ctx.cells.setLen(0)
   eng.ctx.affected = 0
+  if stmt.isUnion:
+    return eng.execUnionStmt(stmt, params)
   if stmt.isGrouped:
     return eng.execGroupedStmt(stmt, params)
   if stmt.isJoin:
@@ -4849,6 +5149,12 @@ proc compileRoots(eng: SqlEngine, sqlText: string,
          nkCreateIndex, nkCreateIndexIfNotExists,
          nkDropIndex, nkDropIndexIfExists,
          nkAlterTable: l.compileDdl(r)
+      of nkUnion:
+        var uphs: seq[string] = @[]
+        var ustmt = CompiledStmt(kind: skSelect)
+        planUnionSelect(eng, r, uphs, ustmt)
+        ustmt.chunk = l.ch
+        ustmt
       else: fail("unsupported SQL statement")
     compiled.add(stmt)
   compiled
@@ -4879,7 +5185,8 @@ proc execSql*(eng: SqlEngine, sqlText: string,
   ## Multiple semicolon-separated statements run sequentially; the last
   ## result is returned. Common single-statement shapes run through the
   ## native fast path without touching the VM.
-  const FastKinds = {nkInsert, nkUpdate, nkDelete, nkSelect, nkSelectDistinct}
+  const FastKinds = {nkInsert, nkUpdate, nkDelete, nkSelect, nkSelectDistinct,
+    nkUnion}
   let roots = eng.cachedRoots(sqlText)
   if roots.len == 1 and roots[0].kind in FastKinds:
     try:
