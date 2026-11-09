@@ -339,6 +339,7 @@ Not supported yet: subqueries (incl. `IN (SELECT ...)`), multi-value
 `IN (a, b)` (cannot parse upstream), `DROP COLUMN` (dropped by the
 upstream parser), `CASE`, `CHECK` constraints, and `INSERT INTO ... SELECT`.
 
+> [!TIP]
 > Statements are parsed once per connection and cached; `exec()` binds its
 > arguments as typed values so repeated calls hit the plan cache.
 > Single-statement `INSERT`/`SELECT`/`UPDATE`/`DELETE` run through native
